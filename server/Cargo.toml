@@ -1,0 +1,21 @@
+[package]
+name = "tts_server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+kokoros = { git = "https://github.com/lucasjinreal/Kokoros.git" }
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.7", features = ["macros"] }
+tower-http = { version = "0.5", features = ["cors", "fs"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.0", features = ["v4"] }
+bytes = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+futures = "0.3"
+tokio-stream = "0.1"
+hound = "3.5"
+deadpool = "0.12"
+async-trait = "0.1"

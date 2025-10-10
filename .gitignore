@@ -1,0 +1,17 @@
+# Rust build artifacts
+target/
+Cargo.lock
+
+# Generated audio files (uncomment if you don't want to track them)
+# *.wav
+
+# macOS system files
+.DS_Store
+
+# Model files (usually large and shouldn't be in git)
+*.onnx
+models/
+
+# IDE
+.vscode/
+.idea/
