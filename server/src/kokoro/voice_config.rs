@@ -48,6 +48,7 @@ impl VoiceConfig {
 }
 
 /// Path to the voices binary file
+#[allow(dead_code)]
 pub const VOICES_FILE_PATH: &str = "models/voices-v1.0.bin";
 
 /// Voice enum representing all available voices in Kokoro TTS v1.0
@@ -278,6 +279,7 @@ impl Voice {
     }
 
     /// Get voices by language
+    #[allow(dead_code)]
     pub fn by_language(language: Language) -> Vec<Voice> {
         Self::all()
             .into_iter()
@@ -286,6 +288,7 @@ impl Voice {
     }
 
     /// Get voices by gender
+    #[allow(dead_code)]
     pub fn by_gender(gender: Gender) -> Vec<Voice> {
         Self::all()
             .into_iter()
@@ -294,6 +297,7 @@ impl Voice {
     }
 
     /// Get voices by language and gender
+    #[allow(dead_code)]
     pub fn by_language_and_gender(language: Language, gender: Gender) -> Vec<Voice> {
         Self::all()
             .into_iter()

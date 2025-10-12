@@ -117,7 +117,8 @@ async fn generate_tts(
     }
 
     // Determine if we should use chunking (enabled and text is long enough)
-    let use_chunking = req.enable_chunking && req.text.len() > 1000;  // Increased threshold
+    // Lower threshold allows faster perceived latency for streaming
+    let use_chunking = req.enable_chunking && req.text.len() > 200;
 
     if use_chunking {
         generate_tts_chunked(state, req).await
@@ -396,11 +397,15 @@ pub struct PoolStatsResponse {
     pub total_requests: usize,
 }
 
-/// Generate TTS audio with streaming response
+/// Generate TTS audio with streaming response (Hybrid approach)
 async fn generate_tts_stream(
     State(state): State<AppState>,
     Json(req): Json<TTSRequest>,
 ) -> Result<Response, (StatusCode, Json<TTSResponse>)> {
+    use std::time::Instant;
+
+    let start = Instant::now();
+
     tracing::debug!(
         "TTS streaming request - text_len={}, voice='{}', speed={}",
         req.text.len(),
@@ -434,18 +439,21 @@ async fn generate_tts_stream(
     let config = ChunkingConfig::default();
     let chunks = chunk_text(&req.text, &config);
 
-    tracing::debug!("Streaming {} chunks", chunks.len());
+    tracing::debug!("Streaming {} text chunks", chunks.len());
 
     // Create a channel for streaming chunks
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<Bytes, String>>(10);
 
-    // Spawn a task to generate and stream chunks
-    tokio::spawn(async move {
-        for (i, chunk) in chunks.into_iter().enumerate() {
-            tracing::debug!("Streaming chunk {}", i);
+    // Handle edge case: if only one chunk, process normally
+    if chunks.len() == 1 {
+        let chunk = chunks[0].clone();
+        let state_clone = state.clone();
+        let voice = req.voice.clone();
+        let speed = req.speed;
 
-            // Acquire TTS engine
-            let tts = match state.tts_pool.acquire().await {
+        tokio::spawn(async move {
+
+            let tts = match state_clone.tts_pool.acquire().await {
                 Ok(t) => t,
                 Err(e) => {
                     let _ = tx.send(Err(format!("Failed to acquire TTS engine: {}", e))).await;
@@ -453,14 +461,10 @@ async fn generate_tts_stream(
                 }
             };
 
-            // Generate temporary file
-            let temp_file = format!("/tmp/tts_stream_{}_{}.wav", Uuid::new_v4(), i);
+            let temp_file = format!("/tmp/tts_stream_single_{}.wav", Uuid::new_v4());
             let temp_file_clone = temp_file.clone();
             let chunk_clone = chunk.clone();
-            let voice = req.voice.clone();
-            let speed = req.speed;
 
-            // Generate audio
             let result = tokio::task::spawn_blocking(move || {
                 futures::executor::block_on(tts.speak(&chunk_clone, &temp_file, &voice, speed))
                     .map_err(|e| e.to_string())
@@ -469,34 +473,207 @@ async fn generate_tts_stream(
 
             match result {
                 Ok(Ok(())) => {
-                    // Read the generated file
                     match tokio::fs::read(&temp_file_clone).await {
                         Ok(audio_data) => {
-                            // Clean up temp file
                             let _ = tokio::fs::remove_file(&temp_file_clone).await;
-
-                            // Send chunk to stream
-                            if tx.send(Ok(Bytes::from(audio_data))).await.is_err() {
-                                tracing::warn!("Stream receiver dropped");
-                                return;
-                            }
+                            let _ = tx.send(Ok(Bytes::from(audio_data))).await;
                         }
                         Err(e) => {
                             let _ = tx.send(Err(format!("Failed to read audio file: {}", e))).await;
-                            return;
                         }
                     }
                 }
                 Ok(Err(e)) => {
                     let _ = tx.send(Err(format!("TTS generation failed: {}", e))).await;
-                    return;
                 }
                 Err(e) => {
                     let _ = tx.send(Err(format!("Task join error: {}", e))).await;
+                }
+            }
+        });
+
+        // Return streaming response
+        let stream = ReceiverStream::new(rx).map(|result| {
+            result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+        });
+
+        let body = axum::body::Body::from_stream(stream);
+
+        return Ok(Response::builder()
+            .header(header::CONTENT_TYPE, "audio/wav")
+            .header(header::TRANSFER_ENCODING, "chunked")
+            .body(body)
+            .unwrap());
+    }
+
+    // Split first chunk from rest
+    let first_chunk = chunks[0].clone();
+    let remaining_chunks: Vec<String> = chunks.into_iter().skip(1).collect();
+    let num_remaining = remaining_chunks.len();
+
+
+    // Clone state for the background task
+    let state_clone = state.clone();
+    let voice_clone = req.voice.clone();
+    let speed = req.speed;
+
+    // Spawn background task for all chunk generation
+    tokio::spawn(async move {
+        // STEP 1: Generate first chunk immediately (blocking this async task)
+
+        let tts = match state_clone.tts_pool.acquire().await {
+            Ok(t) => t,
+            Err(e) => {
+                let _ = tx.send(Err(format!("Failed to acquire TTS engine for first chunk: {}", e))).await;
+                return;
+            }
+        };
+
+        let temp_file = format!("/tmp/tts_stream_first_{}.wav", Uuid::new_v4());
+        let temp_file_clone = temp_file.clone();
+        let chunk_clone = first_chunk.clone();
+        let voice = voice_clone.clone();
+
+        // Generate first chunk audio
+        let result = tokio::task::spawn_blocking(move || {
+            futures::executor::block_on(tts.speak(&chunk_clone, &temp_file, &voice, speed))
+                .map_err(|e| e.to_string())
+        })
+        .await;
+
+        // Send first chunk immediately
+        match result {
+            Ok(Ok(())) => {
+                match tokio::fs::read(&temp_file_clone).await {
+                    Ok(audio_data) => {
+                        let _ = tokio::fs::remove_file(&temp_file_clone).await;
+                        tracing::debug!("First chunk sent ({} bytes) in {:?}", audio_data.len(), start.elapsed());
+
+                        if tx.send(Ok(Bytes::from(audio_data))).await.is_err() {
+                            tracing::warn!("Stream receiver dropped before first chunk");
+                            return;
+                        }
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Err(format!("Failed to read first chunk: {}", e))).await;
+                        return;
+                    }
+                }
+            }
+            Ok(Err(e)) => {
+                let _ = tx.send(Err(format!("First chunk generation failed: {}", e))).await;
+                return;
+            }
+            Err(e) => {
+                let _ = tx.send(Err(format!("First chunk task failed: {}", e))).await;
+                return;
+            }
+        }
+
+        // STEP 2: Generate remaining chunks in parallel
+        if remaining_chunks.is_empty() {
+            return;
+        }
+
+        // Spawn parallel tasks for all remaining chunks
+        let mut tasks = Vec::new();
+
+        for (i, chunk) in remaining_chunks.into_iter().enumerate() {
+            let state = state_clone.clone();
+            let voice = voice_clone.clone();
+            let chunk_index = i + 1; // +1 because chunk 0 was already sent
+
+            let task = tokio::spawn(async move {
+                // Acquire TTS engine
+                let tts = match state.tts_pool.acquire().await {
+                    Ok(t) => t,
+                    Err(e) => {
+                        tracing::error!("Failed to acquire TTS for chunk {}: {}", chunk_index, e);
+                        return Err(format!("Failed to acquire TTS engine: {}", e));
+                    }
+                };
+
+                // Generate audio
+                let temp_file = format!("/tmp/tts_stream_{}_{}.wav", Uuid::new_v4(), chunk_index);
+                let temp_file_clone = temp_file.clone();
+                let chunk_clone = chunk.clone();
+
+                let result = tokio::task::spawn_blocking(move || {
+                    futures::executor::block_on(tts.speak(&chunk_clone, &temp_file, &voice, speed))
+                        .map_err(|e| e.to_string())
+                })
+                .await;
+
+                match result {
+                    Ok(Ok(())) => {
+                        match tokio::fs::read(&temp_file_clone).await {
+                            Ok(audio_data) => {
+                                let _ = tokio::fs::remove_file(&temp_file_clone).await;
+                                Ok((chunk_index, Bytes::from(audio_data)))
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to read chunk {}: {}", chunk_index, e);
+                                Err(format!("Failed to read audio file: {}", e))
+                            }
+                        }
+                    }
+                    Ok(Err(e)) => {
+                        tracing::error!("Chunk {} generation failed: {}", chunk_index, e);
+                        Err(format!("TTS generation failed: {}", e))
+                    }
+                    Err(e) => {
+                        tracing::error!("Chunk {} task panicked: {}", chunk_index, e);
+                        Err(format!("Task join error: {}", e))
+                    }
+                }
+            });
+
+            tasks.push((chunk_index, task));
+        }
+
+        // STEP 3: Collect results and send in order
+        // Use a buffer to hold out-of-order chunks
+        let mut completed_chunks: Vec<Option<Bytes>> = vec![None; num_remaining];
+        let mut next_to_send = 0; // Next chunk index we should send (0-indexed in remaining_chunks)
+
+        // Wait for all tasks to complete
+        for (original_index, task) in tasks {
+            match task.await {
+                Ok(Ok((chunk_index, audio_data))) => {
+                    let buffer_index = chunk_index - 1; // Adjust for 0-indexing
+                    completed_chunks[buffer_index] = Some(audio_data);
+
+                    // Send all consecutive chunks that are ready
+                    while next_to_send < completed_chunks.len() {
+                        if let Some(audio) = completed_chunks[next_to_send].take() {
+                            let actual_chunk_num = next_to_send + 1;
+
+                            if tx.send(Ok(audio)).await.is_err() {
+                                tracing::warn!("Stream receiver dropped at chunk {}", actual_chunk_num);
+                                return;
+                            }
+
+                            next_to_send += 1;
+                        } else {
+                            // Next chunk not ready yet, wait for more to complete
+                            break;
+                        }
+                    }
+                }
+                Ok(Err(e)) => {
+                    tracing::error!("Chunk {} failed: {}", original_index, e);
+                    let _ = tx.send(Err(format!("Chunk {} failed: {}", original_index, e))).await;
+                    return;
+                }
+                Err(e) => {
+                    tracing::error!("Task for chunk {} panicked: {}", original_index, e);
+                    let _ = tx.send(Err(format!("Task failed: {}", e))).await;
                     return;
                 }
             }
         }
+
+        tracing::debug!("Streaming complete: {} chunks sent in {:?}", num_remaining + 1, start.elapsed());
     });
 
     // Create streaming response

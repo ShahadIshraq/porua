@@ -5,14 +5,15 @@ pub struct ChunkingConfig {
     /// Maximum characters per chunk
     pub max_chunk_size: usize,
     /// Minimum characters per chunk (to avoid too many tiny chunks)
+    #[allow(dead_code)]
     pub min_chunk_size: usize,
 }
 
 impl Default for ChunkingConfig {
     fn default() -> Self {
         Self {
-            max_chunk_size: 500,  // Increased from 250
-            min_chunk_size: 100,  // Increased from 50
+            max_chunk_size: 200,  // Lowered for faster streaming - split at ~1-2 sentences
+            min_chunk_size: 50,   // Allow smaller chunks for better streaming
         }
     }
 }
