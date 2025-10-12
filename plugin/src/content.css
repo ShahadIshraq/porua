@@ -1,0 +1,50 @@
+/* TTS Reader Play Button Styles */
+
+.tts-play-button {
+  /* Positioning */
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* Size */
+  width: 32px;
+  height: 32px;
+
+  /* Appearance */
+  background: #4285f4;
+  color: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+
+  /* Font */
+  font-size: 14px;
+  font-family: Arial, sans-serif;
+  line-height: 1;
+
+  /* Animation */
+  transition: all 0.2s ease;
+  opacity: 0.9;
+
+  /* Ensure it's on top */
+  z-index: 999999;
+
+  /* Prevent text selection */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.tts-play-button:hover {
+  opacity: 1;
+  transform: scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  background: #3367d6;
+}
+
+.tts-play-button:active {
+  transform: scale(0.95);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
