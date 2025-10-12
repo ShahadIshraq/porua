@@ -131,12 +131,20 @@
       isPlayingQueue = false;
       updatePlayerState('idle');
       currentAudio = null;
+      console.log('TTS: Playback queue complete');
       return;
     }
 
-    const audioBlob = audioQueue.shift();
-    const audioUrl = URL.createObjectURL(audioBlob);
+    const item = audioQueue.shift();
+    const audioBlob = item.blob;
+    const metadata = item.metadata;
 
+    // Log metadata for debugging (will be used in Part 3)
+    if (metadata) {
+      console.log(`TTS: Playing chunk ${metadata.chunk_index}: "${metadata.text}" (${metadata.duration_ms}ms)`);
+    }
+
+    const audioUrl = URL.createObjectURL(audioBlob);
     currentAudio = new Audio(audioUrl);
 
     currentAudio.onended = () => {
@@ -338,25 +346,187 @@
     return { chunks, remainingOffset: offset };
   }
 
-  // Synthesize and play audio with progressive loading
+  /**
+   * Parse multipart/mixed streaming response
+   * Returns array of parts: { type: 'metadata'|'audio', data: ... }
+   */
+  async function parseMultipartStream(reader, boundary) {
+    const parts = [];
+    let buffer = new Uint8Array(0);
+    const boundaryBytes = new TextEncoder().encode(`--${boundary}`);
+    const endBoundaryBytes = new TextEncoder().encode(`--${boundary}--`);
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (done) break;
+
+      // Append to buffer
+      const newBuffer = new Uint8Array(buffer.length + value.length);
+      newBuffer.set(buffer);
+      newBuffer.set(value, buffer.length);
+      buffer = newBuffer;
+
+      // Try to extract complete parts
+      while (true) {
+        const part = extractNextPart(buffer, boundaryBytes, endBoundaryBytes);
+
+        if (!part) break; // No complete part yet
+
+        if (part.isEnd) {
+          // Final boundary reached
+          return parts;
+        }
+
+        parts.push(part.data);
+        buffer = part.remaining;
+      }
+    }
+
+    return parts;
+  }
+
+  /**
+   * Extract one complete part from buffer
+   */
+  function extractNextPart(buffer, boundaryBytes, endBoundaryBytes) {
+    // Find next boundary
+    const boundaryIndex = findBytesInArray(buffer, boundaryBytes);
+
+    if (boundaryIndex === -1) {
+      return null; // No boundary found, need more data
+    }
+
+    // Check if it's the end boundary
+    const isEndBoundary = arrayStartsWith(
+      buffer.slice(boundaryIndex),
+      endBoundaryBytes
+    );
+
+    if (isEndBoundary) {
+      return { isEnd: true };
+    }
+
+    // Find end of headers (double CRLF: \r\n\r\n)
+    const headersEnd = findBytesInArray(
+      buffer.slice(boundaryIndex),
+      new Uint8Array([13, 10, 13, 10]) // \r\n\r\n
+    );
+
+    if (headersEnd === -1) {
+      return null; // Headers incomplete
+    }
+
+    const headersStart = boundaryIndex + boundaryBytes.length;
+    const contentStart = boundaryIndex + headersEnd + 4; // +4 for \r\n\r\n
+
+    // Extract headers
+    const headersBytes = buffer.slice(headersStart, boundaryIndex + headersEnd);
+    const headers = new TextDecoder().decode(headersBytes);
+    const contentType = extractContentType(headers);
+
+    // Find next boundary to determine content length
+    const nextBoundaryIndex = findBytesInArray(
+      buffer.slice(contentStart),
+      new Uint8Array([13, 10, 45, 45]) // \r\n--
+    );
+
+    if (nextBoundaryIndex === -1) {
+      return null; // Content incomplete
+    }
+
+    const contentEnd = contentStart + nextBoundaryIndex;
+    const contentBytes = buffer.slice(contentStart, contentEnd);
+
+    // Parse based on content type
+    let data;
+    if (contentType.includes('application/json')) {
+      const jsonText = new TextDecoder().decode(contentBytes);
+      try {
+        data = {
+          type: 'metadata',
+          metadata: JSON.parse(jsonText)
+        };
+      } catch (e) {
+        console.error('TTS: Failed to parse JSON metadata:', e);
+        return null;
+      }
+    } else if (contentType.includes('audio/wav')) {
+      data = {
+        type: 'audio',
+        audioData: contentBytes
+      };
+    } else {
+      console.warn('TTS: Unknown content type:', contentType);
+      data = { type: 'unknown' };
+    }
+
+    return {
+      data,
+      remaining: buffer.slice(contentEnd),
+      isEnd: false
+    };
+  }
+
+  /**
+   * Helper: Find byte sequence in array
+   */
+  function findBytesInArray(array, sequence) {
+    for (let i = 0; i <= array.length - sequence.length; i++) {
+      let found = true;
+      for (let j = 0; j < sequence.length; j++) {
+        if (array[i + j] !== sequence[j]) {
+          found = false;
+          break;
+        }
+      }
+      if (found) return i;
+    }
+    return -1;
+  }
+
+  /**
+   * Helper: Check if array starts with sequence
+   */
+  function arrayStartsWith(array, sequence) {
+    if (array.length < sequence.length) return false;
+    for (let i = 0; i < sequence.length; i++) {
+      if (array[i] !== sequence[i]) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Helper: Extract Content-Type from headers
+   */
+  function extractContentType(headers) {
+    const match = headers.match(/Content-Type:\s*([^\r\n]+)/i);
+    return match ? match[1].trim() : '';
+  }
+
+  // Synthesize and play audio with multipart streaming
   async function synthesizeAndPlayStream(text, settings) {
     try {
       const headers = {
         'Content-Type': 'application/json'
       };
 
-      // Add API key if provided
       if (settings.apiKey) {
         headers['X-API-Key'] = settings.apiKey;
       }
 
-      // Use /tts/stream endpoint for proper chunk-by-chunk streaming
+      // Show player control and set loading state
+      showPlayerControl();
+      updatePlayerState('loading');
+
+      // Fetch multipart stream
       const response = await fetch(`${settings.apiUrl}/tts/stream`, {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({
           text: text,
-          voice: 'bf_lily' // Default voice
+          voice: settings.voice || 'bf_lily',
+          speed: settings.speed || 1.0
         })
       });
 
@@ -364,66 +534,67 @@
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // Read the response progressively and parse WAV chunks as they arrive
+      // Extract boundary from Content-Type header
+      const contentType = response.headers.get('Content-Type');
+      if (!contentType || !contentType.includes('multipart')) {
+        throw new Error('Expected multipart response, got: ' + contentType);
+      }
+
+      const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+      if (!boundaryMatch) {
+        throw new Error('No boundary found in multipart response');
+      }
+      const boundary = boundaryMatch[1];
+
+      console.log('TTS: Parsing multipart stream with boundary:', boundary);
+
+      // Parse multipart stream
       const reader = response.body.getReader();
-      let buffer = new Uint8Array(0);
-      let firstChunkPlayed = false;
+      const parts = await parseMultipartStream(reader, boundary);
 
-      while (true) {
-        const { done, value } = await reader.read();
+      console.log(`TTS: Parsed ${parts.length} total parts`);
 
-        if (done) break;
+      // Separate metadata and audio parts
+      const metadataArray = parts
+        .filter(p => p.type === 'metadata')
+        .map(p => p.metadata);
 
-        // Append new data to buffer
-        const newBuffer = new Uint8Array(buffer.length + value.length);
-        newBuffer.set(buffer);
-        newBuffer.set(value, buffer.length);
-        buffer = newBuffer;
+      const audioBlobs = parts
+        .filter(p => p.type === 'audio')
+        .map(p => new Blob([p.audioData], { type: 'audio/wav' }));
 
-        // Try to parse complete WAV chunks from the buffer
-        const { chunks, remainingOffset } = parseWAVChunks(buffer);
+      console.log(`TTS: ${metadataArray.length} metadata chunks, ${audioBlobs.length} audio chunks`);
 
-        if (chunks.length > 0) {
-          // Add all chunks to the queue
-          for (const chunk of chunks) {
-            audioQueue.push(chunk);
-          }
-
-          // Remove processed data from buffer
-          if (remainingOffset > 0) {
-            buffer = buffer.slice(remainingOffset);
-          }
-
-          // Start playing the first chunk immediately
-          if (!firstChunkPlayed) {
-            firstChunkPlayed = true;
-            isPlayingQueue = true;
-            playNextInQueue();
-          }
-        }
+      // Validate that we have matching metadata and audio
+      if (metadataArray.length !== audioBlobs.length) {
+        console.warn(`TTS: Metadata/audio count mismatch: ${metadataArray.length} vs ${audioBlobs.length}`);
       }
 
-      // Handle any remaining data in buffer (final chunk)
-      if (!firstChunkPlayed) {
-        // If we never played anything, try to parse one more time
-        const { chunks } = parseWAVChunks(buffer);
-        if (chunks.length > 0) {
-          for (const chunk of chunks) {
-            audioQueue.push(chunk);
-          }
-          isPlayingQueue = true;
-          playNextInQueue();
-        } else {
-          console.warn('TTS: No complete audio chunks received');
-          updatePlayerState('idle');
-          alert('Failed to receive audio from TTS server.');
-        }
+      if (audioBlobs.length === 0) {
+        throw new Error('No audio data received from server');
       }
+
+      // Store metadata for Part 3 (highlighting)
+      // For now, we just log it
+      console.log('TTS: Metadata received:', metadataArray);
+
+      // Queue audio chunks with their metadata
+      audioQueue = [];
+      for (let i = 0; i < audioBlobs.length; i++) {
+        audioQueue.push({
+          blob: audioBlobs[i],
+          metadata: metadataArray[i] || null
+        });
+      }
+
+      // Start playing
+      isPlayingQueue = true;
+      playNextInQueue();
 
     } catch (error) {
       console.error('TTS: Failed to synthesize:', error);
       updatePlayerState('idle');
-      alert('Failed to connect to TTS server. Please check your settings.');
+      alert('Failed to connect to TTS server. Please check your settings.\n\nError: ' + error.message);
     }
   }
 
