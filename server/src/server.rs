@@ -79,6 +79,160 @@ pub struct HealthResponse {
     pub status: String,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct PhraseMetadata {
+    pub text: String,
+    #[serde(skip_serializing)]
+    pub words: Vec<String>,
+    pub start_ms: f64,
+    pub duration_ms: f64,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct ChunkMetadata {
+    pub chunk_index: usize,
+    pub text: String,
+    pub phrases: Vec<PhraseMetadata>,
+    pub duration_ms: f64,
+    pub start_offset_ms: f64,
+}
+
+// Helper Functions
+
+/// Calculate duration in milliseconds from WAV file bytes
+pub fn calculate_wav_duration_cli(wav_bytes: &[u8]) -> Result<f64, Box<dyn std::error::Error>> {
+    let cursor = Cursor::new(wav_bytes);
+    let reader = WavReader::new(cursor)?;
+
+    let spec = reader.spec();
+    let num_samples = reader.len() as f64;
+    let sample_rate = spec.sample_rate as f64;
+
+    // Duration in milliseconds
+    let duration_ms = (num_samples / sample_rate) * 1000.0;
+
+    Ok(duration_ms)
+}
+
+/// Calculate duration in milliseconds from WAV file bytes (internal version)
+fn calculate_wav_duration(wav_bytes: &[u8]) -> Result<f64, String> {
+    let cursor = Cursor::new(wav_bytes);
+    let reader = WavReader::new(cursor)
+        .map_err(|e| format!("Failed to read WAV: {}", e))?;
+
+    let spec = reader.spec();
+    let num_samples = reader.len() as f64;
+    let sample_rate = spec.sample_rate as f64;
+
+    // Duration in milliseconds
+    let duration_ms = (num_samples / sample_rate) * 1000.0;
+
+    Ok(duration_ms)
+}
+
+/// Split text into words, preserving punctuation with words (public version for CLI)
+pub fn segment_words_cli(text: &str) -> Vec<String> {
+    segment_words(text)
+}
+
+/// Split text into words, preserving punctuation with words
+fn segment_words(text: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut current_word = String::new();
+
+    for ch in text.chars() {
+        if ch.is_whitespace() {
+            if !current_word.is_empty() {
+                words.push(current_word.clone());
+                current_word.clear();
+            }
+        } else {
+            current_word.push(ch);
+        }
+    }
+
+    // Add last word if any
+    if !current_word.is_empty() {
+        words.push(current_word);
+    }
+
+    words
+}
+
+/// Split text into phrases (sentences or 5-word groups, whichever is shorter) - public version for CLI
+pub fn segment_phrases_cli(text: &str) -> Vec<String> {
+    segment_phrases(text)
+}
+
+/// Split text into phrases (sentences or 5-word groups, whichever is shorter)
+fn segment_phrases(text: &str) -> Vec<String> {
+    let mut phrases = Vec::new();
+
+    // First, split by sentence-ending punctuation
+    let sentences: Vec<&str> = text
+        .split(|c| c == '.' || c == '!' || c == '?')
+        .filter(|s| !s.trim().is_empty())
+        .collect();
+
+    for sentence in sentences {
+        let sentence = sentence.trim();
+        let words = segment_words(sentence);
+
+        if words.len() <= 5 {
+            // Sentence has 5 or fewer words, use as-is
+            phrases.push(sentence.to_string());
+        } else {
+            // Split into 5-word chunks
+            for chunk in words.chunks(5) {
+                let phrase = chunk.join(" ");
+                phrases.push(phrase);
+            }
+        }
+    }
+
+    phrases
+}
+
+const BOUNDARY: &str = "tts_chunk_boundary";
+
+fn create_boundary_start() -> String {
+    format!("\r\n--{}\r\n", BOUNDARY)
+}
+
+fn create_boundary_end() -> String {
+    format!("\r\n--{}--\r\n", BOUNDARY)
+}
+
+fn create_metadata_part(metadata: &ChunkMetadata) -> Result<Bytes, String> {
+    let json = serde_json::to_string(metadata)
+        .map_err(|e| format!("Failed to serialize metadata: {}", e))?;
+
+    let part = format!(
+        "{}Content-Type: application/json\r\n\r\n{}\r\n",
+        create_boundary_start(),
+        json
+    );
+
+    Ok(Bytes::from(part))
+}
+
+fn create_audio_part(audio_bytes: Vec<u8>) -> Bytes {
+    let mut part = Vec::new();
+
+    // Boundary + headers
+    let header = format!(
+        "{}Content-Type: audio/wav\r\nContent-Length: {}\r\n\r\n",
+        create_boundary_start(),
+        audio_bytes.len()
+    );
+    part.extend_from_slice(header.as_bytes());
+
+    // Audio data
+    part.extend_from_slice(&audio_bytes);
+
+    Bytes::from(part)
+}
+
 // HTTP Handlers
 
 /// Generate TTS audio from text
@@ -397,23 +551,98 @@ pub struct PoolStatsResponse {
     pub total_requests: usize,
 }
 
-/// Generate TTS audio with streaming response (Hybrid approach)
+/// Generate a single chunk with metadata
+async fn generate_chunk_with_metadata(
+    state: &AppState,
+    text: &str,
+    voice: &str,
+    speed: f32,
+    chunk_index: usize,
+    start_offset_ms: f64,
+) -> Result<(ChunkMetadata, Vec<u8>), String> {
+    // Acquire TTS engine
+    let tts = state.tts_pool.acquire().await
+        .map_err(|e| format!("Failed to acquire TTS engine: {}", e))?;
+
+    // Generate unique temp file
+    let temp_file = format!("/tmp/tts_chunk_{}_{}.wav", Uuid::new_v4(), chunk_index);
+    let temp_file_clone = temp_file.clone();
+    let text_clone = text.to_string();
+    let voice_clone = voice.to_string();
+
+    // Generate audio in blocking thread
+    let generation_result = tokio::task::spawn_blocking(move || {
+        futures::executor::block_on(tts.speak(&text_clone, &temp_file, &voice_clone, speed))
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| format!("Task join error: {}", e))?;
+
+    // Handle generation result
+    generation_result.map_err(|e| format!("TTS generation failed: {}", e))?;
+
+    // Read generated audio file
+    let audio_bytes = tokio::fs::read(&temp_file_clone).await
+        .map_err(|e| format!("Failed to read audio file: {}", e))?;
+
+    // Clean up temp file
+    let _ = tokio::fs::remove_file(&temp_file_clone).await;
+
+    // Calculate duration
+    let duration_ms = calculate_wav_duration(&audio_bytes)
+        .map_err(|e| format!("Duration calculation failed: {}", e))?;
+
+    // Segment text into phrases
+    let phrase_texts = segment_phrases(text);
+
+    // Calculate character-weighted durations for each phrase
+    let total_chars: usize = phrase_texts.iter().map(|p| p.len()).sum();
+    let mut phrases = Vec::new();
+    let mut cumulative_time = 0.0;
+
+    for phrase_text in phrase_texts {
+        let phrase_words = segment_words(&phrase_text);
+        let char_weight = phrase_text.len() as f64 / total_chars as f64;
+        let phrase_duration = duration_ms * char_weight;
+
+        phrases.push(PhraseMetadata {
+            text: phrase_text,
+            words: phrase_words,
+            start_ms: cumulative_time,
+            duration_ms: phrase_duration,
+        });
+
+        cumulative_time += phrase_duration;
+    }
+
+    // Create metadata
+    let metadata = ChunkMetadata {
+        chunk_index,
+        text: text.to_string(),
+        phrases,
+        duration_ms,
+        start_offset_ms,
+    };
+
+    Ok((metadata, audio_bytes))
+}
+
+/// Generate TTS audio with multipart streaming response
 async fn generate_tts_stream(
     State(state): State<AppState>,
     Json(req): Json<TTSRequest>,
 ) -> Result<Response, (StatusCode, Json<TTSResponse>)> {
     use std::time::Instant;
-
     let start = Instant::now();
 
     tracing::debug!(
-        "TTS streaming request - text_len={}, voice='{}', speed={}",
+        "TTS multipart streaming request - text_len={}, voice='{}', speed={}",
         req.text.len(),
         req.voice,
         req.speed
     );
 
-    // Validate text is not empty
+    // Validate text
     if req.text.trim().is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
@@ -435,248 +664,151 @@ async fn generate_tts_stream(
         ));
     }
 
-    // Split text into chunks for streaming
+    // Split text into chunks
     let config = ChunkingConfig::default();
     let chunks = chunk_text(&req.text, &config);
 
-    tracing::debug!("Streaming {} text chunks", chunks.len());
+    tracing::debug!("Streaming {} text chunks with multipart format", chunks.len());
 
-    // Create a channel for streaming chunks
+    // Create channel for streaming multipart data
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<Bytes, String>>(10);
 
-    // Handle edge case: if only one chunk, process normally
-    if chunks.len() == 1 {
-        let chunk = chunks[0].clone();
-        let state_clone = state.clone();
-        let voice = req.voice.clone();
-        let speed = req.speed;
-
-        tokio::spawn(async move {
-
-            let tts = match state_clone.tts_pool.acquire().await {
-                Ok(t) => t,
-                Err(e) => {
-                    let _ = tx.send(Err(format!("Failed to acquire TTS engine: {}", e))).await;
-                    return;
-                }
-            };
-
-            let temp_file = format!("/tmp/tts_stream_single_{}.wav", Uuid::new_v4());
-            let temp_file_clone = temp_file.clone();
-            let chunk_clone = chunk.clone();
-
-            let result = tokio::task::spawn_blocking(move || {
-                futures::executor::block_on(tts.speak(&chunk_clone, &temp_file, &voice, speed))
-                    .map_err(|e| e.to_string())
-            })
-            .await;
-
-            match result {
-                Ok(Ok(())) => {
-                    match tokio::fs::read(&temp_file_clone).await {
-                        Ok(audio_data) => {
-                            let _ = tokio::fs::remove_file(&temp_file_clone).await;
-                            let _ = tx.send(Ok(Bytes::from(audio_data))).await;
-                        }
-                        Err(e) => {
-                            let _ = tx.send(Err(format!("Failed to read audio file: {}", e))).await;
-                        }
-                    }
-                }
-                Ok(Err(e)) => {
-                    let _ = tx.send(Err(format!("TTS generation failed: {}", e))).await;
-                }
-                Err(e) => {
-                    let _ = tx.send(Err(format!("Task join error: {}", e))).await;
-                }
-            }
-        });
-
-        // Return streaming response
-        let stream = ReceiverStream::new(rx).map(|result| {
-            result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-        });
-
-        let body = axum::body::Body::from_stream(stream);
-
-        return Ok(Response::builder()
-            .header(header::CONTENT_TYPE, "audio/wav")
-            .header(header::TRANSFER_ENCODING, "chunked")
-            .body(body)
-            .unwrap());
-    }
-
-    // Split first chunk from rest
-    let first_chunk = chunks[0].clone();
-    let remaining_chunks: Vec<String> = chunks.into_iter().skip(1).collect();
-    let num_remaining = remaining_chunks.len();
-
-
-    // Clone state for the background task
+    // Clone for background task
     let state_clone = state.clone();
     let voice_clone = req.voice.clone();
     let speed = req.speed;
 
-    // Spawn background task for all chunk generation
+    // Spawn background task to generate and stream chunks
     tokio::spawn(async move {
-        // STEP 1: Generate first chunk immediately (blocking this async task)
+        let mut cumulative_offset_ms = 0.0;
 
-        let tts = match state_clone.tts_pool.acquire().await {
-            Ok(t) => t,
-            Err(e) => {
-                let _ = tx.send(Err(format!("Failed to acquire TTS engine for first chunk: {}", e))).await;
-                return;
-            }
-        };
+        // === FIRST CHUNK (sequential for low latency) ===
+        if !chunks.is_empty() {
+            let first_chunk_text = chunks[0].clone();
 
-        let temp_file = format!("/tmp/tts_stream_first_{}.wav", Uuid::new_v4());
-        let temp_file_clone = temp_file.clone();
-        let chunk_clone = first_chunk.clone();
-        let voice = voice_clone.clone();
+            match generate_chunk_with_metadata(
+                &state_clone,
+                &first_chunk_text,
+                &voice_clone,
+                speed,
+                0,
+                cumulative_offset_ms,
+            ).await {
+                Ok((metadata, audio_bytes)) => {
+                    cumulative_offset_ms += metadata.duration_ms;
 
-        // Generate first chunk audio
-        let result = tokio::task::spawn_blocking(move || {
-            futures::executor::block_on(tts.speak(&chunk_clone, &temp_file, &voice, speed))
-                .map_err(|e| e.to_string())
-        })
-        .await;
-
-        // Send first chunk immediately
-        match result {
-            Ok(Ok(())) => {
-                match tokio::fs::read(&temp_file_clone).await {
-                    Ok(audio_data) => {
-                        let _ = tokio::fs::remove_file(&temp_file_clone).await;
-                        tracing::debug!("First chunk sent ({} bytes) in {:?}", audio_data.len(), start.elapsed());
-
-                        if tx.send(Ok(Bytes::from(audio_data))).await.is_err() {
-                            tracing::warn!("Stream receiver dropped before first chunk");
+                    // Send metadata part
+                    match create_metadata_part(&metadata) {
+                        Ok(metadata_bytes) => {
+                            if tx.send(Ok(metadata_bytes)).await.is_err() {
+                                tracing::warn!("Stream receiver dropped during metadata");
+                                return;
+                            }
+                        }
+                        Err(e) => {
+                            let _ = tx.send(Err(format!("Metadata serialization error: {}", e))).await;
                             return;
                         }
                     }
+
+                    // Send audio part
+                    let audio_part = create_audio_part(audio_bytes);
+                    if tx.send(Ok(audio_part)).await.is_err() {
+                        tracing::warn!("Stream receiver dropped during audio");
+                        return;
+                    }
+
+                    tracing::debug!(
+                        "First chunk sent ({:.0}ms duration) in {:?}",
+                        metadata.duration_ms,
+                        start.elapsed()
+                    );
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(format!("First chunk failed: {}", e))).await;
+                    return;
+                }
+            }
+        }
+
+        // === REMAINING CHUNKS (parallel processing) ===
+        if chunks.len() > 1 {
+            let remaining_chunks: Vec<_> = chunks.into_iter().skip(1).collect();
+            let mut tasks = Vec::new();
+
+            for (i, chunk_text) in remaining_chunks.into_iter().enumerate() {
+                let chunk_index = i + 1;
+                let state = state_clone.clone();
+                let voice = voice_clone.clone();
+                let start_offset = cumulative_offset_ms;
+
+                let task = tokio::spawn(async move {
+                    generate_chunk_with_metadata(
+                        &state,
+                        &chunk_text,
+                        &voice,
+                        speed,
+                        chunk_index,
+                        start_offset,
+                    ).await
+                });
+
+                tasks.push((chunk_index, task));
+            }
+
+            // Collect results in order
+            let mut results: Vec<Option<(ChunkMetadata, Vec<u8>)>> = vec![None; tasks.len()];
+
+            for (chunk_index, task) in tasks {
+                match task.await {
+                    Ok(Ok((metadata, audio))) => {
+                        cumulative_offset_ms += metadata.duration_ms;
+                        let buffer_index = chunk_index - 1;
+                        results[buffer_index] = Some((metadata, audio));
+                    }
+                    Ok(Err(e)) => {
+                        let _ = tx.send(Err(format!("Chunk {} failed: {}", chunk_index, e))).await;
+                        return;
+                    }
                     Err(e) => {
-                        let _ = tx.send(Err(format!("Failed to read first chunk: {}", e))).await;
+                        let _ = tx.send(Err(format!("Task {} panicked: {}", chunk_index, e))).await;
                         return;
                     }
                 }
             }
-            Ok(Err(e)) => {
-                let _ = tx.send(Err(format!("First chunk generation failed: {}", e))).await;
-                return;
-            }
-            Err(e) => {
-                let _ = tx.send(Err(format!("First chunk task failed: {}", e))).await;
-                return;
-            }
-        }
 
-        // STEP 2: Generate remaining chunks in parallel
-        if remaining_chunks.is_empty() {
-            return;
-        }
-
-        // Spawn parallel tasks for all remaining chunks
-        let mut tasks = Vec::new();
-
-        for (i, chunk) in remaining_chunks.into_iter().enumerate() {
-            let state = state_clone.clone();
-            let voice = voice_clone.clone();
-            let chunk_index = i + 1; // +1 because chunk 0 was already sent
-
-            let task = tokio::spawn(async move {
-                // Acquire TTS engine
-                let tts = match state.tts_pool.acquire().await {
-                    Ok(t) => t,
-                    Err(e) => {
-                        tracing::error!("Failed to acquire TTS for chunk {}: {}", chunk_index, e);
-                        return Err(format!("Failed to acquire TTS engine: {}", e));
-                    }
-                };
-
-                // Generate audio
-                let temp_file = format!("/tmp/tts_stream_{}_{}.wav", Uuid::new_v4(), chunk_index);
-                let temp_file_clone = temp_file.clone();
-                let chunk_clone = chunk.clone();
-
-                let result = tokio::task::spawn_blocking(move || {
-                    futures::executor::block_on(tts.speak(&chunk_clone, &temp_file, &voice, speed))
-                        .map_err(|e| e.to_string())
-                })
-                .await;
-
-                match result {
-                    Ok(Ok(())) => {
-                        match tokio::fs::read(&temp_file_clone).await {
-                            Ok(audio_data) => {
-                                let _ = tokio::fs::remove_file(&temp_file_clone).await;
-                                Ok((chunk_index, Bytes::from(audio_data)))
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to read chunk {}: {}", chunk_index, e);
-                                Err(format!("Failed to read audio file: {}", e))
-                            }
+            // Send all remaining chunks in order
+            for (metadata, audio_bytes) in results.into_iter().flatten() {
+                // Send metadata
+                match create_metadata_part(&metadata) {
+                    Ok(metadata_bytes) => {
+                        if tx.send(Ok(metadata_bytes)).await.is_err() {
+                            tracing::warn!("Stream receiver dropped");
+                            return;
                         }
                     }
-                    Ok(Err(e)) => {
-                        tracing::error!("Chunk {} generation failed: {}", chunk_index, e);
-                        Err(format!("TTS generation failed: {}", e))
-                    }
                     Err(e) => {
-                        tracing::error!("Chunk {} task panicked: {}", chunk_index, e);
-                        Err(format!("Task join error: {}", e))
+                        let _ = tx.send(Err(e)).await;
+                        return;
                     }
                 }
-            });
 
-            tasks.push((chunk_index, task));
-        }
-
-        // STEP 3: Collect results and send in order
-        // Use a buffer to hold out-of-order chunks
-        let mut completed_chunks: Vec<Option<Bytes>> = vec![None; num_remaining];
-        let mut next_to_send = 0; // Next chunk index we should send (0-indexed in remaining_chunks)
-
-        // Wait for all tasks to complete
-        for (original_index, task) in tasks {
-            match task.await {
-                Ok(Ok((chunk_index, audio_data))) => {
-                    let buffer_index = chunk_index - 1; // Adjust for 0-indexing
-                    completed_chunks[buffer_index] = Some(audio_data);
-
-                    // Send all consecutive chunks that are ready
-                    while next_to_send < completed_chunks.len() {
-                        if let Some(audio) = completed_chunks[next_to_send].take() {
-                            let actual_chunk_num = next_to_send + 1;
-
-                            if tx.send(Ok(audio)).await.is_err() {
-                                tracing::warn!("Stream receiver dropped at chunk {}", actual_chunk_num);
-                                return;
-                            }
-
-                            next_to_send += 1;
-                        } else {
-                            // Next chunk not ready yet, wait for more to complete
-                            break;
-                        }
-                    }
-                }
-                Ok(Err(e)) => {
-                    tracing::error!("Chunk {} failed: {}", original_index, e);
-                    let _ = tx.send(Err(format!("Chunk {} failed: {}", original_index, e))).await;
-                    return;
-                }
-                Err(e) => {
-                    tracing::error!("Task for chunk {} panicked: {}", original_index, e);
-                    let _ = tx.send(Err(format!("Task failed: {}", e))).await;
+                // Send audio
+                let audio_part = create_audio_part(audio_bytes);
+                if tx.send(Ok(audio_part)).await.is_err() {
+                    tracing::warn!("Stream receiver dropped");
                     return;
                 }
             }
         }
 
-        tracing::debug!("Streaming complete: {} chunks sent in {:?}", num_remaining + 1, start.elapsed());
+        // Send final boundary
+        let _ = tx.send(Ok(Bytes::from(create_boundary_end()))).await;
+
+        tracing::debug!("Multipart streaming complete in {:?}", start.elapsed());
     });
 
-    // Create streaming response
+    // Create streaming response with multipart content type
     let stream = ReceiverStream::new(rx).map(|result| {
         result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
     });
@@ -684,7 +816,7 @@ async fn generate_tts_stream(
     let body = axum::body::Body::from_stream(stream);
 
     Ok(Response::builder()
-        .header(header::CONTENT_TYPE, "audio/wav")
+        .header(header::CONTENT_TYPE, format!("multipart/mixed; boundary={}", BOUNDARY))
         .header(header::TRANSFER_ENCODING, "chunked")
         .body(body)
         .unwrap())
@@ -713,4 +845,146 @@ pub fn create_router(state: AppState) -> Router<()> {
         ))
         .with_state(state)
         .layer(cors)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_segment_words_basic() {
+        let text = "Hello world, this is great!";
+        let words = segment_words(text);
+        assert_eq!(words, vec!["Hello", "world,", "this", "is", "great!"]);
+    }
+
+    #[test]
+    fn test_segment_words_multiple_spaces() {
+        let text = "Hello    world";
+        let words = segment_words(text);
+        assert_eq!(words, vec!["Hello", "world"]);
+    }
+
+    #[test]
+    fn test_segment_words_empty() {
+        let text = "";
+        let words = segment_words(text);
+        assert_eq!(words, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_segment_words_whitespace_only() {
+        let text = "   \t\n  ";
+        let words = segment_words(text);
+        assert_eq!(words, Vec::<String>::new());
+    }
+
+    #[test]
+    fn test_segment_words_punctuation() {
+        let text = "Hello, world! How are you?";
+        let words = segment_words(text);
+        assert_eq!(words, vec!["Hello,", "world!", "How", "are", "you?"]);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_wav_duration() {
+        // Create a simple WAV file in memory
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 24000,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let mut writer = WavWriter::new(&mut cursor, spec).unwrap();
+            // Write 1 second of silence (24000 samples)
+            for _ in 0..24000 {
+                writer.write_sample(0i16).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+
+        let wav_bytes = cursor.into_inner();
+        let duration = calculate_wav_duration(&wav_bytes).unwrap();
+
+        // Should be approximately 1000ms (allowing small floating point error)
+        assert!((duration - 1000.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_segment_phrases_basic() {
+        let text = "Hello world. This is great!";
+        let phrases = segment_phrases(text);
+        assert_eq!(phrases.len(), 2);
+        assert_eq!(phrases[0], "Hello world");
+        assert_eq!(phrases[1], "This is great");
+    }
+
+    #[test]
+    fn test_segment_phrases_long_sentence() {
+        let text = "This is a very long sentence with more than five words in it.";
+        let phrases = segment_phrases(text);
+        assert_eq!(phrases.len(), 3);
+        assert_eq!(phrases[0], "This is a very long");
+        assert_eq!(phrases[1], "sentence with more than five");
+        assert_eq!(phrases[2], "words in it");
+    }
+
+    #[test]
+    fn test_segment_phrases_short_sentence() {
+        let text = "Hello there!";
+        let phrases = segment_phrases(text);
+        assert_eq!(phrases.len(), 1);
+        assert_eq!(phrases[0], "Hello there");
+    }
+
+    #[test]
+    fn test_create_metadata_part() {
+        let metadata = ChunkMetadata {
+            chunk_index: 0,
+            text: "Hello world".to_string(),
+            phrases: vec![PhraseMetadata {
+                text: "Hello world".to_string(),
+                words: vec!["Hello".to_string(), "world".to_string()],
+                start_ms: 0.0,
+                duration_ms: 850.0,
+            }],
+            duration_ms: 850.0,
+            start_offset_ms: 0.0,
+        };
+
+        let result = create_metadata_part(&metadata);
+        assert!(result.is_ok());
+
+        let part = result.unwrap();
+        let part_str = String::from_utf8_lossy(&part);
+
+        // Check that it contains the boundary
+        assert!(part_str.contains("--tts_chunk_boundary"));
+        // Check that it contains the Content-Type header
+        assert!(part_str.contains("Content-Type: application/json"));
+        // Check that it contains the JSON data
+        assert!(part_str.contains("\"chunk_index\":0"));
+        assert!(part_str.contains("\"text\":\"Hello world\""));
+        assert!(part_str.contains("\"phrases\""));
+    }
+
+    #[test]
+    fn test_create_audio_part() {
+        let audio_data = vec![1, 2, 3, 4, 5];
+        let part = create_audio_part(audio_data.clone());
+
+        let part_str = String::from_utf8_lossy(&part);
+
+        // Check that it contains the boundary
+        assert!(part_str.contains("--tts_chunk_boundary"));
+        // Check that it contains the Content-Type header
+        assert!(part_str.contains("Content-Type: audio/wav"));
+        // Check that it contains the Content-Length header
+        assert!(part_str.contains("Content-Length: 5"));
+        // The actual audio bytes should be at the end
+        assert!(part.ends_with(&audio_data));
+    }
 }
