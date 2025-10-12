@@ -12,3 +12,6 @@ output.wav
 # Temp files
 /tmp
 .DS_Store
+
+# Distribution packages
+/dist

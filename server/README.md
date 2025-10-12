@@ -36,14 +36,44 @@ server/
 │       └── model_paths.rs      # Model path resolution
 ├── models/                      # TTS model files (337 MB total)
 │   ├── kokoro-v1.0.onnx
-│   └── voices-v1.0.bin
+│   ├── voices-v1.0.bin
+│   └── download_models.py      # Model download script
 ├── Cargo.toml                   # Dependencies
-└── README.md                    # This file
+├── packaging/                   # Packaging and distribution
+│   ├── build_package.sh         # Automated packaging script
+│   ├── install.sh               # Automated installation script
+│   ├── INSTALL.md               # Installation guide
+│   └── PACKAGING.md             # Packaging guide for developers
+├── README.md                    # This file
+└── api_keys.txt.example         # Example API keys file
 ```
 
-## Quick Start
+## Installation Options
 
-### 1. Build the Server
+### Option 1: Pre-built Package (Recommended for Production)
+
+Download and install the pre-built package for your platform:
+
+```bash
+# Download the package (replace URL with your release URL)
+wget https://[your-url]/tts-server-v0.1.0-macos-arm64.tar.gz
+
+# Extract
+tar -xzf tts-server-v0.1.0-macos-arm64.tar.gz
+cd tts-server-v0.1.0-macos-arm64
+
+# Run automated installer
+./install.sh
+
+# Verify installation
+tts_server --version
+```
+
+For detailed installation instructions, see [INSTALL.md](packaging/INSTALL.md).
+
+### Option 2: Build from Source (For Development)
+
+Build the server from source using Cargo:
 
 ```bash
 cd server
@@ -52,7 +82,9 @@ cargo build --release
 
 The compiled binary will be at `target/release/tts_server`.
 
-### 2. Run the HTTP Server
+## Quick Start
+
+### 1. Run the HTTP Server
 
 **Start the server with default settings (pool size: 2, port: 3000):**
 ```bash
@@ -96,7 +128,7 @@ Pool configuration:
 
 **Note:** Voice listings are hidden by default. To see all 54 voices during startup, use `RUST_LOG=kokoros=info`.
 
-### 3. Test the API
+### 2. Test the API
 
 **Generate speech:**
 ```bash
@@ -123,7 +155,7 @@ curl http://localhost:3003/stats
 curl http://localhost:3003/voices | jq .
 ```
 
-### 4. CLI Mode (Simple Testing)
+### 3. CLI Mode (Simple Testing)
 
 For quick tests without starting the server:
 
@@ -679,6 +711,52 @@ Key dependencies from [Cargo.toml](Cargo.toml):
    - Monitor memory usage and adjust pool size accordingly
    - Consider load balancing multiple instances for high traffic
 
+## Packaging & Distribution
+
+### Creating Distribution Packages
+
+To create distributable packages for deployment:
+
+```bash
+# Run the packaging script
+./packaging/build_package.sh
+```
+
+This will:
+1. Build the release binary
+2. Package binary with models and documentation
+3. Create `.tar.gz` and `.zip` archives
+4. Generate SHA256 checksums
+
+**Output location:** `dist/`
+
+**Package contents:**
+- Binary executable (~29 MB)
+- Model files (~337 MB)
+- Installation scripts
+- Documentation
+
+**Package formats:**
+- `tts-server-v0.1.0-[platform]-[arch].tar.gz` (recommended for Unix/Linux)
+- `tts-server-v0.1.0-[platform]-[arch].zip` (cross-platform)
+
+For detailed packaging instructions, see [PACKAGING.md](packaging/PACKAGING.md).
+
+### Distribution
+
+**Platform packages:**
+- macOS (Apple Silicon): `tts-server-v0.1.0-macos-arm64`
+- macOS (Intel): `tts-server-v0.1.0-macos-x86_64`
+- Linux: `tts-server-v0.1.0-linux-x86_64`
+
+**Package size:** ~337 MB compressed, ~370 MB extracted
+
+**Checksum verification:**
+```bash
+# Verify package integrity
+shasum -a 256 -c tts-server-v0.1.0-macos-arm64.tar.gz.sha256
+```
+
 ## Future Plans
 
 ### AWS Lambda Deployment
@@ -732,8 +810,10 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed Lambda deployment instructions.
 
 For issues or questions:
 1. Check this README first
-2. Review [DEPLOYMENT.md](DEPLOYMENT.md) for deployment-specific questions
-3. Open an issue in the repository
+2. Review [INSTALL.md](packaging/INSTALL.md) for installation help
+3. Review [PACKAGING.md](packaging/PACKAGING.md) for packaging/distribution questions
+4. Review [DEPLOYMENT.md](DEPLOYMENT.md) for deployment-specific questions (if available)
+5. Open an issue in the repository
 
 ## Version History
 
