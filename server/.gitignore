@@ -1,0 +1,14 @@
+# Rust build artifacts
+/target
+Cargo.lock
+
+# API keys - DO NOT COMMIT
+api_keys.txt
+
+# Output files
+output.wav
+*.wav
+
+# Temp files
+/tmp
+.DS_Store

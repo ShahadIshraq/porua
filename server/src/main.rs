@@ -1,11 +1,13 @@
 mod kokoro;
 mod server;
 mod chunking;
+mod auth;
 
 use kokoro::model_paths::{get_model_path, get_voices_path};
 use kokoro::voice_config::Voice;
 use kokoro::{TTS, TTSPool};
 use server::{create_router, AppState};
+use auth::load_api_keys;
 use std::env;
 use std::sync::Arc;
 use tracing_subscriber;
@@ -53,6 +55,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if server_mode {
         // Server mode - initialize pool
         println!("Starting TTS HTTP server on port {}...", port);
+
+        // Load API keys
+        let api_keys = load_api_keys();
+
         println!("Initializing TTS pool with {} engines...", pool_size);
 
         let tts_pool = TTSPool::new(
@@ -64,6 +70,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let state = AppState {
             tts_pool: Arc::new(tts_pool),
+            api_keys: api_keys.clone(),
         };
 
         let app = create_router(state);
@@ -80,6 +87,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("\nPool configuration:");
         println!("  Pool size: {} engines", pool_size);
         println!("  Set TTS_POOL_SIZE environment variable to change");
+        println!("\nAuthentication:");
+        if api_keys.is_enabled() {
+            println!("  Status: ENABLED ({} key(s) configured)", api_keys.count());
+            println!("  Use X-API-Key or Authorization: Bearer header");
+        } else {
+            println!("  Status: DISABLED (no key file found)");
+            println!("  Set TTS_API_KEY_FILE or create ./api_keys.txt to enable");
+        }
 
         axum::serve(listener, app).await?;
     } else {

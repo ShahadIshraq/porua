@@ -1,0 +1,26 @@
+# TTS Server API Keys Configuration
+#
+# Instructions:
+# 1. Copy this file to api_keys.txt (or any location)
+# 2. Add one API key per line
+# 3. Lines starting with # are comments and will be ignored
+# 4. Empty lines are ignored
+#
+# If you use a custom location, set the TTS_API_KEY_FILE environment variable:
+#   export TTS_API_KEY_FILE=/path/to/your/api_keys.txt
+#
+# Default search locations (in order):
+#   1. ./api_keys.txt (current directory)
+#   2. ~/.tts-server/api_keys.txt (user home directory)
+#   3. /etc/tts-server/api_keys.txt (system-wide)
+#
+# Example keys (replace with your own secure random keys):
+
+your-secret-key-here
+another-api-key-123abc
+production-key-xyz789
+
+# Generate secure random keys with:
+# openssl rand -hex 32
+# or
+# uuidgen

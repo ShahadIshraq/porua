@@ -2,6 +2,7 @@ use axum::{
     body::Bytes,
     extract::State,
     http::{header, StatusCode},
+    middleware,
     response::Response,
     routing::{get, post},
     Json, Router,
@@ -19,11 +20,13 @@ use crate::kokoro::{
     TTSPool,
 };
 use crate::chunking::{chunk_text, ChunkingConfig};
+use crate::auth::ApiKeys;
 
 // Shared application state
 #[derive(Clone)]
 pub struct AppState {
     pub tts_pool: Arc<TTSPool>,
+    pub api_keys: ApiKeys,
 }
 
 // Request/Response DTOs
@@ -518,12 +521,19 @@ pub fn create_router(state: AppState) -> Router<()> {
         .allow_methods(Any)
         .allow_headers(Any);
 
+    // Clone api_keys for middleware
+    let api_keys_for_middleware = state.api_keys.clone();
+
     Router::new()
         .route("/tts", post(generate_tts))
         .route("/tts/stream", post(generate_tts_stream))
         .route("/voices", get(list_voices))
         .route("/health", get(health_check))
         .route("/stats", get(pool_stats))
+        .layer(middleware::from_fn_with_state(
+            api_keys_for_middleware,
+            crate::auth::auth_middleware,
+        ))
         .with_state(state)
         .layer(cors)
 }
