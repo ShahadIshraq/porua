@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TTS Reader Settings</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <h1>TTS Reader Settings</h1>
+
+    <form id="settings-form">
+      <div class="form-group">
+        <label for="api-url">API URL</label>
+        <input
+          type="url"
+          id="api-url"
+          name="apiUrl"
+          placeholder="http://localhost:3000"
+          required
+        >
+        <small class="help-text">Enter the TTS server URL</small>
+      </div>
+
+      <div class="form-group">
+        <label for="api-key">API Key (Optional)</label>
+        <div class="password-input-wrapper">
+          <input
+            type="password"
+            id="api-key"
+            name="apiKey"
+            placeholder="Enter API key if required"
+            autocomplete="off"
+            spellcheck="false"
+          >
+          <button type="button" id="toggle-visibility" class="toggle-btn" title="Show/Hide API Key">
+            👁️
+          </button>
+          <button type="button" id="change-key" class="change-key-btn" title="Change API Key">
+            Change
+          </button>
+        </div>
+        <small class="help-text">Leave empty if authentication is not required</small>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Settings</button>
+        <button type="button" id="test-connection" class="btn btn-secondary">Test Connection</button>
+      </div>
+    </form>
+
+    <div id="status-message" class="status-message hidden"></div>
+  </div>
+
+  <script src="src/crypto-utils.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

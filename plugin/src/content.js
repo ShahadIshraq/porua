@@ -96,11 +96,77 @@
   }
 
   // Handle play button click
-  function handlePlayClick() {
+  async function handlePlayClick() {
     if (currentParagraph) {
       const text = currentParagraph.textContent.trim();
       console.log('TTS: Reading text:', text);
-      // TODO: Send text to background script for TTS processing
+
+      try {
+        // Get settings from storage (API URL from sync, encrypted API Key from local)
+        chrome.storage.sync.get({ apiUrl: 'http://localhost:3000' }, (syncSettings) => {
+          chrome.storage.local.get({ encryptedApiKey: '' }, async (localSettings) => {
+            let apiKey = '';
+
+            // Decrypt the API key if it exists
+            if (localSettings.encryptedApiKey) {
+              try {
+                apiKey = await window.CryptoUtils.decryptString(localSettings.encryptedApiKey);
+              } catch (error) {
+                console.error('TTS: Failed to decrypt API key:', error);
+              }
+            }
+
+            const settings = {
+              apiUrl: syncSettings.apiUrl,
+              apiKey: apiKey
+            };
+            await synthesizeAndPlay(text, settings);
+          });
+        });
+      } catch (error) {
+        console.error('TTS: Error:', error);
+      }
+    }
+  }
+
+  // Synthesize and play audio
+  async function synthesizeAndPlay(text, settings) {
+    try {
+      const headers = {
+        'Content-Type': 'application/json'
+      };
+
+      // Add API key if provided
+      if (settings.apiKey) {
+        headers['X-API-Key'] = settings.apiKey;
+      }
+
+      const response = await fetch(`${settings.apiUrl}/synthesize`, {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({
+          text: text,
+          voice: 'af' // Default voice
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      const audio = new Audio(audioUrl);
+      audio.play();
+
+      // Clean up the blob URL after playing
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+      };
+    } catch (error) {
+      console.error('TTS: Failed to synthesize:', error);
+      alert('Failed to connect to TTS server. Please check your settings.');
     }
   }
 
