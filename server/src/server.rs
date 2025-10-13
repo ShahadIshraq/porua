@@ -564,7 +564,7 @@ async fn generate_tts_stream(
     tracing::debug!("Streaming {} text chunks with multipart format", chunks.len());
 
     // Create channel for streaming multipart data
-    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Bytes, String>>(10);
+    let (tx, rx) = tokio::sync::mpsc::channel::<std::result::Result<Bytes, String>>(10);
 
     // Clone for background task
     let state_clone = state.clone();
@@ -599,7 +599,7 @@ async fn generate_tts_stream(
                             }
                         }
                         Err(e) => {
-                            let _ = tx.send(Err(format!("Metadata serialization error: {}", e))).await;
+                            let _ = tx.send(Err(e.to_string())).await;
                             return;
                         }
                     }
@@ -618,7 +618,7 @@ async fn generate_tts_stream(
                     );
                 }
                 Err(e) => {
-                    let _ = tx.send(Err(format!("First chunk failed: {}", e))).await;
+                    let _ = tx.send(Err(e.to_string())).await;
                     return;
                 }
             }
@@ -676,11 +676,11 @@ async fn generate_tts_stream(
                         results[buffer_index] = Some((metadata, audio));
                     }
                     Ok(Err(e)) => {
-                        let _ = tx.send(Err(format!("Chunk {} failed: {}", chunk_index, e))).await;
+                        let _ = tx.send(Err(e.to_string())).await;
                         return;
                     }
                     Err(e) => {
-                        let _ = tx.send(Err(format!("Task {} panicked: {}", chunk_index, e))).await;
+                        let _ = tx.send(Err(e.to_string())).await;
                         return;
                     }
                 }
@@ -697,7 +697,7 @@ async fn generate_tts_stream(
                         }
                     }
                     Err(e) => {
-                        let _ = tx.send(Err(e)).await;
+                        let _ = tx.send(Err(e.to_string())).await;
                         return;
                     }
                 }
