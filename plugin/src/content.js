@@ -137,8 +137,6 @@
       // Clear highlights
       clearPhraseHighlights();
 
-      console.log('TTS: Playback complete');
-
       // Restore paragraph after a short delay
       setTimeout(() => {
         if (currentParagraph) {
@@ -153,10 +151,6 @@
     const audioBlob = item.blob;
     const metadata = item.metadata;
 
-    if (metadata) {
-      console.log(`TTS: Playing chunk ${metadata.chunk_index}: "${metadata.text}" (${metadata.duration_ms}ms)`);
-    }
-
     const audioUrl = URL.createObjectURL(audioBlob);
     currentAudio = new Audio(audioUrl);
 
@@ -168,14 +162,12 @@
       currentAudio.addEventListener('timeupdate', () => {
         if (currentAudio && !currentAudio.paused) {
           const currentTimeMs = startOffsetMs + (currentAudio.currentTime * 1000);
-          console.log(`TTS [DEBUG]: audio.currentTime=${currentAudio.currentTime.toFixed(3)}s, startOffset=${startOffsetMs}ms, calculated=${currentTimeMs.toFixed(0)}ms`);
           updatePhraseHighlight(currentTimeMs);
         }
       });
 
       // Also update on play event (for initial phrase)
       currentAudio.addEventListener('play', () => {
-        console.log(`TTS [DEBUG]: Play event - highlighting at ${startOffsetMs}ms`);
         updatePhraseHighlight(startOffsetMs);
       });
     }
@@ -186,13 +178,11 @@
     };
 
     currentAudio.onerror = (e) => {
-      console.error('TTS: Audio playback error:', e);
       URL.revokeObjectURL(audioUrl);
       playNextInQueue();
     };
 
     currentAudio.play().catch(err => {
-      console.error('TTS: Failed to play audio:', err);
       URL.revokeObjectURL(audioUrl);
       playNextInQueue();
     });
@@ -215,8 +205,6 @@
       if (currentParagraph) {
         restoreParagraph(currentParagraph);
       }
-
-      console.log('TTS: Playback stopped by user');
     }
   }
 
@@ -343,7 +331,7 @@
               try {
                 apiKey = await window.CryptoUtils.decryptString(localSettings.encryptedApiKey);
               } catch (error) {
-                console.error('TTS: Failed to decrypt API key:', error);
+                // Silently fail - will use empty API key
               }
             }
 
@@ -355,7 +343,6 @@
           });
         });
       } catch (error) {
-        console.error('TTS: Error:', error);
         updatePlayerState('idle');
       }
     }
@@ -373,7 +360,6 @@
       // Check for RIFF header
       const riffHeader = String.fromCharCode(buffer[offset], buffer[offset+1], buffer[offset+2], buffer[offset+3]);
       if (riffHeader !== 'RIFF') {
-        console.warn('TTS: Invalid RIFF header at offset', offset);
         break;
       }
 
@@ -498,7 +484,6 @@
           metadata: JSON.parse(jsonText)
         };
       } catch (e) {
-        console.error('TTS: Failed to parse JSON metadata:', e);
         return null;
       }
     } else if (contentType.includes('audio/wav')) {
@@ -507,7 +492,6 @@
         audioData: contentBytes
       };
     } else {
-      console.warn('TTS: Unknown content type:', contentType);
       data = { type: 'unknown' };
     }
 
@@ -565,7 +549,6 @@
       const { chunk_index, phrases, start_offset_ms } = metadata;
 
       if (!phrases || phrases.length === 0) {
-        console.warn(`TTS: Chunk ${chunk_index} has no phrases`);
         continue;
       }
 
@@ -579,7 +562,6 @@
       }
     }
 
-    console.log(`TTS: Built timeline with ${timeline.length} phrases`);
     return timeline;
   }
 
@@ -609,7 +591,6 @@
       const phraseIndex = originalText.indexOf(phraseText, currentIndex);
 
       if (phraseIndex === -1) {
-        console.warn(`TTS: Could not find phrase "${phraseText}" in paragraph text`);
         continue;
       }
 
@@ -633,8 +614,6 @@
 
     // Replace paragraph content with wrapped version
     paragraph.innerHTML = html;
-
-    console.log(`TTS: Wrapped ${timelineIndex} phrases in paragraph`);
   }
 
   /**
@@ -660,8 +639,6 @@
     // Also remove any lingering highlight classes
     const highlightedPhrases = paragraph.querySelectorAll('.tts-phrase.tts-highlighted');
     highlightedPhrases.forEach(el => el.classList.remove('tts-highlighted'));
-
-    console.log('TTS: Restored paragraph to original state');
   }
 
   /**
@@ -690,18 +667,11 @@
           span.classList.add('tts-highlighted');
           currentHighlightedPhrase = span;
 
-          console.log(`TTS [DEBUG]: Highlighting phrase "${span.textContent}" [${startTime}-${endTime}ms] at currentTime=${currentTimeMs.toFixed(0)}ms`);
-
           // Scroll into view if needed
           scrollToPhraseIfNeeded(span);
         }
         return; // Found the phrase, no need to continue
       }
-    }
-
-    // If we're here, no phrase matched - log for debugging
-    if (phraseSpans.length > 0) {
-      console.log(`TTS [DEBUG]: No phrase match at ${currentTimeMs.toFixed(0)}ms (have ${phraseSpans.length} phrases)`);
     }
   }
 
@@ -782,13 +752,9 @@
       }
       const boundary = boundaryMatch[1];
 
-      console.log('TTS: Parsing multipart stream with boundary:', boundary);
-
       // Parse multipart stream
       const reader = response.body.getReader();
       const parts = await parseMultipartStream(reader, boundary);
-
-      console.log(`TTS: Parsed ${parts.length} total parts`);
 
       // Separate metadata and audio parts
       const metadataArray = parts
@@ -799,28 +765,16 @@
         .filter(p => p.type === 'audio')
         .map(p => new Blob([p.audioData], { type: 'audio/wav' }));
 
-      console.log(`TTS: ${metadataArray.length} metadata chunks, ${audioBlobs.length} audio chunks`);
-
-      // Validate that we have matching metadata and audio
-      if (metadataArray.length !== audioBlobs.length) {
-        console.warn(`TTS: Metadata/audio count mismatch: ${metadataArray.length} vs ${audioBlobs.length}`);
-      }
-
       if (audioBlobs.length === 0) {
         throw new Error('No audio data received from server');
       }
 
       // Build phrase timeline and prepare paragraph for highlighting
-      console.log('TTS: Building phrase timeline...');
       phraseTimeline = buildPhraseTimeline(metadataArray);
-      console.log(`TTS: Timeline built with ${phraseTimeline.length} phrases`);
 
       // Wrap phrases in paragraph for highlighting
       if (currentParagraph && phraseTimeline.length > 0) {
-        console.log('TTS [DEBUG]: Phrase timeline:', phraseTimeline);
         wrapPhrasesInParagraph(currentParagraph, phraseTimeline);
-      } else {
-        console.warn('TTS: No current paragraph or phrases to highlight');
       }
 
       // Queue audio chunks with their metadata
@@ -837,7 +791,6 @@
       playNextInQueue();
 
     } catch (error) {
-      console.error('TTS: Failed to synthesize:', error);
       updatePlayerState('idle');
 
       // Clean up on error
