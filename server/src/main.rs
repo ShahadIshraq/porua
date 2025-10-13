@@ -4,6 +4,7 @@ mod chunking;
 mod auth;
 mod error;
 mod utils;
+mod models;
 
 use kokoro::model_paths::{get_model_path, get_voices_path};
 use kokoro::voice_config::Voice;
@@ -136,7 +137,8 @@ async fn main() -> error::Result<()> {
         let audio_bytes = std::fs::read(output_path)?;
 
         // Calculate duration using server helper functions
-        use server::{calculate_wav_duration_cli, segment_phrases_cli, segment_words_cli, PhraseMetadata, ChunkMetadata};
+        use server::{calculate_wav_duration_cli, segment_phrases_cli, segment_words_cli};
+        use models::{PhraseMetadata, ChunkMetadata};
 
         let duration_ms = calculate_wav_duration_cli(&audio_bytes)?;
         let phrase_texts = segment_phrases_cli(&text);

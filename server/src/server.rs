@@ -7,7 +7,6 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tokio_stream::{StreamExt, wrappers::ReceiverStream};
@@ -22,80 +21,13 @@ use crate::chunking::{chunk_text, ChunkingConfig};
 use crate::auth::ApiKeys;
 use crate::error::{Result, TtsError};
 use crate::utils::temp_file::TempFile;
+use crate::models::{TTSRequest, TTSResponse, VoiceInfo, VoicesResponse, HealthResponse, PoolStatsResponse, PhraseMetadata, ChunkMetadata};
 
 // Shared application state
 #[derive(Clone)]
 pub struct AppState {
     pub tts_pool: Arc<TTSPool>,
     pub api_keys: ApiKeys,
-}
-
-// Request/Response DTOs
-#[derive(Debug, Deserialize)]
-pub struct TTSRequest {
-    pub text: String,
-    #[serde(default = "default_voice")]
-    pub voice: String,
-    #[serde(default = "default_speed")]
-    pub speed: f32,
-    #[serde(default = "default_enable_chunking")]
-    pub enable_chunking: bool,
-}
-
-fn default_enable_chunking() -> bool {
-    true
-}
-
-fn default_voice() -> String {
-    "bf_lily".to_string()
-}
-
-fn default_speed() -> f32 {
-    1.0
-}
-
-#[derive(Debug, Serialize)]
-pub struct TTSResponse {
-    pub status: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct VoiceInfo {
-    pub id: String,
-    pub name: String,
-    pub gender: String,
-    pub language: String,
-    pub description: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct VoicesResponse {
-    pub voices: Vec<VoiceInfo>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct HealthResponse {
-    pub status: String,
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct PhraseMetadata {
-    pub text: String,
-    #[serde(skip_serializing)]
-    pub words: Vec<String>,
-    pub start_ms: f64,
-    pub duration_ms: f64,
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct ChunkMetadata {
-    pub chunk_index: usize,
-    pub text: String,
-    pub phrases: Vec<PhraseMetadata>,
-    pub duration_ms: f64,
-    pub start_offset_ms: f64,
 }
 
 // Helper Functions
@@ -450,14 +382,6 @@ async fn pool_stats(State(state): State<AppState>) -> Json<PoolStatsResponse> {
         available_engines: stats.available_engines,
         total_requests: stats.total_requests,
     })
-}
-
-#[derive(Debug, Serialize)]
-pub struct PoolStatsResponse {
-    pub pool_size: usize,
-    pub active_requests: usize,
-    pub available_engines: usize,
-    pub total_requests: usize,
 }
 
 /// Generate a single chunk with metadata
