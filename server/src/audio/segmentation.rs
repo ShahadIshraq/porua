@@ -19,12 +19,52 @@ pub struct SegmentationConfig {
 
 impl Default for SegmentationConfig {
     fn default() -> Self {
+        Self::for_tts()
+    }
+}
+
+impl SegmentationConfig {
+    /// Preset for TTS applications (optimized defaults)
+    pub fn for_tts() -> Self {
         Self {
             max_phrase_words: 8,
             normalize_unicode: true,
             respect_comma_boundaries: true,
-            separate_punctuation: false, // Keep current behavior by default
-            emdash_as_boundary: false, // Conservative default
+            separate_punctuation: false,
+            emdash_as_boundary: false,
+        }
+    }
+
+    /// Preset for linguistic analysis
+    pub fn for_linguistic_analysis() -> Self {
+        Self {
+            max_phrase_words: 10,
+            normalize_unicode: true,
+            respect_comma_boundaries: true,
+            separate_punctuation: true,
+            emdash_as_boundary: false,
+        }
+    }
+
+    /// Preset for subtitle generation (shorter phrases)
+    pub fn for_subtitles() -> Self {
+        Self {
+            max_phrase_words: 6,
+            normalize_unicode: true,
+            respect_comma_boundaries: true,
+            separate_punctuation: false,
+            emdash_as_boundary: true,
+        }
+    }
+
+    /// Preset for natural reading (longer phrases)
+    pub fn for_reading() -> Self {
+        Self {
+            max_phrase_words: 12,
+            normalize_unicode: true,
+            respect_comma_boundaries: false,
+            separate_punctuation: false,
+            emdash_as_boundary: false,
         }
     }
 }
@@ -665,5 +705,49 @@ mod tests {
         let words = segment_words(text);
         // Should handle nested quotes
         assert!(words.len() > 0);
+    }
+
+    // Preset configuration tests
+    #[test]
+    fn test_preset_configs() {
+        let text = "This is a test sentence, with multiple clauses, for testing.";
+
+        let tts_phrases = segment_phrases_with_config(text, &SegmentationConfig::for_tts());
+        let subtitle_phrases = segment_phrases_with_config(text, &SegmentationConfig::for_subtitles());
+        let reading_phrases = segment_phrases_with_config(text, &SegmentationConfig::for_reading());
+
+        // Subtitles should have more (shorter) phrases than reading
+        assert!(subtitle_phrases.len() >= reading_phrases.len());
+        // TTS should be in the middle
+        assert!(tts_phrases.len() >= reading_phrases.len());
+    }
+
+    #[test]
+    fn test_for_tts_preset() {
+        let config = SegmentationConfig::for_tts();
+        assert_eq!(config.max_phrase_words, 8);
+        assert_eq!(config.respect_comma_boundaries, true);
+        assert_eq!(config.separate_punctuation, false);
+    }
+
+    #[test]
+    fn test_for_linguistic_analysis_preset() {
+        let config = SegmentationConfig::for_linguistic_analysis();
+        assert_eq!(config.max_phrase_words, 10);
+        assert_eq!(config.separate_punctuation, true);
+    }
+
+    #[test]
+    fn test_for_subtitles_preset() {
+        let config = SegmentationConfig::for_subtitles();
+        assert_eq!(config.max_phrase_words, 6);
+        assert_eq!(config.emdash_as_boundary, true);
+    }
+
+    #[test]
+    fn test_for_reading_preset() {
+        let config = SegmentationConfig::for_reading();
+        assert_eq!(config.max_phrase_words, 12);
+        assert_eq!(config.respect_comma_boundaries, false);
     }
 }
