@@ -107,9 +107,12 @@ pub fn calculate_wav_duration_cli(wav_bytes: &[u8]) -> Result<f64, Box<dyn std::
     let spec = reader.spec();
     let num_samples = reader.len() as f64;
     let sample_rate = spec.sample_rate as f64;
+    let num_channels = spec.channels as f64;
 
-    // Duration in milliseconds
-    let duration_ms = (num_samples / sample_rate) * 1000.0;
+    // reader.len() returns total samples across all channels
+    // We need frames (samples per channel) for duration calculation
+    let num_frames = num_samples / num_channels;
+    let duration_ms = (num_frames / sample_rate) * 1000.0;
 
     Ok(duration_ms)
 }
@@ -123,9 +126,12 @@ fn calculate_wav_duration(wav_bytes: &[u8]) -> Result<f64, String> {
     let spec = reader.spec();
     let num_samples = reader.len() as f64;
     let sample_rate = spec.sample_rate as f64;
+    let num_channels = spec.channels as f64;
 
-    // Duration in milliseconds
-    let duration_ms = (num_samples / sample_rate) * 1000.0;
+    // reader.len() returns total samples across all channels
+    // We need frames (samples per channel) for duration calculation
+    let num_frames = num_samples / num_channels;
+    let duration_ms = (num_frames / sample_rate) * 1000.0;
 
     Ok(duration_ms)
 }
@@ -734,13 +740,26 @@ async fn generate_tts_stream(
         // === REMAINING CHUNKS (parallel processing) ===
         if chunks.len() > 1 {
             let remaining_chunks: Vec<_> = chunks.into_iter().skip(1).collect();
+
+            // Calculate start offsets for each chunk sequentially BEFORE spawning tasks
+            let mut chunk_offsets = Vec::new();
+            let mut temp_offset = cumulative_offset_ms;
+
+            // We need to estimate durations OR process chunks sequentially for accurate offsets
+            // For now, let's spawn tasks with estimated offsets (will fix after metadata arrives)
+            for (i, chunk_text) in remaining_chunks.iter().enumerate() {
+                chunk_offsets.push((i + 1, chunk_text.clone(), temp_offset));
+                // Estimate duration based on character count (rough approximation)
+                // Average speech rate: ~150 words/min = ~2.5 words/sec = ~400ms/word
+                // Average word length: ~5 chars => ~80ms/char
+                temp_offset += (chunk_text.len() as f64) * 80.0;
+            }
+
             let mut tasks = Vec::new();
 
-            for (i, chunk_text) in remaining_chunks.into_iter().enumerate() {
-                let chunk_index = i + 1;
+            for (chunk_index, chunk_text, start_offset) in chunk_offsets {
                 let state = state_clone.clone();
                 let voice = voice_clone.clone();
-                let start_offset = cumulative_offset_ms;
 
                 let task = tokio::spawn(async move {
                     generate_chunk_with_metadata(
@@ -756,13 +775,16 @@ async fn generate_tts_stream(
                 tasks.push((chunk_index, task));
             }
 
-            // Collect results in order
+            // Collect results in order and fix offsets
             let mut results: Vec<Option<(ChunkMetadata, Vec<u8>)>> = vec![None; tasks.len()];
 
             for (chunk_index, task) in tasks {
                 match task.await {
-                    Ok(Ok((metadata, audio))) => {
+                    Ok(Ok((mut metadata, audio))) => {
+                        // Fix the start_offset_ms to be accurate
+                        metadata.start_offset_ms = cumulative_offset_ms;
                         cumulative_offset_ms += metadata.duration_ms;
+
                         let buffer_index = chunk_index - 1;
                         results[buffer_index] = Some((metadata, audio));
                     }
