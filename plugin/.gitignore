@@ -1,3 +1,9 @@
 node_modules/
 dist/
 package-lock.json
+
+# Packaging artifacts
+packages/
+.packaging-temp/
+*.zip
+*.xpi
