@@ -225,8 +225,10 @@ The response contains alternating parts:
 ```
 
 **Phrase Segmentation:**
-- Phrases are segmented as sentences (≤5 words) or 5-word groups
-- Timing uses character-weighted proportional distribution (~70-75% accuracy)
+- Intelligent segmentation: sentences ≤8 words or comma-aware splitting
+- Smart sentence detection: handles abbreviations (Dr., Mrs., etc.), decimals, URLs
+- Unicode normalization: smart quotes, em-dashes, ellipsis
+- Timing: character-weighted proportional distribution (~70-75% accuracy)
 - Each phrase includes `text`, `start_ms`, and `duration_ms`
 
 **Use Cases:**
@@ -353,6 +355,7 @@ cargo fmt
 ```bash
 cargo test
 ```
+
 
 ## Configuration
 
