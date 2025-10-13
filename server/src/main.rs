@@ -122,9 +122,70 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("Using voice: {} ({})", voice_config.name, voice_config.description);
 
         // Generate speech with selected voice and normal speed
-        tts.speak(&text, "output.wav", voice.id(), 1.0)?;
+        let output_path = "output.wav";
+        tts.speak(&text, output_path, voice.id(), 1.0)?;
 
-        println!("Speech saved to output.wav");
+        println!("Speech saved to {}", output_path);
+
+        // Generate timing metadata
+        println!("\nGenerating timing metadata...");
+
+        // Read the generated WAV file
+        let audio_bytes = std::fs::read(output_path)?;
+
+        // Calculate duration using server helper functions
+        use server::{calculate_wav_duration_cli, segment_phrases_cli, segment_words_cli, PhraseMetadata, ChunkMetadata};
+
+        let duration_ms = calculate_wav_duration_cli(&audio_bytes)?;
+        let phrase_texts = segment_phrases_cli(&text);
+
+        // Calculate character-weighted durations for each phrase
+        let total_chars: usize = phrase_texts.iter().map(|p| p.len()).sum();
+        let mut phrases = Vec::new();
+        let mut cumulative_time = 0.0;
+
+        for phrase_text in phrase_texts {
+            let phrase_words = segment_words_cli(&phrase_text);
+            let char_weight = phrase_text.len() as f64 / total_chars as f64;
+            let phrase_duration = duration_ms * char_weight;
+
+            phrases.push(PhraseMetadata {
+                text: phrase_text,
+                words: phrase_words,
+                start_ms: cumulative_time,
+                duration_ms: phrase_duration,
+            });
+
+            cumulative_time += phrase_duration;
+        }
+
+        // Create metadata
+        let metadata = ChunkMetadata {
+            chunk_index: 0,
+            text: text.clone(),
+            phrases,
+            duration_ms,
+            start_offset_ms: 0.0,
+        };
+
+        // Save metadata to JSON file
+        let metadata_path = "output.json";
+        let json = serde_json::to_string_pretty(&metadata)?;
+        std::fs::write(metadata_path, json)?;
+
+        println!("Metadata saved to {}", metadata_path);
+        println!("\nTiming Summary:");
+        println!("  Total duration: {:.2}s", duration_ms / 1000.0);
+        println!("  Number of phrases: {}", metadata.phrases.len());
+        println!("\nPhrase breakdown:");
+        for (i, phrase) in metadata.phrases.iter().enumerate() {
+            println!("  {}. \"{}\" - {:.2}s @ {:.2}s",
+                i + 1,
+                phrase.text,
+                phrase.duration_ms / 1000.0,
+                phrase.start_ms / 1000.0
+            );
+        }
     }
 
     Ok(())

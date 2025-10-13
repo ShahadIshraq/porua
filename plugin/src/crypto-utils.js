@@ -67,7 +67,6 @@
       // Convert to base64 for storage
       return btoa(String.fromCharCode.apply(null, combined));
     } catch (error) {
-      console.error('Encryption error:', error);
       throw error;
     }
   }
@@ -100,7 +99,6 @@
       const decoder = new TextDecoder();
       return decoder.decode(decryptedData);
     } catch (error) {
-      console.error('Decryption error:', error);
       // Return empty string if decryption fails (e.g., corrupted data)
       return '';
     }

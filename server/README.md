@@ -22,32 +22,6 @@ The server runs in two modes:
   - `kokoro-v1.0.onnx` (310 MB)
   - `voices-v1.0.bin` (27 MB)
 
-## Project Structure
-
-```
-server/
-├── src/
-│   ├── main.rs                 # Entry point and server initialization
-│   ├── server.rs               # HTTP server and API endpoints
-│   ├── chunking.rs             # Text chunking for parallel processing
-│   └── kokoro/
-│       ├── mod.rs              # TTS engine wrapper and pooling
-│       ├── voice_config.rs     # 54 voice configurations
-│       └── model_paths.rs      # Model path resolution
-├── models/                      # TTS model files (337 MB total)
-│   ├── kokoro-v1.0.onnx
-│   ├── voices-v1.0.bin
-│   └── download_models.py      # Model download script
-├── Cargo.toml                   # Dependencies
-├── packaging/                   # Packaging and distribution
-│   ├── build_package.sh         # Automated packaging script
-│   ├── install.sh               # Automated installation script
-│   ├── INSTALL.md               # Installation guide
-│   └── PACKAGING.md             # Packaging guide for developers
-├── README.md                    # This file
-└── api_keys.txt.example         # Example API keys file
-```
-
 ## Installation Options
 
 ### Option 1: Pre-built Package (Recommended for Production)
@@ -155,22 +129,13 @@ curl http://localhost:3003/stats
 curl http://localhost:3003/voices | jq .
 ```
 
-### 3. CLI Mode (Simple Testing)
-
-For quick tests without starting the server:
+### 3. CLI Mode
 
 ```bash
 ./target/release/tts_server "Hello, this is Kokoro TTS speaking!"
 ```
 
-**Output:**
-- Generates speech and saves to `output.wav` in the current directory
-- Uses British female voice "Lily" (`BritishFemaleLily`) by default
-
-**Play the audio (macOS):**
-```bash
-afplay output.wav
-```
+Generates `output.wav` and `output.json` with timing metadata.
 
 ## API Documentation
 
@@ -225,26 +190,57 @@ curl -X POST http://localhost:3003/tts \
   --output speech.wav
 ```
 
-#### `POST /tts/stream` - Streaming Speech Generation
+#### `POST /tts/stream` - Multipart Streaming with Metadata
 
-Generate speech with streaming response for progressive audio delivery.
+Generate speech with streaming response that includes both audio chunks and timing metadata in multipart format.
 
 **Request:** Same as `/tts` endpoint
 
 **Response:**
-- **Success (200)**: Chunked WAV audio stream
+- **Success (200)**: Multipart/mixed stream with alternating metadata (JSON) and audio (WAV) parts
 - **Headers**:
-  - `Content-Type: audio/wav`
+  - `Content-Type: multipart/mixed; boundary=tts_chunk_boundary`
   - `Transfer-Encoding: chunked`
 
-**Use Case:** Better user experience for long texts - audio chunks are delivered as they're generated instead of waiting for complete processing.
+**Response Format:**
+The response contains alternating parts:
+1. **Metadata part** (JSON): Timing information for the chunk
+2. **Audio part** (WAV): Audio data for the chunk
+
+**Metadata Structure:**
+```json
+{
+  "chunk_index": 0,
+  "text": "Full chunk text",
+  "phrases": [
+    {
+      "text": "Phrase text",
+      "start_ms": 0.0,
+      "duration_ms": 1900.0
+    }
+  ],
+  "duration_ms": 7600.0,
+  "start_offset_ms": 0.0
+}
+```
+
+**Phrase Segmentation:**
+- Phrases are segmented as sentences (≤5 words) or 5-word groups
+- Timing uses character-weighted proportional distribution (~70-75% accuracy)
+- Each phrase includes `text`, `start_ms`, and `duration_ms`
+
+**Use Cases:**
+- Real-time text highlighting synchronized with audio playback
+- Progressive audio delivery with timing information
+- Building karaoke-style reading applications
+- Accessible reading tools with synchronized highlighting
 
 **Example:**
 ```bash
 curl -X POST http://localhost:3003/tts/stream \
   -H "Content-Type: application/json" \
-  -d '{"text": "Streaming audio generation example", "voice": "bf_emma"}' \
-  --output stream.wav
+  -d '{"text": "Hello world. This is a test.", "voice": "bf_emma"}' \
+  --output stream_multipart.txt
 ```
 
 #### `GET /voices` - List Available Voices
@@ -303,80 +299,6 @@ Get real-time statistics about the TTS engine pool.
 - `available_engines`: Number of idle engines ready for work
 - `total_requests`: Lifetime request count since server start
 
-**Use Case:** Monitoring, capacity planning, and debugging.
-
-### Performance Optimizations
-
-#### 1. Engine Pooling
-
-Pre-warmed TTS engines eliminate cold-start latency and enable concurrent processing.
-
-**Configuration:**
-```bash
-# Set pool size (default: 2)
-export TTS_POOL_SIZE=4
-./target/release/tts_server --server --port 3003
-```
-
-**Benefits:**
-- No model loading delay for requests
-- True concurrent request handling (up to pool_size simultaneous requests)
-- Round-robin engine allocation for load balancing
-
-**Trade-offs:**
-- Memory: Each engine uses ~500 MB
-- Startup time: ~1-2 seconds per engine during initialization
-
-**Recommended pool sizes:**
-- Development/Testing: 1-2 engines
-- Production (low traffic): 2-3 engines
-- Production (high traffic): 4-6 engines
-
-#### 2. Intelligent Text Chunking
-
-Long texts are automatically split and processed in parallel for faster generation.
-
-**How it works:**
-1. Texts > 500 characters trigger automatic chunking
-2. Text is split at sentence boundaries (periods, question marks, exclamation points)
-3. Chunks are processed concurrently using available pool engines
-4. Audio chunks are concatenated into seamless output
-
-**Configuration:**
-```rust
-// In chunking.rs - ChunkingConfig
-max_chunk_size: 250 characters  // Maximum chunk size
-min_chunk_size: 50 characters   // Minimum chunk size
-```
-
-**Performance impact:**
-- **Short text** (<500 chars): No overhead
-- **Medium text** (500-1000 chars): 30-50% faster
-- **Long text** (>1000 chars): 40-60% faster
-
-**Example:**
-```bash
-# 611 character text split into 4 chunks, processed in parallel
-curl -X POST http://localhost:3003/tts \
-  -d '{"text": "Very long text here..."}' \
-  --output output.wav
-
-# Server logs show:
-# INFO Split text into 4 chunks for parallel processing
-# All 4 chunks process concurrently using pool engines
-```
-
-#### 3. Streaming Responses
-
-Progressive audio delivery improves perceived latency for long texts.
-
-**Benefits:**
-- Reduced time-to-first-byte
-- Better user experience (can start playback before completion)
-- Lower memory footprint on client side
-
-**Use Case:** Real-time applications, audiobook generation, podcast production
-
 ## Model Path Resolution
 
 The server automatically searches for models in the following locations (in priority order):
@@ -391,44 +313,12 @@ The server automatically searches for models in the following locations (in prio
 
 **How it works:** The server checks each location in order and uses the **first path where the model files actually exist**. This allows the binary to work in different environments (development, production, Lambda) without code changes.
 
-### Using Environment Variable
-
 ```bash
 # Set custom model directory
 export TTS_MODEL_DIR=/path/to/your/models
-
-# Run server
 ./target/release/tts_server "Test message"
 ```
 
-### Verify Model Loading
-
-The server logs which paths it's loading from:
-
-```
-Loading model from: /Users/yourname/workspace/tts-plugin/server/models/kokoro-v1.0.onnx
-Loading voices from: /Users/yourname/workspace/tts-plugin/server/models/voices-v1.0.bin
-Initializing TTS engine for CLI mode...
-Generating speech for: "Test message"
-Using voice: Lily (British female voice - Lily)
-Speech saved to output.wav
-```
-
-## Available Voices
-
-The server includes 54 voices across multiple languages:
-
-- **American English**: 20 voices (11 female, 9 male)
-- **British English**: 8 voices (4 female, 4 male)
-- **European**: 3 voices
-- **French**: 1 voice
-- **Hindi**: 4 voices
-- **Italian**: 2 voices
-- **Japanese**: 5 voices
-- **Portuguese**: 3 voices
-- **Chinese**: 8 voices
-
-Currently using: `BritishFemaleLily` (configurable in [main.rs:94](src/main.rs#L94))
 
 ## Development
 
@@ -501,216 +391,6 @@ RUST_LOG=warn ./target/release/tts_server --server
 RUST_LOG=tts_server=debug,ort=warn,kokoros=warn ./target/release/tts_server --server
 ```
 
-**What each level shows:**
-
-- **Default (no RUST_LOG set)**: Clean, essential logs
-  ```
-  Loading model from: models/kokoro-v1.0.onnx
-  Loading voices from: models/voices-v1.0.bin
-  Starting TTS HTTP server on port 3000...
-  Initializing TTS pool with 3 engines...
-  INFO Initializing TTS pool with 3 engines...
-  INFO TTS pool initialized successfully
-
-  Server listening on http://0.0.0.0:3000
-  ```
-
-- **warn**: Minimal output, only startup and errors
-  ```
-  Loading model from: models/kokoro-v1.0.onnx
-  Loading voices from: models/voices-v1.0.bin
-  Starting TTS HTTP server on port 3000...
-
-  Server listening on http://0.0.0.0:3000
-  ```
-
-- **debug**: Detailed request/response information
-  ```
-  [All default logs plus:]
-  DEBUG Loading TTS engine 1/3...
-  DEBUG Loading TTS engine 2/3...
-  DEBUG TTS request - text_len=1205, voice='bf_lily', speed=1, chunking=true
-  DEBUG Split text into 3 chunks for parallel processing
-  DEBUG Concatenating 3 audio chunks
-  ```
-
-- **trace**: Everything including internal library details (very verbose, not recommended)
-
-**Production recommendations:**
-- Use default (no RUST_LOG) for production - clean and professional
-- Use `RUST_LOG=warn` to reduce log volume in high-traffic scenarios
-- Use `RUST_LOG=debug` for troubleshooting issues
-- Never use `trace` in production (performance impact)
-
-**Default log filtering:**
-
-By default (when RUST_LOG is not set), the server uses:
-```
-tts_server=info,ort=warn,kokoros=warn
-```
-
-This configuration:
-- Shows important events from tts_server
-- Hides noisy ONNX Runtime initialization logs
-- Hides the 54-voice listing from kokoros (use `RUST_LOG=kokoros=info` to see it)
-- Uses compact formatting without module paths for readability
-
-**Note:** The "Audio saved to /tmp/tts_*.wav" messages come from the kokoros library. They appear at INFO level, so they're hidden by default. To see them, use `RUST_LOG=kokoros=info`.
-
-### Change Voice
-
-Edit [src/main.rs](src/main.rs#L94):
-
-```rust
-// Change from:
-let voice = Voice::BritishFemaleLily;
-
-// To any other voice, e.g.:
-let voice = Voice::AmericanFemaleNova;
-let voice = Voice::AmericanMaleAdam;
-let voice = Voice::JapaneseFemaleAlpha;
-```
-
-See all available voices in [src/kokoro/voice_config.rs](src/kokoro/voice_config.rs#L55).
-
-### Change Output File
-
-Edit [src/main.rs](src/main.rs#L100):
-
-```rust
-// Change output path
-tts.speak(&text, "custom_output.wav", voice.id(), 1.0)?;
-```
-
-### Adjust Speed
-
-Change the last parameter (default 1.0) in [src/main.rs](src/main.rs#L100):
-
-```rust
-// Slower (0.5x)
-tts.speak(&text, "output.wav", voice.id(), 0.5)?;
-
-// Faster (1.5x)
-tts.speak(&text, "output.wav", voice.id(), 1.5)?;
-```
-
-## Troubleshooting
-
-### Models Not Found
-
-**Error:**
-```
-Error: Failed to load model from: models/kokoro-v1.0.onnx
-```
-
-**Solution:**
-Set the `TTS_MODEL_DIR` environment variable to the absolute path:
-
-```bash
-export TTS_MODEL_DIR=/Users/yourname/workspace/tts-plugin/server/models
-./target/release/tts_server "Test"
-```
-
-### Compilation Warnings
-
-The project has some dead code warnings for unused voices and fields. These are safe to ignore:
-- Unused voice variants (we only use one by default)
-- Unused `gender` and `language` fields (reserved for future filtering)
-
-### Slow First Run
-
-The first compilation takes several minutes because:
-- Rust compiles the entire dependency tree
-- The `kokoros` library includes ONNX runtime
-
-Subsequent builds are much faster (incremental compilation).
-
-### macOS Library Path Issues
-
-If you see dynamic library errors on macOS:
-
-```bash
-# Set library path
-export DYLD_LIBRARY_PATH=/opt/homebrew/lib
-./target/release/tts_server "Test"
-```
-
-## Dependencies
-
-Key dependencies from [Cargo.toml](Cargo.toml):
-
-**Core:**
-- **kokoros**: TTS engine (from GitHub)
-- **tokio**: Async runtime with full features
-- **onnxruntime**: ML model inference (transitive dependency)
-
-**HTTP Server:**
-- **axum**: High-performance web framework
-- **tower-http**: HTTP middleware (CORS, etc.)
-- **serde** / **serde_json**: JSON serialization
-
-**Performance:**
-- **tokio-stream**: Streaming response support
-- **hound**: WAV file manipulation and concatenation
-- **deadpool**: Connection pooling infrastructure
-- **async-trait**: Async trait support
-
-**Utilities:**
-- **uuid**: Unique file name generation
-- **bytes**: Efficient byte buffer handling
-- **tracing** / **tracing-subscriber**: Structured logging
-- **futures**: Future combinators
-
-## Performance
-
-### Benchmarks
-
-**Server Startup:**
-- Single engine: ~1 second
-- Pool of 3 engines: ~2.5 seconds
-- Pool of 5 engines: ~4 seconds
-
-**Request Processing:**
-- **Short text** (50 chars): ~0.5-1 second
-- **Medium text** (200 chars): ~1-2 seconds
-- **Long text** (600 chars, chunked): ~2-3 seconds (parallel)
-- **Long text** (600 chars, no chunk): ~4-6 seconds (sequential)
-
-**Resource Usage:**
-- Binary size: ~5 MB (without models)
-- Model files: 337 MB
-- Memory per engine: ~500 MB
-- Pool of 3 engines: ~1.5 GB total memory
-
-**Concurrent Processing:**
-- Pool of 2: Up to 2 simultaneous requests
-- Pool of 3: Up to 3 simultaneous requests
-- Pool of 4: Up to 4 simultaneous requests
-- Additional requests queue automatically
-
-### Performance Tips
-
-1. **Optimize pool size:**
-   - Match pool size to expected concurrent load
-   - Monitor `/stats` endpoint to track utilization
-   - Increase pool size if `available_engines` is often 0
-
-2. **Enable chunking for long texts:**
-   - Default threshold: 500 characters
-   - Automatic for most use cases
-   - Disable only if you need precise control over audio generation
-
-3. **Use streaming for real-time applications:**
-   - Lower perceived latency
-   - Better user experience for long content
-   - Progressive playback support
-
-4. **Production deployment:**
-   - Use release build (`cargo build --release`)
-   - Set appropriate `TTS_POOL_SIZE` based on traffic
-   - Monitor memory usage and adjust pool size accordingly
-   - Consider load balancing multiple instances for high traffic
-
 ## Packaging & Distribution
 
 ### Creating Distribution Packages
@@ -721,114 +401,3 @@ To create distributable packages for deployment:
 # Run the packaging script
 ./packaging/build_package.sh
 ```
-
-This will:
-1. Build the release binary
-2. Package binary with models and documentation
-3. Create `.tar.gz` and `.zip` archives
-4. Generate SHA256 checksums
-
-**Output location:** `dist/`
-
-**Package contents:**
-- Binary executable (~29 MB)
-- Model files (~337 MB)
-- Installation scripts
-- Documentation
-
-**Package formats:**
-- `tts-server-v0.1.0-[platform]-[arch].tar.gz` (recommended for Unix/Linux)
-- `tts-server-v0.1.0-[platform]-[arch].zip` (cross-platform)
-
-For detailed packaging instructions, see [PACKAGING.md](packaging/PACKAGING.md).
-
-### Distribution
-
-**Platform packages:**
-- macOS (Apple Silicon): `tts-server-v0.1.0-macos-arm64`
-- macOS (Intel): `tts-server-v0.1.0-macos-x86_64`
-- Linux: `tts-server-v0.1.0-linux-x86_64`
-
-**Package size:** ~337 MB compressed, ~370 MB extracted
-
-**Checksum verification:**
-```bash
-# Verify package integrity
-shasum -a 256 -c tts-server-v0.1.0-macos-arm64.tar.gz.sha256
-```
-
-## Future Plans
-
-### AWS Lambda Deployment
-
-This server can be deployed to AWS Lambda using container images:
-
-```dockerfile
-FROM public.ecr.aws/lambda/provided:al2023
-COPY target/release/tts_server /var/runtime/bootstrap
-COPY models /opt/models
-ENV TTS_MODEL_DIR=/opt/models
-ENV TTS_POOL_SIZE=2
-```
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed Lambda deployment instructions.
-
-### Planned Features
-
-- **WebSocket support**: Real-time bidirectional audio streaming
-- **Voice cloning**: Custom voice training and deployment
-- **Audio effects**: Pitch control, echo, reverb, etc.
-- **Batch processing**: Process multiple texts in one request
-- **Caching layer**: Cache frequently requested phrases
-- **Metrics**: Prometheus/Grafana integration
-- **Docker**: Pre-built container images
-
-## Contributing
-
-### Code Structure
-
-- [src/main.rs](src/main.rs) - Entry point, CLI and server mode initialization
-- [src/server.rs](src/server.rs) - HTTP server, API endpoints, request handlers
-- [src/chunking.rs](src/chunking.rs) - Text chunking algorithm for parallel processing
-- [src/kokoro/mod.rs](src/kokoro/mod.rs) - TTS engine wrapper, pooling implementation
-- [src/kokoro/voice_config.rs](src/kokoro/voice_config.rs) - Voice metadata and enums (54 voices)
-- [src/kokoro/model_paths.rs](src/kokoro/model_paths.rs) - Model path resolution logic
-
-### Adding New Features
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-[Add your license here]
-
-## Support
-
-For issues or questions:
-1. Check this README first
-2. Review [INSTALL.md](packaging/INSTALL.md) for installation help
-3. Review [PACKAGING.md](packaging/PACKAGING.md) for packaging/distribution questions
-4. Review [DEPLOYMENT.md](DEPLOYMENT.md) for deployment-specific questions (if available)
-5. Open an issue in the repository
-
-## Version History
-
-- **v0.2.0** (Current) - Production-Ready HTTP Server
-  - HTTP REST API with 5 endpoints (`/tts`, `/tts/stream`, `/voices`, `/health`, `/stats`)
-  - Engine pooling for concurrent request handling
-  - Intelligent text chunking with parallel processing (40-60% faster for long texts)
-  - Streaming audio responses for progressive delivery
-  - Real-time pool statistics and monitoring
-  - Configurable pool size via `TTS_POOL_SIZE` environment variable
-  - Full CORS support for web applications
-  - Comprehensive error handling and logging
-
-- **v0.1.0** - Initial CLI Implementation
-  - Basic CLI interface
-  - 54 voice support across 9 languages
-  - Flexible model path resolution
-  - AWS Lambda preparation

@@ -54,7 +54,6 @@
           toggleVisibilityBtn.style.display = 'none';
           changeKeyBtn.style.display = 'block';
         } catch (error) {
-          console.error('Error loading API key:', error);
           apiKeyInput.placeholder = 'Enter API key if required';
           apiKeyInput.disabled = false;
           hasStoredKey = false;
