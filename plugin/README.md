@@ -1,88 +1,174 @@
-# TTS Reader Extension
+# TTS Reader Extension - Restructured
 
-Browser extension for text-to-speech with real-time phrase highlighting.
+This is a modernized, modular browser extension for text-to-speech functionality.
 
-## Setup
+## Architecture
 
-```bash
-npm install
-npm run build
+The extension follows a clean, modular architecture with proper separation of concerns:
+
+### Directory Structure
+
+```
+plugin/
+├── src/
+│   ├── shared/           # Shared utilities and services
+│   │   ├── api/          # API client (TTSClient)
+│   │   ├── crypto/       # Encryption utilities
+│   │   ├── storage/      # Storage management (SettingsStore)
+│   │   └── utils/        # Constants, errors, debounce, throttle
+│   ├── content/          # Content script modules
+│   │   ├── audio/        # Audio handling (StreamParser, AudioQueue)
+│   │   ├── state/        # State management (PlaybackState)
+│   │   ├── ui/           # UI components (PlayButton, PlayerControl, HighlightManager)
+│   │   ├── utils/        # DOM and event utilities
+│   │   └── index.js      # Content script entry point
+│   ├── popup/            # Popup modules
+│   │   ├── SettingsForm.js
+│   │   ├── StatusMessage.js
+│   │   └── index.js      # Popup entry point
+│   └── styles/           # CSS files
+│       ├── variables.css
+│       ├── popup.css
+│       └── content/      # Content script styles
+│           ├── play-button.css
+│           ├── player-control.css
+│           └── highlighting.css
+├── dist/                 # Bundled output (generated)
+│   ├── content.js
+│   └── popup.js
+├── build/                # Build configuration
+│   └── bundle.js
+├── manifest.json         # Extension manifest
+├── popup.html            # Popup HTML
+└── package.json          # Node dependencies
+
 ```
 
-## Load in Browser
+## Key Improvements
 
-1. Go to `chrome://extensions`
-2. Enable "Developer mode"
-3. Click "Load unpacked" → Select the `plugin` directory
+### 1. Modular Architecture
+- **Separation of Concerns**: Each module has a single, well-defined responsibility
+- **Reusability**: Shared utilities can be used across content and popup scripts
+- **Testability**: Small, focused modules are easier to test
+- **Maintainability**: Easy to locate and modify specific functionality
 
-## Usage
+### 2. Clean Code
+- **ES Modules**: Modern import/export syntax
+- **No Global Pollution**: Everything is scoped properly
+- **Centralized Constants**: Magic numbers replaced with named constants
+- **Proper Error Handling**: Custom error classes with meaningful messages
 
-Hover over any paragraph and click the play button to start TTS with highlighting.
+### 3. Performance
+- **Bundling**: esbuild bundles and minifies code for optimal load times
+- **Event Management**: EventManager class ensures proper cleanup
+- **Resource Management**: URL.createObjectURL() cleanup, proper event listener removal
+
+### 4. Security
+- **Proper Encryption**: Uses Web Crypto API with PBKDF2 and AES-GCM
+- **Input Sanitization**: escapeHtml function prevents XSS
+- **Secure Storage**: API keys encrypted in local storage
+
+## Build System
+
+The extension uses esbuild for fast, efficient bundling:
+
+### Commands
+
+```bash
+# Install dependencies
+npm install
+
+# Build for production (minified)
+npm run build
+
+# Build for development (with watch mode and source maps)
+npm run dev
+```
+
+### Build Configuration
+
+The build system (`build/bundle.js`):
+- Bundles ES modules into browser-compatible IIFE format
+- Minifies code for production
+- Generates source maps for development
+- Supports watch mode for rapid development
+
+## Module Overview
+
+### Shared Modules
+
+#### `shared/utils/constants.js`
+Centralized constants for timeouts, player states, default settings, and z-index values.
+
+#### `shared/utils/errors.js`
+Custom error classes: APIError, StreamParseError, AudioPlaybackError.
+
+#### `shared/crypto/encryption.js`
+Encryption utilities using Web Crypto API for secure API key storage.
+
+#### `shared/storage/SettingsStore.js`
+Centralized settings management with encrypted API key storage.
+
+#### `shared/api/TTSClient.js`
+HTTP client for TTS server communication with proper error handling.
+
+### Content Script Modules
+
+#### `content/state/PlaybackState.js`
+Centralized state management with observable pattern for player state.
+
+#### `content/audio/StreamParser.js`
+Multipart stream parsing for audio chunks and metadata.
+
+#### `content/audio/AudioQueue.js`
+Audio playback queue management with highlight synchronization.
+
+#### `content/ui/PlayButton.js`
+Floating play button that appears on paragraph hover.
+
+#### `content/ui/PlayerControl.js`
+Draggable player control with play/pause functionality.
+
+#### `content/ui/HighlightManager.js`
+Phrase-level text highlighting synchronized with audio playback.
+
+#### `content/utils/events.js`
+Event management with automatic cleanup to prevent memory leaks.
+
+#### `content/utils/dom.js`
+DOM utilities for safe HTML escaping and element creation.
+
+### Popup Modules
+
+#### `popup/SettingsForm.js`
+Settings form management with validation and API testing.
+
+#### `popup/StatusMessage.js`
+Status message display with auto-hide functionality.
 
 ## Development
 
-```bash
-npm run dev    # Watch mode with auto-rebuild
-```
+1. Make changes to source files in `src/`
+2. Run `npm run dev` to build with watch mode
+3. Reload extension in browser
+4. Test changes
 
 ## Testing
 
-```bash
-npm test              # Run all tests once
-npm run test:watch    # Run tests in watch mode
-npm run test:ui       # Run tests with interactive UI
-npm run test:coverage # Run tests with coverage report
-```
+To test the extension:
 
-Test files are in `tests/` directory. Current coverage: 171 tests across utilities, state management, stream parsing, encryption, API client, and storage layer.
+1. Build the extension: `npm run build`
+2. Load unpacked extension from the `plugin` directory in your browser
+3. Navigate to any webpage with paragraphs
+4. Hover over a paragraph to see the play button
+5. Click to start TTS playback
+6. Open the popup to configure settings
 
-## Building for Production
+## Migration Notes
 
-### Create Distribution Packages
-
-```bash
-npm run package          # Create both Chrome and Firefox packages
-npm run package:chrome   # Create Chrome package only
-npm run package:firefox  # Create Firefox package only
-npm run release          # Build + package in one command
-```
-
-Packages are created in the `packages/` directory:
-- `tts-reader-chrome-v{version}.zip` - Chrome Web Store package
-- `tts-reader-firefox-v{version}.zip` - Firefox Add-ons package
-- `tts-reader-source-v{version}.zip` - Source code archive (for Firefox review)
-
-### Package Contents
-
-Both packages include:
-- `dist/` - Bundled and minified JavaScript
-- `icons/` - Extension icons
-- `popup.html` - Settings popup
-- `src/styles/` - CSS stylesheets
-- `manifest.json` - Browser-specific manifest
-
-### Submission Guidelines
-
-#### Chrome Web Store
-1. Run `npm run package:chrome`
-2. Upload `tts-reader-chrome-v{version}.zip` to [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)
-3. Follow the submission wizard
-
-#### Firefox Add-ons (AMO)
-1. Run `npm run package:firefox`
-2. Upload both:
-   - `tts-reader-firefox-v{version}.zip` (extension package)
-   - `tts-reader-source-v{version}.zip` (source code for review)
-3. Submit at [Firefox Add-on Developer Hub](https://addons.mozilla.org/developers/addon/submit/distribution)
-4. The source archive includes `BUILD_INSTRUCTIONS.md` for reviewers
-
-### Validation
-
-Before packaging, the build script validates:
-- All required files exist (manifests, icons, built JavaScript)
-- Production build completes successfully
-- Package sizes are reasonable
-
-After packaging, test in both browsers:
-- Chrome: Load unpacked extension from root directory
-- Firefox: Load temporary add-on from root directory
+This restructuring maintains 100% feature parity with the original monolithic version while providing:
+- Better code organization
+- Improved maintainability
+- Enhanced performance
+- Proper resource cleanup
+- Modern development workflow
