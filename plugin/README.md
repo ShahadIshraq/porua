@@ -24,3 +24,14 @@ Hover over any paragraph and click the play button to start TTS with highlightin
 ```bash
 npm run dev    # Watch mode with auto-rebuild
 ```
+
+## Testing
+
+```bash
+npm test              # Run all tests once
+npm run test:watch    # Run tests in watch mode
+npm run test:ui       # Run tests with interactive UI
+npm run test:coverage # Run tests with coverage report
+```
+
+Test files are in `tests/` directory. Current coverage: 171 tests across utilities, state management, stream parsing, encryption, API client, and storage layer.
