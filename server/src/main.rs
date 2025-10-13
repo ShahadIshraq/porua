@@ -138,40 +138,8 @@ async fn main() -> error::Result<()> {
         // Read the generated WAV file
         let audio_bytes = std::fs::read(output_path)?;
 
-        // Calculate duration and segment text
-        use models::{PhraseMetadata, ChunkMetadata};
-
-        let duration_ms = audio::duration::calculate(&audio_bytes)?;
-        let phrase_texts = audio::segmentation::segment_phrases(&text);
-
-        // Calculate character-weighted durations for each phrase
-        let total_chars: usize = phrase_texts.iter().map(|p| p.len()).sum();
-        let mut phrases = Vec::new();
-        let mut cumulative_time = 0.0;
-
-        for phrase_text in phrase_texts {
-            let phrase_words = audio::segmentation::segment_words(&phrase_text);
-            let char_weight = phrase_text.len() as f64 / total_chars as f64;
-            let phrase_duration = duration_ms * char_weight;
-
-            phrases.push(PhraseMetadata {
-                text: phrase_text,
-                words: phrase_words,
-                start_ms: cumulative_time,
-                duration_ms: phrase_duration,
-            });
-
-            cumulative_time += phrase_duration;
-        }
-
-        // Create metadata
-        let metadata = ChunkMetadata {
-            chunk_index: 0,
-            text: text.clone(),
-            phrases,
-            duration_ms,
-            start_offset_ms: 0.0,
-        };
+        // Build metadata using shared function
+        let metadata = services::metadata_builder::build_metadata(&audio_bytes, &text, 0, 0.0)?;
 
         // Save metadata to JSON file
         let metadata_path = "output.json";
@@ -180,7 +148,7 @@ async fn main() -> error::Result<()> {
 
         println!("Metadata saved to {}", metadata_path);
         println!("\nTiming Summary:");
-        println!("  Total duration: {:.2}s", duration_ms / 1000.0);
+        println!("  Total duration: {:.2}s", metadata.duration_ms / 1000.0);
         println!("  Number of phrases: {}", metadata.phrases.len());
         println!("\nPhrase breakdown:");
         for (i, phrase) in metadata.phrases.iter().enumerate() {
