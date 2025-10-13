@@ -60,8 +60,7 @@ async fn generate_chunk_with_metadata(
     start_offset_ms: f64,
 ) -> Result<(ChunkMetadata, Vec<u8>)> {
     use crate::utils::temp_file::TempFile;
-    use crate::models::PhraseMetadata;
-    use crate::audio;
+    use crate::services::metadata_builder;
 
     // Acquire TTS engine
     let tts = state.tts_pool.acquire().await
@@ -88,40 +87,8 @@ async fn generate_chunk_with_metadata(
 
     // TempFile will automatically clean up when it goes out of scope
 
-    // Calculate duration
-    let duration_ms = audio::duration::calculate(&audio_bytes)?;
-
-    // Segment text into phrases
-    let phrase_texts = audio::segmentation::segment_phrases(text);
-
-    // Calculate character-weighted durations for each phrase
-    let total_chars: usize = phrase_texts.iter().map(|p| p.len()).sum();
-    let mut phrases = Vec::new();
-    let mut cumulative_time = 0.0;
-
-    for phrase_text in phrase_texts {
-        let phrase_words = audio::segmentation::segment_words(&phrase_text);
-        let char_weight = phrase_text.len() as f64 / total_chars as f64;
-        let phrase_duration = duration_ms * char_weight;
-
-        phrases.push(PhraseMetadata {
-            text: phrase_text,
-            words: phrase_words,
-            start_ms: cumulative_time,
-            duration_ms: phrase_duration,
-        });
-
-        cumulative_time += phrase_duration;
-    }
-
-    // Create metadata
-    let metadata = ChunkMetadata {
-        chunk_index,
-        text: text.to_string(),
-        phrases,
-        duration_ms,
-        start_offset_ms,
-    };
+    // Build metadata using shared function
+    let metadata = metadata_builder::build_metadata(&audio_bytes, text, chunk_index, start_offset_ms)?;
 
     Ok((metadata, audio_bytes))
 }
