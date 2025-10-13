@@ -1,7 +1,7 @@
 use axum::{
     body::Bytes,
     extract::State,
-    http::{header, StatusCode},
+    http::header,
     middleware,
     response::Response,
     routing::{get, post},
@@ -10,7 +10,6 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
-use uuid::Uuid;
 use tokio_stream::{StreamExt, wrappers::ReceiverStream};
 use hound::{WavReader, WavWriter, SampleFormat};
 use std::io::Cursor;
@@ -21,6 +20,8 @@ use crate::kokoro::{
 };
 use crate::chunking::{chunk_text, ChunkingConfig};
 use crate::auth::ApiKeys;
+use crate::error::{Result, TtsError};
+use crate::utils::temp_file::TempFile;
 
 // Shared application state
 #[derive(Clone)]
@@ -100,28 +101,14 @@ pub struct ChunkMetadata {
 // Helper Functions
 
 /// Calculate duration in milliseconds from WAV file bytes
-pub fn calculate_wav_duration_cli(wav_bytes: &[u8]) -> Result<f64, Box<dyn std::error::Error>> {
-    let cursor = Cursor::new(wav_bytes);
-    let reader = WavReader::new(cursor)?;
-
-    let spec = reader.spec();
-    let num_samples = reader.len() as f64;
-    let sample_rate = spec.sample_rate as f64;
-    let num_channels = spec.channels as f64;
-
-    // reader.len() returns total samples across all channels
-    // We need frames (samples per channel) for duration calculation
-    let num_frames = num_samples / num_channels;
-    let duration_ms = (num_frames / sample_rate) * 1000.0;
-
-    Ok(duration_ms)
+pub fn calculate_wav_duration_cli(wav_bytes: &[u8]) -> Result<f64> {
+    calculate_wav_duration(wav_bytes)
 }
 
 /// Calculate duration in milliseconds from WAV file bytes (internal version)
-fn calculate_wav_duration(wav_bytes: &[u8]) -> Result<f64, String> {
+fn calculate_wav_duration(wav_bytes: &[u8]) -> Result<f64> {
     let cursor = Cursor::new(wav_bytes);
-    let reader = WavReader::new(cursor)
-        .map_err(|e| format!("Failed to read WAV: {}", e))?;
+    let reader = WavReader::new(cursor)?;
 
     let spec = reader.spec();
     let num_samples = reader.len() as f64;
@@ -209,9 +196,8 @@ fn create_boundary_end() -> String {
     format!("\r\n--{}--\r\n", BOUNDARY)
 }
 
-fn create_metadata_part(metadata: &ChunkMetadata) -> Result<Bytes, String> {
-    let json = serde_json::to_string(metadata)
-        .map_err(|e| format!("Failed to serialize metadata: {}", e))?;
+fn create_metadata_part(metadata: &ChunkMetadata) -> Result<Bytes> {
+    let json = serde_json::to_string(metadata)?;
 
     let part = format!(
         "{}Content-Type: application/json\r\n\r\n{}\r\n",
@@ -245,7 +231,7 @@ fn create_audio_part(audio_bytes: Vec<u8>) -> Bytes {
 async fn generate_tts(
     State(state): State<AppState>,
     Json(req): Json<TTSRequest>,
-) -> Result<Vec<u8>, (StatusCode, Json<TTSResponse>)> {
+) -> Result<Vec<u8>> {
     tracing::debug!(
         "TTS request - text_len={}, voice='{}', speed={}, chunking={}",
         req.text.len(),
@@ -256,24 +242,12 @@ async fn generate_tts(
 
     // Validate text is not empty
     if req.text.trim().is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(TTSResponse {
-                status: "error".to_string(),
-                error: Some("Text cannot be empty".to_string()),
-            }),
-        ));
+        return Err(TtsError::EmptyText);
     }
 
     // Validate speed is reasonable
     if req.speed <= 0.0 || req.speed > 3.0 {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(TTSResponse {
-                status: "error".to_string(),
-                error: Some("Speed must be between 0.0 and 3.0".to_string()),
-            }),
-        ));
+        return Err(TtsError::InvalidSpeed(req.speed));
     }
 
     // Determine if we should use chunking (enabled and text is long enough)
@@ -291,23 +265,17 @@ async fn generate_tts(
 async fn generate_tts_single(
     state: AppState,
     req: TTSRequest,
-) -> Result<Vec<u8>, (StatusCode, Json<TTSResponse>)> {
+) -> Result<Vec<u8>> {
     // Acquire a TTS engine from the pool
     let tts = state.tts_pool.acquire().await
         .map_err(|e| {
             tracing::error!("Failed to acquire TTS engine: {}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(TTSResponse {
-                    status: "error".to_string(),
-                    error: Some(format!("Failed to acquire TTS engine: {}", e)),
-                }),
-            )
+            TtsError::TtsEngine(e.to_string())
         })?;
 
-    // Generate unique temporary filename
-    let temp_file = format!("/tmp/tts_{}.wav", Uuid::new_v4());
-    let temp_file_clone = temp_file.clone();
+    // Generate unique temporary file
+    let temp_file = TempFile::new();
+    let temp_path = temp_file.as_str().to_string();
 
     let text = req.text.clone();
     let voice = req.voice.clone();
@@ -315,59 +283,27 @@ async fn generate_tts_single(
 
     // Move TTS generation to blocking thread pool
     let generation_result = tokio::task::spawn_blocking(move || {
-        futures::executor::block_on(tts.speak(&text, &temp_file, &voice, speed))
-            .map_err(|e| e.to_string())
+        futures::executor::block_on(tts.speak(&text, &temp_path, &voice, speed))
+            .map_err(|e| TtsError::TtsEngine(e.to_string()))
     })
-    .await;
+    .await?;
 
-    // Handle result
-    match generation_result {
-        Ok(Ok(())) => {
-            match tokio::fs::read(&temp_file_clone).await {
-                Ok(audio_data) => {
-                    let _ = tokio::fs::remove_file(&temp_file_clone).await;
-                    Ok(audio_data)
-                }
-                Err(e) => {
-                    tracing::error!("Failed to read audio file: {}", e);
-                    Err((
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(TTSResponse {
-                            status: "error".to_string(),
-                            error: Some(format!("Failed to read audio file: {}", e)),
-                        }),
-                    ))
-                }
-            }
-        }
-        Ok(Err(e)) => {
-            tracing::error!("TTS generation failed: {}", e);
-            Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(TTSResponse {
-                    status: "error".to_string(),
-                    error: Some(format!("TTS generation failed: {}", e)),
-                }),
-            ))
-        }
-        Err(e) => {
-            tracing::error!("Task join error: {}", e);
-            Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(TTSResponse {
-                    status: "error".to_string(),
-                    error: Some("Internal task execution error".to_string()),
-                }),
-            ))
-        }
-    }
+    // Handle generation result
+    generation_result?;
+
+    // Read generated audio file
+    let audio_data = tokio::fs::read(temp_file.path()).await?;
+
+    // TempFile will automatically clean up when it goes out of scope
+
+    Ok(audio_data)
 }
 
 /// Generate TTS with text chunking and parallel processing
 async fn generate_tts_chunked(
     state: AppState,
     req: TTSRequest,
-) -> Result<Vec<u8>, (StatusCode, Json<TTSResponse>)> {
+) -> Result<Vec<u8>> {
     // Split text into chunks
     let config = ChunkingConfig::default();
     let chunks = chunk_text(&req.text, &config);
@@ -397,49 +333,21 @@ async fn generate_tts_chunked(
     // Wait for all chunks to complete
     let mut audio_chunks = Vec::new();
     for (i, task) in tasks.into_iter().enumerate() {
-        match task.await {
-            Ok(Ok(audio_data)) => {
-                tracing::debug!("Chunk {} completed", i);
-                audio_chunks.push(audio_data);
-            }
-            Ok(Err(e)) => {
-                tracing::error!("Chunk {} failed: {:?}", i, e);
-                return Err(e);
-            }
-            Err(e) => {
-                tracing::error!("Chunk {} task failed: {}", i, e);
-                return Err((
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(TTSResponse {
-                        status: "error".to_string(),
-                        error: Some(format!("Chunk processing failed: {}", e)),
-                    }),
-                ));
-            }
-        }
+        let audio_data = task.await??;
+        tracing::debug!("Chunk {} completed", i);
+        audio_chunks.push(audio_data);
     }
 
     // Concatenate all audio chunks
     tracing::debug!("Concatenating {} audio chunks", audio_chunks.len());
-    match concatenate_wav_files(audio_chunks) {
-        Ok(combined_audio) => Ok(combined_audio),
-        Err(e) => {
-            tracing::error!("Failed to concatenate audio: {}", e);
-            Err((
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(TTSResponse {
-                    status: "error".to_string(),
-                    error: Some(format!("Failed to concatenate audio: {}", e)),
-                }),
-            ))
-        }
-    }
+    let combined_audio = concatenate_wav_files(audio_chunks)?;
+    Ok(combined_audio)
 }
 
 /// Concatenate multiple WAV files into a single WAV file
-fn concatenate_wav_files(wav_files: Vec<Vec<u8>>) -> Result<Vec<u8>, String> {
+fn concatenate_wav_files(wav_files: Vec<Vec<u8>>) -> Result<Vec<u8>> {
     if wav_files.is_empty() {
-        return Err("No audio files to concatenate".to_string());
+        return Err(TtsError::WavConcatenation("No audio files to concatenate".to_string()));
     }
 
     if wav_files.len() == 1 {
@@ -448,8 +356,7 @@ fn concatenate_wav_files(wav_files: Vec<Vec<u8>>) -> Result<Vec<u8>, String> {
 
     // Read the first file to get the WAV spec
     let first_cursor = Cursor::new(&wav_files[0]);
-    let first_reader = WavReader::new(first_cursor)
-        .map_err(|e| format!("Failed to read first WAV file: {}", e))?;
+    let first_reader = WavReader::new(first_cursor)?;
     let spec = first_reader.spec();
 
     // Determine sample type based on spec
@@ -460,7 +367,7 @@ fn concatenate_wav_files(wav_files: Vec<Vec<u8>>) -> Result<Vec<u8>, String> {
             match spec.bits_per_sample {
                 16 => concatenate_wav_files_typed::<i16>(wav_files, spec),
                 32 => concatenate_wav_files_typed::<i32>(wav_files, spec),
-                _ => Err(format!("Unsupported bits per sample: {}", spec.bits_per_sample))
+                _ => Err(TtsError::WavConcatenation(format!("Unsupported bits per sample: {}", spec.bits_per_sample)))
             }
         }
     }
@@ -470,7 +377,7 @@ fn concatenate_wav_files(wav_files: Vec<Vec<u8>>) -> Result<Vec<u8>, String> {
 fn concatenate_wav_files_typed<T>(
     wav_files: Vec<Vec<u8>>,
     spec: hound::WavSpec
-) -> Result<Vec<u8>, String>
+) -> Result<Vec<u8>>
 where
     T: hound::Sample + Copy,
 {
@@ -479,17 +386,16 @@ where
 
     for (i, wav_data) in wav_files.iter().enumerate() {
         let cursor = Cursor::new(wav_data);
-        let reader = WavReader::new(cursor)
-            .map_err(|e| format!("Failed to read WAV file {}: {}", i, e))?;
+        let reader = WavReader::new(cursor)?;
 
         // Verify all files have the same spec
         if reader.spec() != spec {
-            return Err(format!("WAV file {} has different spec", i));
+            return Err(TtsError::WavConcatenation(format!("WAV file {} has different spec", i)));
         }
 
         // Collect samples
         for sample in reader.into_samples::<T>() {
-            let sample = sample.map_err(|e| format!("Failed to read sample: {}", e))?;
+            let sample = sample?;
             all_samples.push(sample);
         }
     }
@@ -497,16 +403,13 @@ where
     // Write combined WAV to buffer
     let mut output = Cursor::new(Vec::new());
     {
-        let mut writer = WavWriter::new(&mut output, spec)
-            .map_err(|e| format!("Failed to create WAV writer: {}", e))?;
+        let mut writer = WavWriter::new(&mut output, spec)?;
 
         for sample in all_samples {
-            writer.write_sample(sample)
-                .map_err(|e| format!("Failed to write sample: {}", e))?;
+            writer.write_sample(sample)?;
         }
 
-        writer.finalize()
-            .map_err(|e| format!("Failed to finalize WAV: {}", e))?;
+        writer.finalize()?;
     }
 
     Ok(output.into_inner())
@@ -565,38 +468,34 @@ async fn generate_chunk_with_metadata(
     speed: f32,
     chunk_index: usize,
     start_offset_ms: f64,
-) -> Result<(ChunkMetadata, Vec<u8>), String> {
+) -> Result<(ChunkMetadata, Vec<u8>)> {
     // Acquire TTS engine
     let tts = state.tts_pool.acquire().await
-        .map_err(|e| format!("Failed to acquire TTS engine: {}", e))?;
+        .map_err(|e| TtsError::TtsEngine(e.to_string()))?;
 
     // Generate unique temp file
-    let temp_file = format!("/tmp/tts_chunk_{}_{}.wav", Uuid::new_v4(), chunk_index);
-    let temp_file_clone = temp_file.clone();
+    let temp_file = TempFile::new();
+    let temp_path = temp_file.as_str().to_string();
     let text_clone = text.to_string();
     let voice_clone = voice.to_string();
 
     // Generate audio in blocking thread
     let generation_result = tokio::task::spawn_blocking(move || {
-        futures::executor::block_on(tts.speak(&text_clone, &temp_file, &voice_clone, speed))
-            .map_err(|e| e.to_string())
+        futures::executor::block_on(tts.speak(&text_clone, &temp_path, &voice_clone, speed))
+            .map_err(|e| TtsError::TtsEngine(e.to_string()))
     })
-    .await
-    .map_err(|e| format!("Task join error: {}", e))?;
+    .await?;
 
     // Handle generation result
-    generation_result.map_err(|e| format!("TTS generation failed: {}", e))?;
+    generation_result?;
 
     // Read generated audio file
-    let audio_bytes = tokio::fs::read(&temp_file_clone).await
-        .map_err(|e| format!("Failed to read audio file: {}", e))?;
+    let audio_bytes = tokio::fs::read(temp_file.path()).await?;
 
-    // Clean up temp file
-    let _ = tokio::fs::remove_file(&temp_file_clone).await;
+    // TempFile will automatically clean up when it goes out of scope
 
     // Calculate duration
-    let duration_ms = calculate_wav_duration(&audio_bytes)
-        .map_err(|e| format!("Duration calculation failed: {}", e))?;
+    let duration_ms = calculate_wav_duration(&audio_bytes)?;
 
     // Segment text into phrases
     let phrase_texts = segment_phrases(text);
@@ -637,7 +536,7 @@ async fn generate_chunk_with_metadata(
 async fn generate_tts_stream(
     State(state): State<AppState>,
     Json(req): Json<TTSRequest>,
-) -> Result<Response, (StatusCode, Json<TTSResponse>)> {
+) -> Result<Response> {
     use std::time::Instant;
     let start = Instant::now();
 
@@ -650,24 +549,12 @@ async fn generate_tts_stream(
 
     // Validate text
     if req.text.trim().is_empty() {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(TTSResponse {
-                status: "error".to_string(),
-                error: Some("Text cannot be empty".to_string()),
-            }),
-        ));
+        return Err(TtsError::EmptyText);
     }
 
     // Validate speed
     if req.speed <= 0.0 || req.speed > 3.0 {
-        return Err((
-            StatusCode::BAD_REQUEST,
-            Json(TTSResponse {
-                status: "error".to_string(),
-                error: Some("Speed must be between 0.0 and 3.0".to_string()),
-            }),
-        ));
+        return Err(TtsError::InvalidSpeed(req.speed));
     }
 
     // Split text into chunks

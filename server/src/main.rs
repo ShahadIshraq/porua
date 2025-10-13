@@ -2,6 +2,8 @@ mod kokoro;
 mod server;
 mod chunking;
 mod auth;
+mod error;
+mod utils;
 
 use kokoro::model_paths::{get_model_path, get_voices_path};
 use kokoro::voice_config::Voice;
@@ -13,7 +15,7 @@ use std::sync::Arc;
 use tracing_subscriber;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> error::Result<()> {
     // Initialize tracing for logging with environment variable support
     // Default log level is INFO for tts_server, WARN for dependencies
     // This hides noisy voice listings and ONNX logs by default
