@@ -15,6 +15,8 @@
   let dragOffsetY = 0;
   let audioQueue = [];
   let isPlayingQueue = false;
+  let currentHighlightedPhrase = null;
+  let phraseTimeline = [];
 
   // Create draggable player control
   function createPlayerControl() {
@@ -125,13 +127,25 @@
     document.removeEventListener('mouseup', stopDrag);
   }
 
-  // Play next audio in queue
+  // Play next audio in queue with phrase highlighting
   function playNextInQueue() {
     if (audioQueue.length === 0) {
       isPlayingQueue = false;
       updatePlayerState('idle');
       currentAudio = null;
-      console.log('TTS: Playback queue complete');
+
+      // Clear highlights
+      clearPhraseHighlights();
+
+      console.log('TTS: Playback complete');
+
+      // Restore paragraph after a short delay
+      setTimeout(() => {
+        if (currentParagraph) {
+          restoreParagraph(currentParagraph);
+        }
+      }, 1000);
+
       return;
     }
 
@@ -139,13 +153,32 @@
     const audioBlob = item.blob;
     const metadata = item.metadata;
 
-    // Log metadata for debugging (will be used in Part 3)
     if (metadata) {
       console.log(`TTS: Playing chunk ${metadata.chunk_index}: "${metadata.text}" (${metadata.duration_ms}ms)`);
     }
 
     const audioUrl = URL.createObjectURL(audioBlob);
     currentAudio = new Audio(audioUrl);
+
+    // Sync highlighting with audio playback
+    if (metadata) {
+      const startOffsetMs = metadata.start_offset_ms;
+
+      // Update highlights as audio plays
+      currentAudio.addEventListener('timeupdate', () => {
+        if (currentAudio && !currentAudio.paused) {
+          const currentTimeMs = startOffsetMs + (currentAudio.currentTime * 1000);
+          console.log(`TTS [DEBUG]: audio.currentTime=${currentAudio.currentTime.toFixed(3)}s, startOffset=${startOffsetMs}ms, calculated=${currentTimeMs.toFixed(0)}ms`);
+          updatePhraseHighlight(currentTimeMs);
+        }
+      });
+
+      // Also update on play event (for initial phrase)
+      currentAudio.addEventListener('play', () => {
+        console.log(`TTS [DEBUG]: Play event - highlighting at ${startOffsetMs}ms`);
+        updatePhraseHighlight(startOffsetMs);
+      });
+    }
 
     currentAudio.onended = () => {
       URL.revokeObjectURL(audioUrl);
@@ -176,6 +209,14 @@
       isPlayingQueue = false;
       updatePlayerState('idle');
       currentAudio = null;
+
+      // Clear highlights and restore paragraph
+      clearPhraseHighlights();
+      if (currentParagraph) {
+        restoreParagraph(currentParagraph);
+      }
+
+      console.log('TTS: Playback stopped by user');
     }
   }
 
@@ -252,7 +293,12 @@
       currentButton.parentNode.removeChild(currentButton);
     }
     currentButton = null;
-    currentParagraph = null;
+
+    // Only clear currentParagraph if we're not loading or playing audio
+    // This prevents clearing the paragraph reference while audio fetch is in progress
+    if (playerState === 'idle') {
+      currentParagraph = null;
+    }
   }
 
   // Schedule hiding the button
@@ -269,6 +315,7 @@
   async function handlePlayClick() {
     if (currentParagraph) {
       const text = currentParagraph.textContent.trim();
+      const paragraphToPlay = currentParagraph; // Store reference before it gets cleared
 
       // Stop any existing audio and clear queue
       if (currentAudio) {
@@ -281,6 +328,9 @@
       // Show player control
       showPlayerControl();
       updatePlayerState('loading');
+
+      // Keep the paragraph reference for highlighting
+      currentParagraph = paragraphToPlay;
 
       try {
         // Get settings from storage (API URL from sync, encrypted API Key from local)
@@ -504,6 +554,192 @@
     return match ? match[1].trim() : '';
   }
 
+  /**
+   * Build phrase-level timeline from chunk metadata
+   * Returns array of { phrase, startTime, endTime, chunkIndex }
+   */
+  function buildPhraseTimeline(metadataArray) {
+    const timeline = [];
+
+    for (const metadata of metadataArray) {
+      const { chunk_index, phrases, start_offset_ms } = metadata;
+
+      if (!phrases || phrases.length === 0) {
+        console.warn(`TTS: Chunk ${chunk_index} has no phrases`);
+        continue;
+      }
+
+      for (const phrase of phrases) {
+        timeline.push({
+          phrase: phrase.text,
+          startTime: start_offset_ms + phrase.start_ms,
+          endTime: start_offset_ms + phrase.start_ms + phrase.duration_ms,
+          chunkIndex: chunk_index
+        });
+      }
+    }
+
+    console.log(`TTS: Built timeline with ${timeline.length} phrases`);
+    return timeline;
+  }
+
+  /**
+   * Wrap phrases in paragraph with <span> elements for highlighting
+   * Stores original text for cleanup
+   */
+  function wrapPhrasesInParagraph(paragraph, timeline) {
+    // Store original HTML for cleanup
+    if (!paragraph.dataset.originalHtml) {
+      paragraph.dataset.originalHtml = paragraph.innerHTML;
+    }
+
+    // Get the original text content
+    const originalText = paragraph.textContent;
+
+    // Build a list of all phrase texts to find them in order
+    const phrasesToFind = timeline.map(t => t.phrase);
+
+    let currentIndex = 0;
+    let html = '';
+    let timelineIndex = 0;
+
+    // Try to find each phrase in the text and wrap it
+    for (const phraseText of phrasesToFind) {
+      // Find the phrase in the remaining text
+      const phraseIndex = originalText.indexOf(phraseText, currentIndex);
+
+      if (phraseIndex === -1) {
+        console.warn(`TTS: Could not find phrase "${phraseText}" in paragraph text`);
+        continue;
+      }
+
+      // Add any text before this phrase (unwrapped)
+      if (phraseIndex > currentIndex) {
+        html += escapeHtml(originalText.substring(currentIndex, phraseIndex));
+      }
+
+      // Add the wrapped phrase
+      const phraseData = timeline[timelineIndex];
+      html += `<span class="tts-phrase" data-start-time="${phraseData.startTime}" data-end-time="${phraseData.endTime}" data-phrase-index="${timelineIndex}">${escapeHtml(phraseText)}</span>`;
+
+      currentIndex = phraseIndex + phraseText.length;
+      timelineIndex++;
+    }
+
+    // Add any remaining text after the last phrase
+    if (currentIndex < originalText.length) {
+      html += escapeHtml(originalText.substring(currentIndex));
+    }
+
+    // Replace paragraph content with wrapped version
+    paragraph.innerHTML = html;
+
+    console.log(`TTS: Wrapped ${timelineIndex} phrases in paragraph`);
+  }
+
+  /**
+   * Helper: Escape HTML special characters
+   */
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  /**
+   * Remove highlighting and restore original text
+   */
+  function restoreParagraph(paragraph) {
+    if (!paragraph) return;
+
+    if (paragraph.dataset.originalHtml) {
+      paragraph.innerHTML = paragraph.dataset.originalHtml;
+      delete paragraph.dataset.originalHtml;
+    }
+
+    // Also remove any lingering highlight classes
+    const highlightedPhrases = paragraph.querySelectorAll('.tts-phrase.tts-highlighted');
+    highlightedPhrases.forEach(el => el.classList.remove('tts-highlighted'));
+
+    console.log('TTS: Restored paragraph to original state');
+  }
+
+  /**
+   * Update highlighted phrase based on current playback time (in milliseconds)
+   */
+  function updatePhraseHighlight(currentTimeMs) {
+    // Find all phrase spans in the current paragraph
+    if (!currentParagraph) return;
+
+    const phraseSpans = currentParagraph.querySelectorAll('.tts-phrase[data-start-time][data-end-time]');
+
+    for (const span of phraseSpans) {
+      const startTime = parseFloat(span.dataset.startTime);
+      const endTime = parseFloat(span.dataset.endTime);
+
+      // Check if current time is within this phrase's time range
+      if (currentTimeMs >= startTime && currentTimeMs < endTime) {
+        // This phrase should be highlighted
+        if (currentHighlightedPhrase !== span) {
+          // Remove previous highlight
+          if (currentHighlightedPhrase) {
+            currentHighlightedPhrase.classList.remove('tts-highlighted');
+          }
+
+          // Add new highlight
+          span.classList.add('tts-highlighted');
+          currentHighlightedPhrase = span;
+
+          console.log(`TTS [DEBUG]: Highlighting phrase "${span.textContent}" [${startTime}-${endTime}ms] at currentTime=${currentTimeMs.toFixed(0)}ms`);
+
+          // Scroll into view if needed
+          scrollToPhraseIfNeeded(span);
+        }
+        return; // Found the phrase, no need to continue
+      }
+    }
+
+    // If we're here, no phrase matched - log for debugging
+    if (phraseSpans.length > 0) {
+      console.log(`TTS [DEBUG]: No phrase match at ${currentTimeMs.toFixed(0)}ms (have ${phraseSpans.length} phrases)`);
+    }
+  }
+
+  /**
+   * Scroll to phrase if it's outside viewport
+   */
+  function scrollToPhraseIfNeeded(phraseSpan) {
+    const rect = phraseSpan.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+
+    // Check if phrase is outside viewport
+    const isAboveViewport = rect.top < 0;
+    const isBelowViewport = rect.bottom > viewportHeight;
+
+    if (isAboveViewport || isBelowViewport) {
+      phraseSpan.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest'
+      });
+    }
+  }
+
+  /**
+   * Clear all highlights
+   */
+  function clearPhraseHighlights() {
+    if (currentHighlightedPhrase) {
+      currentHighlightedPhrase.classList.remove('tts-highlighted');
+      currentHighlightedPhrase = null;
+    }
+
+    // Also clear any other highlighted phrases (safety)
+    document.querySelectorAll('.tts-phrase.tts-highlighted').forEach(el => {
+      el.classList.remove('tts-highlighted');
+    });
+  }
+
   // Synthesize and play audio with multipart streaming
   async function synthesizeAndPlayStream(text, settings) {
     try {
@@ -574,9 +810,18 @@
         throw new Error('No audio data received from server');
       }
 
-      // Store metadata for Part 3 (highlighting)
-      // For now, we just log it
-      console.log('TTS: Metadata received:', metadataArray);
+      // Build phrase timeline and prepare paragraph for highlighting
+      console.log('TTS: Building phrase timeline...');
+      phraseTimeline = buildPhraseTimeline(metadataArray);
+      console.log(`TTS: Timeline built with ${phraseTimeline.length} phrases`);
+
+      // Wrap phrases in paragraph for highlighting
+      if (currentParagraph && phraseTimeline.length > 0) {
+        console.log('TTS [DEBUG]: Phrase timeline:', phraseTimeline);
+        wrapPhrasesInParagraph(currentParagraph, phraseTimeline);
+      } else {
+        console.warn('TTS: No current paragraph or phrases to highlight');
+      }
 
       // Queue audio chunks with their metadata
       audioQueue = [];
@@ -594,6 +839,13 @@
     } catch (error) {
       console.error('TTS: Failed to synthesize:', error);
       updatePlayerState('idle');
+
+      // Clean up on error
+      if (currentParagraph) {
+        restoreParagraph(currentParagraph);
+      }
+      clearPhraseHighlights();
+
       alert('Failed to connect to TTS server. Please check your settings.\n\nError: ' + error.message);
     }
   }
