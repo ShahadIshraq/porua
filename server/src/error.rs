@@ -77,6 +77,12 @@ impl From<tokio::task::JoinError> for TtsError {
     }
 }
 
+impl From<Box<dyn std::error::Error>> for TtsError {
+    fn from(err: Box<dyn std::error::Error>) -> Self {
+        TtsError::Unknown(err.to_string())
+    }
+}
+
 // Axum integration
 impl IntoResponse for TtsError {
     fn into_response(self) -> Response {
