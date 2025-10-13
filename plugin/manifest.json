@@ -20,8 +20,13 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["src/crypto-utils.js", "src/content.js"],
-      "css": ["src/content.css"],
+      "js": ["dist/content.js"],
+      "css": [
+        "src/styles/variables.css",
+        "src/styles/content/play-button.css",
+        "src/styles/content/player-control.css",
+        "src/styles/content/highlighting.css"
+      ],
       "run_at": "document_idle"
     }
   ],

@@ -1,0 +1,22 @@
+/* CSS Variables for TTS Reader */
+
+:root {
+  /* Colors */
+  --tts-primary-color: #4285f4;
+  --tts-primary-hover: #3367d6;
+  --tts-loading-color: #ff9800;
+  --tts-loading-hover: #f57c00;
+  --tts-playing-color: #f44336;
+  --tts-playing-hover: #d32f2f;
+  --tts-highlight-color: rgb(255, 193, 7);
+  --tts-highlight-dark: rgb(255, 235, 59);
+
+  /* Z-index */
+  --tts-play-button-z: 999999;
+  --tts-player-control-z: 1000000;
+
+  /* Shadows */
+  --tts-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --tts-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --tts-shadow-lg: 0 6px 16px rgba(0, 0, 0, 0.4);
+}

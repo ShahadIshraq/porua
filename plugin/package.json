@@ -1,0 +1,12 @@
+{
+  "name": "tts-reader-extension",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build/bundle.js",
+    "dev": "node build/bundle.js --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.19.0"
+  }
+}
