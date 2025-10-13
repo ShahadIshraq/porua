@@ -9,7 +9,7 @@
   let hideTimeout = null;
   let currentAudio = null;
   let playerControl = null;
-  let playerState = 'idle'; // 'idle', 'loading', 'playing'
+  let playerState = 'idle'; // 'idle', 'loading', 'playing', 'paused'
   let isDragging = false;
   let dragOffsetX = 0;
   let dragOffsetY = 0;
@@ -17,6 +17,8 @@
   let isPlayingQueue = false;
   let currentHighlightedPhrase = null;
   let phraseTimeline = [];
+  let pausedAudioQueue = []; // Store queue when paused
+  let currentAudioMetadata = null; // Store metadata for current playing audio chunk
 
   // Create draggable player control
   function createPlayerControl() {
@@ -70,6 +72,10 @@
       button.classList.add('playing');
       button.innerHTML = '⏸';
       button.title = 'Pause';
+    } else if (state === 'paused') {
+      button.classList.remove('loading', 'playing');
+      button.innerHTML = '▶';
+      button.title = 'Resume';
     }
   }
 
@@ -133,6 +139,7 @@
       isPlayingQueue = false;
       updatePlayerState('idle');
       currentAudio = null;
+      currentAudioMetadata = null;
 
       // Clear highlights
       clearPhraseHighlights();
@@ -150,6 +157,7 @@
     const item = audioQueue.shift();
     const audioBlob = item.blob;
     const metadata = item.metadata;
+    currentAudioMetadata = metadata; // Store for pause/resume
 
     const audioUrl = URL.createObjectURL(audioBlob);
     currentAudio = new Audio(audioUrl);
@@ -193,18 +201,35 @@
   // Handle player control button click
   function handlePlayerControlClick() {
     if (playerState === 'playing' && currentAudio) {
+      // Pause the current audio
       currentAudio.pause();
-      // Clear the queue and stop playback
-      audioQueue = [];
-      isPlayingQueue = false;
-      updatePlayerState('idle');
-      currentAudio = null;
 
-      // Clear highlights and restore paragraph
-      clearPhraseHighlights();
-      if (currentParagraph) {
-        restoreParagraph(currentParagraph);
-      }
+      // Save the current state
+      pausedAudioQueue = [...audioQueue]; // Save remaining queue
+      isPlayingQueue = false;
+      updatePlayerState('paused');
+
+      // Don't clear highlights or restore paragraph - keep them visible
+    } else if (playerState === 'paused' && currentAudio) {
+      // Resume the paused audio
+      currentAudio.play().then(() => {
+        // Update highlight to current position when resuming
+        if (currentAudioMetadata) {
+          const startOffsetMs = currentAudioMetadata.start_offset_ms;
+          const currentTimeMs = startOffsetMs + (currentAudio.currentTime * 1000);
+          updatePhraseHighlight(currentTimeMs);
+        }
+      }).catch(err => {
+        console.error('Failed to resume audio:', err);
+        // If resume fails, try playing next in queue
+        playNextInQueue();
+      });
+
+      isPlayingQueue = true;
+      updatePlayerState('playing');
+    } else if (playerState === 'idle' && currentParagraph) {
+      // Start new playback from the stored paragraph
+      handlePlayClick();
     }
   }
 
@@ -311,6 +336,8 @@
         currentAudio = null;
       }
       audioQueue = [];
+      pausedAudioQueue = [];
+      currentAudioMetadata = null;
       isPlayingQueue = false;
 
       // Show player control
