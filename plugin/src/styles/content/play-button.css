@@ -1,0 +1,81 @@
+/* TTS Reader Play Button Styles */
+
+.tts-play-button {
+  /* Positioning */
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  /* Size */
+  width: 32px;
+  height: 32px;
+
+  /* Appearance */
+  background: var(--tts-primary-color, #4285f4);
+  color: white;
+  border-radius: 50%;
+  box-shadow: var(--tts-shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.3));
+  cursor: pointer;
+
+  /* Font */
+  font-size: 14px;
+  font-family: Arial, sans-serif;
+  line-height: 1;
+
+  /* Animation */
+  transition: all 0.2s ease;
+  opacity: 0.9;
+
+  /* Ensure it's on top */
+  z-index: var(--tts-play-button-z, 999999);
+
+  /* Prevent text selection */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.tts-play-button:hover {
+  opacity: 1;
+  transform: scale(1.1);
+  box-shadow: var(--tts-shadow-lg, 0 4px 12px rgba(0, 0, 0, 0.4));
+  background: var(--tts-primary-hover, #3367d6);
+}
+
+.tts-play-button:active {
+  transform: scale(0.95);
+  box-shadow: var(--tts-shadow-sm, 0 2px 6px rgba(0, 0, 0, 0.3));
+}
+
+/* Loading state */
+.tts-play-button.loading {
+  background: var(--tts-loading-color, #ff9800);
+  animation: spin 1s linear infinite;
+}
+
+.tts-play-button.loading:hover {
+  background: var(--tts-loading-hover, #f57c00);
+  transform: scale(1.1);
+}
+
+/* Playing/Pause state */
+.tts-play-button.playing {
+  background: var(--tts-playing-color, #f44336);
+}
+
+.tts-play-button.playing:hover {
+  background: var(--tts-playing-hover, #d32f2f);
+  transform: scale(1.1);
+}
+
+/* Spinner animation */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,0 +1,56 @@
+/* Phrase-level highlighting for TTS */
+
+/* Base style for wrapped phrases */
+.tts-phrase {
+  display: inline;
+  position: relative;
+  transition: all 0.15s ease-in-out;
+  cursor: default;
+  z-index: auto;
+}
+
+/* Highlighted state - active phrase being spoken */
+.tts-phrase.tts-highlighted {
+  background: transparent;
+  color: inherit;
+  border-bottom: 3px solid var(--tts-highlight-color, rgb(255, 193, 7));
+  text-decoration: none;
+  font-weight: 600;
+  z-index: 1;
+  position: relative;
+  animation: tts-highlight-fadein 0.2s ease-in-out;
+
+  /* Prevent text selection during highlighting */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Fade-in animation when phrase becomes highlighted */
+@keyframes tts-highlight-fadein {
+  0% {
+    border-bottom-color: rgba(255, 193, 7, 0);
+  }
+  100% {
+    border-bottom-color: var(--tts-highlight-color, rgb(255, 193, 7));
+  }
+}
+
+/* Smooth transition when removing highlight */
+.tts-phrase:not(.tts-highlighted) {
+  border-bottom-color: transparent;
+  transition: border-bottom-color 0.2s ease-out;
+}
+
+/* Optional: Subtle hover effect */
+.tts-phrase:hover:not(.tts-highlighted) {
+  border-bottom: 1px solid rgba(200, 200, 200, 0.3);
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .tts-phrase.tts-highlighted {
+    border-bottom-color: var(--tts-highlight-dark, rgb(255, 235, 59));
+  }
+}
