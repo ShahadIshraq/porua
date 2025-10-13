@@ -9,9 +9,9 @@
     "test:coverage": "vitest run --coverage",
     "build": "node build/bundle.js",
     "dev": "node build/bundle.js --watch",
-    "package": "node build/package.js",
-    "package:chrome": "node build/package.js --chrome",
-    "package:firefox": "node build/package.js --firefox",
+    "package": "node build/package.cjs",
+    "package:chrome": "node build/package.cjs --chrome",
+    "package:firefox": "node build/package.cjs --firefox",
     "release": "npm run build && npm run package"
   },
   "devDependencies": {
