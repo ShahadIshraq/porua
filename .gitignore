@@ -15,3 +15,6 @@ models/
 # IDE
 .vscode/
 .idea/
+
+# Test coverage
+plugin/coverage/

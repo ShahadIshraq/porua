@@ -363,5 +363,56 @@ describe('StreamParser', () => {
 
       expect(result).toBeNull();
     });
+
+    it('should return null when next boundary not found (incomplete content)', () => {
+      const boundary = 'test';
+      const chunk = createMultipartChunk(boundary, 'application/json', '{"key": "value"}');
+      // Truncate to remove next boundary marker
+      const incomplete = chunk.slice(0, chunk.length - 10);
+      const boundaryBytes = new TextEncoder().encode('--test');
+      const endBoundaryBytes = new TextEncoder().encode('--test--');
+
+      const result = StreamParser.extractNextPart(incomplete, boundaryBytes, endBoundaryBytes);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when JSON parsing fails in metadata part', () => {
+      // Create a chunk with invalid JSON
+      const boundary = 'test';
+      const boundaryLine = `--${boundary}\r\n`;
+      const headers = 'Content-Type: application/json\r\n\r\n';
+      const invalidJson = '{this is not valid json}';
+      const nextBoundary = '\r\n--';
+
+      const buffer = new TextEncoder().encode(
+        boundaryLine + headers + invalidJson + nextBoundary
+      );
+      const boundaryBytes = new TextEncoder().encode('--test');
+      const endBoundaryBytes = new TextEncoder().encode('--test--');
+
+      const result = StreamParser.extractNextPart(buffer, boundaryBytes, endBoundaryBytes);
+
+      expect(result).toBeNull();
+    });
+
+    it('should handle unknown content types', () => {
+      const boundary = 'test';
+      const boundaryLine = `--${boundary}\r\n`;
+      const headers = 'Content-Type: text/plain\r\n\r\n';
+      const content = 'Some plain text';
+      const nextBoundary = '\r\n--';
+
+      const buffer = new TextEncoder().encode(
+        boundaryLine + headers + content + nextBoundary
+      );
+      const boundaryBytes = new TextEncoder().encode('--test');
+      const endBoundaryBytes = new TextEncoder().encode('--test--');
+
+      const result = StreamParser.extractNextPart(buffer, boundaryBytes, endBoundaryBytes);
+
+      expect(result).not.toBeNull();
+      expect(result.data.type).toBe('unknown');
+    });
   });
 });
