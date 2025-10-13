@@ -5,6 +5,8 @@ mod auth;
 mod error;
 mod utils;
 mod models;
+mod audio;
+mod services;
 
 use kokoro::model_paths::{get_model_path, get_voices_path};
 use kokoro::voice_config::Voice;
@@ -136,12 +138,11 @@ async fn main() -> error::Result<()> {
         // Read the generated WAV file
         let audio_bytes = std::fs::read(output_path)?;
 
-        // Calculate duration using server helper functions
-        use server::{calculate_wav_duration_cli, segment_phrases_cli, segment_words_cli};
+        // Calculate duration and segment text
         use models::{PhraseMetadata, ChunkMetadata};
 
-        let duration_ms = calculate_wav_duration_cli(&audio_bytes)?;
-        let phrase_texts = segment_phrases_cli(&text);
+        let duration_ms = audio::duration::calculate(&audio_bytes)?;
+        let phrase_texts = audio::segmentation::segment_phrases(&text);
 
         // Calculate character-weighted durations for each phrase
         let total_chars: usize = phrase_texts.iter().map(|p| p.len()).sum();
@@ -149,7 +150,7 @@ async fn main() -> error::Result<()> {
         let mut cumulative_time = 0.0;
 
         for phrase_text in phrase_texts {
-            let phrase_words = segment_words_cli(&phrase_text);
+            let phrase_words = audio::segmentation::segment_words(&phrase_text);
             let char_weight = phrase_text.len() as f64 / total_chars as f64;
             let phrase_duration = duration_ms * char_weight;
 
