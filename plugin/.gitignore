@@ -1,9 +1,10 @@
 node_modules/
+coverage
 dist/
+packages/
 package-lock.json
 
 # Packaging artifacts
-packages/
 .packaging-temp/
 *.zip
 *.xpi
