@@ -493,15 +493,11 @@ describe('AudioQueue', () => {
       expect(mockHighlightManager.clearHighlights).toHaveBeenCalled();
     });
 
-    it('should restore paragraph after timeout', () => {
+    it('should restore paragraph immediately', () => {
       const mockParagraph = document.createElement('p');
       mockState.getParagraph.mockReturnValue(mockParagraph);
 
       audioQueue.finish();
-
-      expect(mockHighlightManager.restoreParagraph).not.toHaveBeenCalled();
-
-      vi.advanceTimersByTime(TIMEOUTS.PARAGRAPH_RESTORE);
 
       expect(mockState.getParagraph).toHaveBeenCalled();
       expect(mockHighlightManager.restoreParagraph).toHaveBeenCalledWith(mockParagraph);
@@ -511,7 +507,6 @@ describe('AudioQueue', () => {
       mockState.getParagraph.mockReturnValue(null);
 
       audioQueue.finish();
-      vi.advanceTimersByTime(TIMEOUTS.PARAGRAPH_RESTORE);
 
       expect(mockHighlightManager.restoreParagraph).not.toHaveBeenCalled();
     });

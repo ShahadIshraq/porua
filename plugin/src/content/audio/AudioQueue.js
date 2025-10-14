@@ -111,15 +111,19 @@ export class AudioQueue {
   finish() {
     this.isPlaying = false;
     this.state.setState(PLAYER_STATES.IDLE);
-    this.currentAudio = null;
-    this.currentMetadata = null;
+
+    // Clear highlights immediately
     this.highlightManager.clearHighlights();
 
-    setTimeout(() => {
-      const paragraph = this.state.getParagraph();
-      if (paragraph) {
-        this.highlightManager.restoreParagraph(paragraph);
-      }
-    }, TIMEOUTS.PARAGRAPH_RESTORE);
+    // Restore paragraph immediately (no timeout!)
+    // Only restore if we're truly done and not paused
+    const paragraph = this.state.getParagraph();
+    if (paragraph) {
+      this.highlightManager.restoreParagraph(paragraph);
+    }
+
+    // Clean up audio references
+    this.currentAudio = null;
+    this.currentMetadata = null;
   }
 }

@@ -1,8 +1,10 @@
 import { escapeHtml } from '../utils/dom.js';
+import { PhraseMatcher } from '../utils/phraseMatcher.js';
 
 export class HighlightManager {
   constructor(state) {
     this.state = state;
+    this.mutationObserver = null;
   }
 
   wrapPhrases(paragraph, timeline) {
@@ -11,32 +13,112 @@ export class HighlightManager {
     }
 
     const originalText = paragraph.textContent;
-    const phrasesToFind = timeline.map(t => t.phrase);
+    const matcher = new PhraseMatcher(originalText);
 
     let currentIndex = 0;
     let html = '';
-    let timelineIndex = 0;
+    let wrappedCount = 0;
+    const failedPhrases = [];
 
-    for (const phraseText of phrasesToFind) {
-      const phraseIndex = originalText.indexOf(phraseText, currentIndex);
-      if (phraseIndex === -1) continue;
+    for (let timelineIndex = 0; timelineIndex < timeline.length; timelineIndex++) {
+      const phraseData = timeline[timelineIndex];
+      const phraseText = phraseData.phrase;
 
-      if (phraseIndex > currentIndex) {
-        html += escapeHtml(originalText.substring(currentIndex, phraseIndex));
+      // Use word-count matcher
+      const match = matcher.find(phraseText, currentIndex);
+
+      if (!match) {
+        failedPhrases.push({
+          index: timelineIndex,
+          phrase: phraseText,
+          searchStart: currentIndex
+        });
+        continue;
       }
 
-      const phraseData = timeline[timelineIndex];
-      html += `<span class="tts-phrase" data-start-time="${phraseData.startTime}" data-end-time="${phraseData.endTime}" data-phrase-index="${timelineIndex}">${escapeHtml(phraseText)}</span>`;
+      // Add any gap text before this phrase
+      if (match.index > currentIndex) {
+        const gapText = originalText.substring(currentIndex, match.index);
+        html += escapeHtml(gapText);
+      }
 
-      currentIndex = phraseIndex + phraseText.length;
-      timelineIndex++;
+      // Extract actual matched text from original
+      const actualText = originalText.substring(
+        match.index,
+        match.index + match.length
+      );
+
+      // Create span with phrase data
+      html += `<span class="tts-phrase" `;
+      html += `data-start-time="${phraseData.startTime}" `;
+      html += `data-end-time="${phraseData.endTime}" `;
+      html += `data-phrase-index="${timelineIndex}"`;
+      html += `>${escapeHtml(actualText)}</span>`;
+
+      currentIndex = match.index + match.length;
+      wrappedCount++;
     }
 
+    // Add any remaining text after last phrase
     if (currentIndex < originalText.length) {
       html += escapeHtml(originalText.substring(currentIndex));
     }
 
+    // Update paragraph HTML
     paragraph.innerHTML = html;
+
+    // Setup DOM protection
+    this.setupDOMProtection(paragraph);
+  }
+
+  /**
+   * Setup MutationObserver to detect external DOM changes.
+   */
+  setupDOMProtection(paragraph) {
+    // Disconnect existing observer
+    if (this.mutationObserver) {
+      this.mutationObserver.disconnect();
+    }
+
+    this.mutationObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.type === 'childList' || mutation.type === 'characterData') {
+          // Check if our phrase spans still exist
+          const phraseSpans = paragraph.querySelectorAll('.tts-phrase');
+
+          if (phraseSpans.length === 0) {
+            this.attemptReWrap();
+          }
+        }
+      }
+    });
+
+    // Observe changes to paragraph
+    this.mutationObserver.observe(paragraph, {
+      childList: true,
+      characterData: true,
+      subtree: true
+    });
+  }
+
+  /**
+   * Attempt to re-wrap phrases after DOM corruption.
+   */
+  attemptReWrap() {
+    const paragraph = this.state.getParagraph();
+    const timeline = this.state.getPhraseTimeline();
+
+    if (!paragraph || !timeline || timeline.length === 0) {
+      return;
+    }
+
+    // Restore original HTML
+    if (paragraph.dataset.originalHtml) {
+      paragraph.innerHTML = paragraph.dataset.originalHtml;
+    }
+
+    // Re-wrap
+    this.wrapPhrases(paragraph, timeline);
   }
 
   restoreParagraph(paragraph) {
@@ -55,17 +137,38 @@ export class HighlightManager {
     const paragraph = this.state.getParagraph();
     if (!paragraph) return;
 
+    // Check if the paragraph still has phrase spans
     const phraseSpans = paragraph.querySelectorAll('.tts-phrase[data-start-time][data-end-time]');
 
+    if (phraseSpans.length === 0) {
+      // Attempt to re-wrap if we still have timeline data
+      const timeline = this.state.getPhraseTimeline();
+      if (timeline && timeline.length > 0 && paragraph.dataset.originalHtml) {
+        this.wrapPhrases(paragraph, timeline);
+      }
+      return;
+    }
+
+    let foundMatch = false;
     for (const span of phraseSpans) {
       const startTime = parseFloat(span.dataset.startTime);
       const endTime = parseFloat(span.dataset.endTime);
+      const phraseIndex = span.dataset.phraseIndex;
+      const phraseText = span.textContent;
 
-      if (currentTimeMs >= startTime && currentTimeMs < endTime) {
+      const isInRange = currentTimeMs >= startTime && currentTimeMs < endTime;
+
+      if (isInRange) {
+        foundMatch = true;
         const currentHighlight = this.state.getHighlightedPhrase();
 
+        // Check if current highlight is still valid (attached to DOM)
+        if (currentHighlight && !currentHighlight.isConnected) {
+          this.state.setHighlightedPhrase(null);
+        }
+
         if (currentHighlight !== span) {
-          if (currentHighlight) {
+          if (currentHighlight && currentHighlight.isConnected) {
             currentHighlight.classList.remove('tts-highlighted');
           }
 
