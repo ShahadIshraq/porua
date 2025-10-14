@@ -6,10 +6,12 @@ use std::fmt;
 pub enum TtsError {
     // I/O errors
     Io(std::io::Error),
+    #[allow(dead_code)]
     FileNotFound(String),
 
     // TTS engine errors
     TtsEngine(String),
+    #[allow(dead_code)]
     PoolExhausted,
 
     // Audio processing errors
@@ -17,12 +19,15 @@ pub enum TtsError {
     WavConcatenation(String),
 
     // Request validation errors
+    #[allow(dead_code)]
     InvalidRequest(String),
     EmptyText,
     InvalidSpeed(f32),
 
     // Auth errors
+    #[allow(dead_code)]
     Unauthorized,
+    #[allow(dead_code)]
     InvalidApiKey,
 
     // Internal errors

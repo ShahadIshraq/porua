@@ -36,6 +36,7 @@ impl SegmentationConfig {
     }
 
     /// Preset for linguistic analysis
+    #[allow(dead_code)]
     pub fn for_linguistic_analysis() -> Self {
         Self {
             max_phrase_words: 10,
@@ -47,6 +48,7 @@ impl SegmentationConfig {
     }
 
     /// Preset for subtitle generation (shorter phrases)
+    #[allow(dead_code)]
     pub fn for_subtitles() -> Self {
         Self {
             max_phrase_words: 6,
@@ -58,6 +60,7 @@ impl SegmentationConfig {
     }
 
     /// Preset for natural reading (longer phrases)
+    #[allow(dead_code)]
     pub fn for_reading() -> Self {
         Self {
             max_phrase_words: 12,
