@@ -13,7 +13,8 @@ describe('AudioQueue', () => {
     // Mock PlaybackState
     mockState = {
       setState: vi.fn(),
-      getParagraph: vi.fn()
+      getPlayingParagraph: vi.fn(),
+      setPlayingParagraph: vi.fn()
     };
 
     // Mock HighlightManager
@@ -495,20 +496,26 @@ describe('AudioQueue', () => {
 
     it('should restore paragraph immediately', () => {
       const mockParagraph = document.createElement('p');
-      mockState.getParagraph.mockReturnValue(mockParagraph);
+      mockState.getPlayingParagraph.mockReturnValue(mockParagraph);
 
       audioQueue.finish();
 
-      expect(mockState.getParagraph).toHaveBeenCalled();
+      expect(mockState.getPlayingParagraph).toHaveBeenCalled();
       expect(mockHighlightManager.restoreParagraph).toHaveBeenCalledWith(mockParagraph);
     });
 
     it('should not restore paragraph if none exists', () => {
-      mockState.getParagraph.mockReturnValue(null);
+      mockState.getPlayingParagraph.mockReturnValue(null);
 
       audioQueue.finish();
 
       expect(mockHighlightManager.restoreParagraph).not.toHaveBeenCalled();
+    });
+
+    it('should clear playing paragraph reference', () => {
+      audioQueue.finish();
+
+      expect(mockState.setPlayingParagraph).toHaveBeenCalledWith(null);
     });
   });
 

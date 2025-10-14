@@ -32,12 +32,13 @@ class TTSContentScript {
   }
 
   async handlePlayClick() {
-    const paragraph = this.state.getParagraph();
+    const paragraph = this.playButton.currentParagraph;
     if (!paragraph) return;
 
     const text = paragraph.textContent.trim();
 
     this.audioQueue.clear();
+    this.state.setPlayingParagraph(paragraph);
     this.playerControl.show();
     this.state.setState(PLAYER_STATES.LOADING);
 
@@ -59,7 +60,7 @@ class TTSContentScript {
     } else if (currentState === PLAYER_STATES.PAUSED) {
       this.audioQueue.resume();
     } else if (currentState === PLAYER_STATES.IDLE) {
-      const paragraph = this.state.getParagraph();
+      const paragraph = this.state.getPlayingParagraph();
       if (paragraph) {
         this.handlePlayClick();
       }
@@ -98,7 +99,7 @@ class TTSContentScript {
     const phraseTimeline = StreamParser.buildPhraseTimeline(metadataArray);
     this.state.setPhraseTimeline(phraseTimeline);
 
-    const paragraph = this.state.getParagraph();
+    const paragraph = this.state.getPlayingParagraph();
     if (paragraph && phraseTimeline.length > 0) {
       this.highlightManager.wrapPhrases(paragraph, phraseTimeline);
     }

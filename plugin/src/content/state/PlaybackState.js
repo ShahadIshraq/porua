@@ -4,8 +4,8 @@ export class PlaybackState {
   constructor() {
     this.state = PLAYER_STATES.IDLE;
     this.listeners = new Set();
-    this.currentParagraph = null;
-    this.currentHighlightedPhrase = null;
+    this.playingParagraph = null;
+    this.highlightedPhrase = null;
     this.phraseTimeline = [];
   }
 
@@ -20,20 +20,20 @@ export class PlaybackState {
     return this.state;
   }
 
-  setParagraph(paragraph) {
-    this.currentParagraph = paragraph;
+  setPlayingParagraph(paragraph) {
+    this.playingParagraph = paragraph;
   }
 
-  getParagraph() {
-    return this.currentParagraph;
+  getPlayingParagraph() {
+    return this.playingParagraph;
   }
 
   setHighlightedPhrase(phrase) {
-    this.currentHighlightedPhrase = phrase;
+    this.highlightedPhrase = phrase;
   }
 
   getHighlightedPhrase() {
-    return this.currentHighlightedPhrase;
+    return this.highlightedPhrase;
   }
 
   setPhraseTimeline(timeline) {
@@ -55,8 +55,8 @@ export class PlaybackState {
 
   reset() {
     this.state = PLAYER_STATES.IDLE;
-    this.currentParagraph = null;
-    this.currentHighlightedPhrase = null;
+    this.playingParagraph = null;
+    this.highlightedPhrase = null;
     this.phraseTimeline = [];
     this.notify();
   }
