@@ -118,13 +118,17 @@ export class StreamParser {
 
     for (const metadata of metadataArray) {
       const { chunk_index, phrases, start_offset_ms } = metadata;
+
       if (!phrases || phrases.length === 0) continue;
 
       for (const phrase of phrases) {
+        const startTime = start_offset_ms + phrase.start_ms;
+        const endTime = start_offset_ms + phrase.start_ms + phrase.duration_ms;
+
         timeline.push({
           phrase: phrase.text,
-          startTime: start_offset_ms + phrase.start_ms,
-          endTime: start_offset_ms + phrase.start_ms + phrase.duration_ms,
+          startTime: startTime,
+          endTime: endTime,
           chunkIndex: chunk_index
         });
       }

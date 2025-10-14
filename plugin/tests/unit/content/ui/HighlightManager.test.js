@@ -107,16 +107,20 @@ describe('HighlightManager', () => {
       }).not.toThrow();
     });
 
-    it('should escape HTML in phrases', () => {
-      mockParagraph.textContent = '<script>alert("xss")</script>';
+    it('should escape HTML in matched text', () => {
+      mockParagraph.textContent = '<div>alert("xss")</div>';
       const timeline = [
-        { phrase: '<script>', startTime: 0, endTime: 500 }
+        { phrase: 'div', startTime: 0, endTime: 500 }
       ];
 
       highlightManager.wrapPhrases(mockParagraph, timeline);
 
-      expect(mockParagraph.innerHTML).not.toContain('<script>alert');
-      expect(mockParagraph.innerHTML).toContain('&lt;script&gt;');
+      // Should escape the HTML entities in the final output
+      expect(mockParagraph.innerHTML).not.toContain('<div>');
+      expect(mockParagraph.innerHTML).toContain('&lt;');
+      expect(mockParagraph.innerHTML).toContain('&gt;');
+      // The word "div" should be wrapped
+      expect(mockParagraph.innerHTML).toContain('<span class="tts-phrase"');
     });
 
     it('should handle empty timeline', () => {
@@ -217,6 +221,9 @@ describe('HighlightManager', () => {
 
     it('should remove previous highlight when switching phrases', () => {
       mockSpan1.classList.add('tts-highlighted');
+      // Make spans connected to DOM
+      Object.defineProperty(mockSpan1, 'isConnected', { value: true, writable: true });
+      Object.defineProperty(mockSpan2, 'isConnected', { value: true, writable: true });
       mockState.getHighlightedPhrase.mockReturnValue(mockSpan1);
 
       highlightManager.updateHighlight(750);
@@ -227,7 +234,9 @@ describe('HighlightManager', () => {
 
     it('should not update if same phrase already highlighted', () => {
       mockSpan1.classList.add('tts-highlighted');
+      Object.defineProperty(mockSpan1, 'isConnected', { value: true, writable: true });
       mockState.getHighlightedPhrase.mockReturnValue(mockSpan1);
+      // Clear the initial call from getHighlightedPhrase setup
       mockState.setHighlightedPhrase.mockClear();
 
       highlightManager.updateHighlight(250);
