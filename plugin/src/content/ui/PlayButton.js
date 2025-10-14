@@ -9,6 +9,8 @@ export class PlayButton {
     this.element = null;
     this.currentParagraph = null;
     this.hideTimeout = null;
+    this.rafId = null;
+    this.pendingPosition = false;
   }
 
   init() {
@@ -33,9 +35,7 @@ export class PlayButton {
 
   setupScrollListener() {
     const handleScroll = () => {
-      if (this.element && this.currentParagraph) {
-        this.position(this.currentParagraph);
-      }
+      this.schedulePosition();
     };
 
     this.eventManager.on(window, 'scroll', handleScroll, true);
@@ -43,12 +43,22 @@ export class PlayButton {
 
   setupResizeListener() {
     const handleResize = () => {
-      if (this.element && this.currentParagraph) {
-        this.position(this.currentParagraph);
-      }
+      this.schedulePosition();
     };
 
     this.eventManager.on(window, 'resize', handleResize);
+  }
+
+  schedulePosition() {
+    if (!this.element || !this.currentParagraph) return;
+
+    if (this.pendingPosition) return;
+
+    this.pendingPosition = true;
+    this.rafId = requestAnimationFrame(() => {
+      this.position(this.currentParagraph);
+      this.pendingPosition = false;
+    });
   }
 
   create() {
@@ -99,7 +109,6 @@ export class PlayButton {
     this.hide();
 
     this.currentParagraph = paragraph;
-    this.state.setParagraph(paragraph);
     this.element = this.create();
     document.body.appendChild(this.element);
     this.position(paragraph);
@@ -132,6 +141,10 @@ export class PlayButton {
   }
 
   cleanup() {
+    if (this.rafId) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
     this.hide();
     this.currentParagraph = null;
   }

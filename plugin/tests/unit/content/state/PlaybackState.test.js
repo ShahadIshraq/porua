@@ -15,7 +15,7 @@ describe('PlaybackState', () => {
     });
 
     it('should initialize with null paragraph', () => {
-      expect(playbackState.getParagraph()).toBeNull();
+      expect(playbackState.getPlayingParagraph()).toBeNull();
     });
 
     it('should initialize with null highlighted phrase', () => {
@@ -147,20 +147,20 @@ describe('PlaybackState', () => {
       const paragraph = document.createElement('p');
       paragraph.textContent = 'Test paragraph';
 
-      playbackState.setParagraph(paragraph);
+      playbackState.setPlayingParagraph(paragraph);
 
-      expect(playbackState.getParagraph()).toBe(paragraph);
+      expect(playbackState.getPlayingParagraph()).toBe(paragraph);
     });
 
     it('should update paragraph', () => {
       const paragraph1 = document.createElement('p');
       const paragraph2 = document.createElement('p');
 
-      playbackState.setParagraph(paragraph1);
-      expect(playbackState.getParagraph()).toBe(paragraph1);
+      playbackState.setPlayingParagraph(paragraph1);
+      expect(playbackState.getPlayingParagraph()).toBe(paragraph1);
 
-      playbackState.setParagraph(paragraph2);
-      expect(playbackState.getParagraph()).toBe(paragraph2);
+      playbackState.setPlayingParagraph(paragraph2);
+      expect(playbackState.getPlayingParagraph()).toBe(paragraph2);
     });
   });
 
@@ -212,14 +212,14 @@ describe('PlaybackState', () => {
       const timeline = [{ phrase: 'Test', startTime: 0, endTime: 500 }];
 
       playbackState.setState(PLAYER_STATES.PLAYING);
-      playbackState.setParagraph(paragraph);
+      playbackState.setPlayingParagraph(paragraph);
       playbackState.setHighlightedPhrase('test phrase');
       playbackState.setPhraseTimeline(timeline);
 
       playbackState.reset();
 
       expect(playbackState.getState()).toBe(PLAYER_STATES.IDLE);
-      expect(playbackState.getParagraph()).toBeNull();
+      expect(playbackState.getPlayingParagraph()).toBeNull();
       expect(playbackState.getHighlightedPhrase()).toBeNull();
       expect(playbackState.getPhraseTimeline()).toEqual([]);
     });

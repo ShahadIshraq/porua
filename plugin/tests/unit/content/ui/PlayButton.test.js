@@ -12,7 +12,6 @@ describe('PlayButton', () => {
   beforeEach(() => {
     // Mock PlaybackState
     mockState = {
-      setParagraph: vi.fn(),
       getState: vi.fn(() => 'idle')
     };
 
@@ -157,7 +156,7 @@ describe('PlayButton', () => {
       expect(scrollCall).toBeDefined();
     });
 
-    it('should reposition button on scroll', () => {
+    it('should reposition button on scroll', async () => {
       const positionSpy = vi.spyOn(playButton, 'position');
       playButton.setupScrollListener();
       playButton.element = document.createElement('div');
@@ -168,6 +167,7 @@ describe('PlayButton', () => {
       )[2];
 
       scrollHandler();
+      await vi.runAllTimersAsync();
 
       expect(positionSpy).toHaveBeenCalledWith(mockParagraph);
     });
@@ -198,7 +198,7 @@ describe('PlayButton', () => {
       expect(resizeCall).toBeDefined();
     });
 
-    it('should reposition button on resize', () => {
+    it('should reposition button on resize', async () => {
       const positionSpy = vi.spyOn(playButton, 'position');
       playButton.setupResizeListener();
       playButton.element = document.createElement('div');
@@ -209,6 +209,7 @@ describe('PlayButton', () => {
       )[2];
 
       resizeHandler();
+      await vi.runAllTimersAsync();
 
       expect(positionSpy).toHaveBeenCalledWith(mockParagraph);
     });
@@ -323,7 +324,6 @@ describe('PlayButton', () => {
       playButton.show(mockParagraph);
 
       expect(playButton.currentParagraph).toBe(mockParagraph);
-      expect(mockState.setParagraph).toHaveBeenCalledWith(mockParagraph);
     });
 
     it('should clear hide timeout', () => {

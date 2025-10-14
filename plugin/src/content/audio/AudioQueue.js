@@ -117,10 +117,13 @@ export class AudioQueue {
 
     // Restore paragraph immediately (no timeout!)
     // Only restore if we're truly done and not paused
-    const paragraph = this.state.getParagraph();
+    const paragraph = this.state.getPlayingParagraph();
     if (paragraph) {
       this.highlightManager.restoreParagraph(paragraph);
     }
+
+    // Clear playing paragraph reference
+    this.state.setPlayingParagraph(null);
 
     // Clean up audio references
     this.currentAudio = null;

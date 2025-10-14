@@ -9,7 +9,8 @@ describe('HighlightManager', () => {
   beforeEach(() => {
     // Mock PlaybackState
     mockState = {
-      getParagraph: vi.fn(),
+      getPlayingParagraph: vi.fn(),
+      getPhraseTimeline: vi.fn(),
       getHighlightedPhrase: vi.fn(),
       setHighlightedPhrase: vi.fn()
     };
@@ -19,6 +20,13 @@ describe('HighlightManager', () => {
     mockParagraph.textContent = 'Hello World this is a test';
     mockParagraph.querySelectorAll = vi.fn(() => []);
     mockParagraph.querySelector = vi.fn();
+
+    // Mock IntersectionObserver
+    global.IntersectionObserver = vi.fn((callback, options) => ({
+      observe: vi.fn(),
+      unobserve: vi.fn(),
+      disconnect: vi.fn()
+    }));
 
     highlightManager = new HighlightManager(mockState);
 
@@ -196,7 +204,7 @@ describe('HighlightManager', () => {
       mockSpan3.dataset.endTime = '1500';
 
       mockParagraph.querySelectorAll = vi.fn(() => [mockSpan1, mockSpan2, mockSpan3]);
-      mockState.getParagraph.mockReturnValue(mockParagraph);
+      mockState.getPlayingParagraph.mockReturnValue(mockParagraph);
     });
 
     it('should add highlight class to matching phrase', () => {
@@ -254,7 +262,7 @@ describe('HighlightManager', () => {
     });
 
     it('should return early if no paragraph', () => {
-      mockState.getParagraph.mockReturnValue(null);
+      mockState.getPlayingParagraph.mockReturnValue(null);
       mockState.setHighlightedPhrase.mockClear();
 
       highlightManager.updateHighlight(100);
@@ -277,19 +285,46 @@ describe('HighlightManager', () => {
 
   describe('scrollToPhraseIfNeeded', () => {
     let mockSpan;
+    let mockObserver;
 
     beforeEach(() => {
       mockSpan = document.createElement('span');
       mockSpan.scrollIntoView = vi.fn();
+
+      // Reset IntersectionObserver mock for each test
+      mockObserver = {
+        observe: vi.fn(),
+        unobserve: vi.fn(),
+        disconnect: vi.fn()
+      };
+      global.IntersectionObserver = vi.fn(() => mockObserver);
     });
 
-    it('should scroll when phrase is above viewport', () => {
-      mockSpan.getBoundingClientRect = vi.fn(() => ({
-        top: -100,
-        bottom: -50
-      }));
-
+    it('should create IntersectionObserver and observe phrase', () => {
       highlightManager.scrollToPhraseIfNeeded(mockSpan);
+
+      expect(global.IntersectionObserver).toHaveBeenCalled();
+      expect(mockObserver.observe).toHaveBeenCalledWith(mockSpan);
+    });
+
+    it('should unobserve previous span when observing new one', () => {
+      const span1 = document.createElement('span');
+      const span2 = document.createElement('span');
+
+      highlightManager.scrollToPhraseIfNeeded(span1);
+      highlightManager.scrollToPhraseIfNeeded(span2);
+
+      expect(mockObserver.unobserve).toHaveBeenCalledWith(span1);
+      expect(mockObserver.observe).toHaveBeenCalledWith(span2);
+    });
+
+    it('should scroll when phrase is not intersecting', () => {
+      // Get the callback passed to IntersectionObserver
+      highlightManager.scrollToPhraseIfNeeded(mockSpan);
+      const callback = global.IntersectionObserver.mock.calls[0][0];
+
+      // Simulate phrase not visible (not intersecting)
+      callback([{ target: mockSpan, isIntersecting: false }]);
 
       expect(mockSpan.scrollIntoView).toHaveBeenCalledWith({
         behavior: 'smooth',
@@ -298,46 +333,12 @@ describe('HighlightManager', () => {
       });
     });
 
-    it('should scroll when phrase is below viewport', () => {
-      mockSpan.getBoundingClientRect = vi.fn(() => ({
-        top: 1000,
-        bottom: 1100
-      }));
-
+    it('should not scroll when phrase is intersecting', () => {
       highlightManager.scrollToPhraseIfNeeded(mockSpan);
+      const callback = global.IntersectionObserver.mock.calls[0][0];
 
-      expect(mockSpan.scrollIntoView).toHaveBeenCalled();
-    });
-
-    it('should not scroll when phrase is visible', () => {
-      mockSpan.getBoundingClientRect = vi.fn(() => ({
-        top: 100,
-        bottom: 200
-      }));
-
-      highlightManager.scrollToPhraseIfNeeded(mockSpan);
-
-      expect(mockSpan.scrollIntoView).not.toHaveBeenCalled();
-    });
-
-    it('should not scroll when phrase is at top edge', () => {
-      mockSpan.getBoundingClientRect = vi.fn(() => ({
-        top: 0,
-        bottom: 50
-      }));
-
-      highlightManager.scrollToPhraseIfNeeded(mockSpan);
-
-      expect(mockSpan.scrollIntoView).not.toHaveBeenCalled();
-    });
-
-    it('should not scroll when phrase is at bottom edge', () => {
-      mockSpan.getBoundingClientRect = vi.fn(() => ({
-        top: 700,
-        bottom: 768
-      }));
-
-      highlightManager.scrollToPhraseIfNeeded(mockSpan);
+      // Simulate phrase visible (intersecting)
+      callback([{ target: mockSpan, isIntersecting: true }]);
 
       expect(mockSpan.scrollIntoView).not.toHaveBeenCalled();
     });
