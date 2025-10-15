@@ -1,6 +1,6 @@
 import { createElement, getScrollPosition } from '../utils/dom.js';
 import { TIMEOUTS, Z_INDEX } from '../../shared/utils/constants.js';
-import { shouldShowPlayButton, isReadableElement } from '../../shared/config/readableElements.js';
+import { shouldShowPlayButton, isReadableElement } from '../../shared/utils/elementValidation.js';
 
 export class PlayButton {
   constructor(state, eventManager, onPlayClick) {
