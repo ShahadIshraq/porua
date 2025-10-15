@@ -29,6 +29,10 @@ describe('PlaybackState', () => {
     it('should initialize with empty listeners set', () => {
       expect(playbackState.listeners.size).toBe(0);
     });
+
+    it('should initialize with continuous mode disabled', () => {
+      expect(playbackState.isContinuousMode()).toBe(false);
+    });
   });
 
   describe('setState', () => {
@@ -206,6 +210,29 @@ describe('PlaybackState', () => {
     });
   });
 
+  describe('continuous mode', () => {
+    it('should set continuous mode to true', () => {
+      playbackState.setContinuousMode(true);
+      expect(playbackState.isContinuousMode()).toBe(true);
+    });
+
+    it('should set continuous mode to false', () => {
+      playbackState.setContinuousMode(true);
+      playbackState.setContinuousMode(false);
+      expect(playbackState.isContinuousMode()).toBe(false);
+    });
+
+    it('should toggle continuous mode', () => {
+      expect(playbackState.isContinuousMode()).toBe(false);
+
+      playbackState.setContinuousMode(true);
+      expect(playbackState.isContinuousMode()).toBe(true);
+
+      playbackState.setContinuousMode(false);
+      expect(playbackState.isContinuousMode()).toBe(false);
+    });
+  });
+
   describe('reset', () => {
     it('should clear all state', () => {
       const paragraph = document.createElement('p');
@@ -215,6 +242,7 @@ describe('PlaybackState', () => {
       playbackState.setPlayingParagraph(paragraph);
       playbackState.setHighlightedPhrase('test phrase');
       playbackState.setPhraseTimeline(timeline);
+      playbackState.setContinuousMode(true);
 
       playbackState.reset();
 
@@ -222,6 +250,7 @@ describe('PlaybackState', () => {
       expect(playbackState.getPlayingParagraph()).toBeNull();
       expect(playbackState.getHighlightedPhrase()).toBeNull();
       expect(playbackState.getPhraseTimeline()).toEqual([]);
+      expect(playbackState.isContinuousMode()).toBe(false);
     });
 
     it('should notify listeners after reset', () => {

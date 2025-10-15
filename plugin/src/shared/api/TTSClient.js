@@ -22,6 +22,18 @@ export class TTSClient {
     });
   }
 
+  async synthesize(text, options = {}) {
+    return await this.fetch('/tts', {
+      method: 'POST',
+      body: JSON.stringify({
+        text,
+        voice: options.voice || 'bf_lily',
+        speed: options.speed || 1.0
+      }),
+      signal: options.signal
+    });
+  }
+
   async fetch(endpoint, options = {}) {
     const headers = {
       'Content-Type': 'application/json',

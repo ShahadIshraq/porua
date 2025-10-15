@@ -14,7 +14,8 @@ describe('AudioQueue', () => {
     mockState = {
       setState: vi.fn(),
       getPlayingParagraph: vi.fn(),
-      setPlayingParagraph: vi.fn()
+      setPlayingParagraph: vi.fn(),
+      isContinuousMode: vi.fn(() => false)
     };
 
     // Mock HighlightManager
@@ -463,6 +464,26 @@ describe('AudioQueue', () => {
     });
   });
 
+  describe('setOnQueueEmpty', () => {
+    it('should set callback', () => {
+      const callback = vi.fn();
+
+      audioQueue.setOnQueueEmpty(callback);
+
+      expect(audioQueue.onQueueEmptyCallback).toBe(callback);
+    });
+
+    it('should allow updating callback', () => {
+      const callback1 = vi.fn();
+      const callback2 = vi.fn();
+
+      audioQueue.setOnQueueEmpty(callback1);
+      audioQueue.setOnQueueEmpty(callback2);
+
+      expect(audioQueue.onQueueEmptyCallback).toBe(callback2);
+    });
+  });
+
   describe('finish', () => {
     it('should set isPlaying to false', () => {
       audioQueue.isPlaying = true;
@@ -472,13 +493,41 @@ describe('AudioQueue', () => {
       expect(audioQueue.isPlaying).toBe(false);
     });
 
-    it('should set state to IDLE', () => {
+    it('should call onQueueEmptyCallback in continuous mode', () => {
+      mockState.isContinuousMode = vi.fn(() => true);
+      const callback = vi.fn();
+      audioQueue.setOnQueueEmpty(callback);
+
+      audioQueue.finish();
+
+      expect(callback).toHaveBeenCalled();
+      expect(mockState.setState).not.toHaveBeenCalled();
+    });
+
+    it('should not do cleanup in continuous mode', () => {
+      mockState.isContinuousMode = vi.fn(() => true);
+      const callback = vi.fn();
+      audioQueue.setOnQueueEmpty(callback);
+      const mockParagraph = document.createElement('p');
+      mockState.getPlayingParagraph.mockReturnValue(mockParagraph);
+
+      audioQueue.finish();
+
+      expect(mockHighlightManager.clearHighlights).not.toHaveBeenCalled();
+      expect(mockHighlightManager.restoreParagraph).not.toHaveBeenCalled();
+      expect(mockState.setPlayingParagraph).not.toHaveBeenCalled();
+    });
+
+    it('should set state to IDLE in normal mode', () => {
+      mockState.isContinuousMode = vi.fn(() => false);
+
       audioQueue.finish();
 
       expect(mockState.setState).toHaveBeenCalledWith(PLAYER_STATES.IDLE);
     });
 
-    it('should null currentAudio and metadata', () => {
+    it('should null currentAudio and metadata in normal mode', () => {
+      mockState.isContinuousMode = vi.fn(() => false);
       audioQueue.currentAudio = mockAudio;
       audioQueue.currentMetadata = { start_offset_ms: 0 };
 
@@ -488,13 +537,16 @@ describe('AudioQueue', () => {
       expect(audioQueue.currentMetadata).toBeNull();
     });
 
-    it('should clear highlights', () => {
+    it('should clear highlights in normal mode', () => {
+      mockState.isContinuousMode = vi.fn(() => false);
+
       audioQueue.finish();
 
       expect(mockHighlightManager.clearHighlights).toHaveBeenCalled();
     });
 
-    it('should restore paragraph immediately', () => {
+    it('should restore paragraph immediately in normal mode', () => {
+      mockState.isContinuousMode = vi.fn(() => false);
       const mockParagraph = document.createElement('p');
       mockState.getPlayingParagraph.mockReturnValue(mockParagraph);
 
@@ -504,7 +556,8 @@ describe('AudioQueue', () => {
       expect(mockHighlightManager.restoreParagraph).toHaveBeenCalledWith(mockParagraph);
     });
 
-    it('should not restore paragraph if none exists', () => {
+    it('should not restore paragraph if none exists in normal mode', () => {
+      mockState.isContinuousMode = vi.fn(() => false);
       mockState.getPlayingParagraph.mockReturnValue(null);
 
       audioQueue.finish();
@@ -512,7 +565,9 @@ describe('AudioQueue', () => {
       expect(mockHighlightManager.restoreParagraph).not.toHaveBeenCalled();
     });
 
-    it('should clear playing paragraph reference', () => {
+    it('should clear playing paragraph reference in normal mode', () => {
+      mockState.isContinuousMode = vi.fn(() => false);
+
       audioQueue.finish();
 
       expect(mockState.setPlayingParagraph).toHaveBeenCalledWith(null);

@@ -10,6 +10,7 @@ export class AudioQueue {
     this.currentMetadata = null;
     this.isPlaying = false;
     this.pausedQueue = [];
+    this.onQueueEmptyCallback = null;
   }
 
   enqueue(audioBlob, metadata) {
@@ -108,8 +109,22 @@ export class AudioQueue {
     });
   }
 
+  setOnQueueEmpty(callback) {
+    this.onQueueEmptyCallback = callback;
+  }
+
   finish() {
     this.isPlaying = false;
+
+    // In continuous mode, delegate to the controller
+    if (this.state.isContinuousMode()) {
+      if (this.onQueueEmptyCallback) {
+        this.onQueueEmptyCallback();
+      }
+      return;
+    }
+
+    // Original cleanup logic for single paragraph playback
     this.state.setState(PLAYER_STATES.IDLE);
 
     // Clear highlights immediately

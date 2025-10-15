@@ -7,6 +7,7 @@ export class PlaybackState {
     this.playingParagraph = null;
     this.highlightedPhrase = null;
     this.phraseTimeline = [];
+    this.isContinuousModeEnabled = false;
   }
 
   setState(newState) {
@@ -53,11 +54,20 @@ export class PlaybackState {
     this.listeners.forEach(listener => listener(this.state));
   }
 
+  setContinuousMode(enabled) {
+    this.isContinuousModeEnabled = enabled;
+  }
+
+  isContinuousMode() {
+    return this.isContinuousModeEnabled;
+  }
+
   reset() {
     this.state = PLAYER_STATES.IDLE;
     this.playingParagraph = null;
     this.highlightedPhrase = null;
     this.phraseTimeline = [];
+    this.isContinuousModeEnabled = false;
     this.notify();
   }
 }
