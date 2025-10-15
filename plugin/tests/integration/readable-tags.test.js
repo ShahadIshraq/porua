@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  getReadableElementsSelector,
-  filterReadableElements,
-  shouldShowPlayButton
-} from '../../src/shared/config/readableElements.js';
+import { getReadableElementsSelector } from '../../src/shared/config/readableElements.js';
+import { filterReadableElements, shouldShowPlayButton } from '../../src/shared/utils/elementValidation.js';
 
 describe('Readable Tags Integration', () => {
   let container;
