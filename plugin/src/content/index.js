@@ -11,6 +11,7 @@ import { PLAYER_STATES } from '../shared/utils/constants.js';
 import { ParagraphQueue } from './queue/ParagraphQueue.js';
 import { PrefetchManager } from './prefetch/PrefetchManager.js';
 import { ContinuousPlaybackController } from './controllers/ContinuousPlaybackController.js';
+import { getReadableElementsSelector, filterReadableElements } from '../shared/config/readableElements.js';
 
 class TTSContentScript {
   constructor() {
@@ -81,11 +82,11 @@ class TTSContentScript {
   }
 
   getFollowingParagraphs(startParagraph) {
-    const all = Array.from(document.querySelectorAll('p'));
+    const all = Array.from(document.querySelectorAll(getReadableElementsSelector()));
     const startIndex = all.indexOf(startParagraph);
     if (startIndex === -1) return [];
 
-    return all.slice(startIndex + 1).filter(p => p.textContent.trim().length > 0);
+    return filterReadableElements(all.slice(startIndex + 1));
   }
 
   handlePlayerControlClick() {
