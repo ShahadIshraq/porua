@@ -5,8 +5,6 @@ export class HighlightManager {
   constructor(state) {
     this.state = state;
     this.mutationObserver = null;
-    this.intersectionObserver = null;
-    this.observedSpan = null;
   }
 
   wrapPhrases(paragraph, timeline) {
@@ -184,33 +182,23 @@ export class HighlightManager {
   }
 
   scrollToPhraseIfNeeded(phraseSpan) {
-    // Stop observing previous span
-    if (this.observedSpan && this.intersectionObserver) {
-      this.intersectionObserver.unobserve(this.observedSpan);
-    }
+    // Check if element is currently visible in viewport
+    const rect = phraseSpan.getBoundingClientRect();
+    const isVisible = (
+      rect.top >= 0 &&
+      rect.left >= 0 &&
+      rect.bottom <= window.innerHeight &&
+      rect.right <= window.innerWidth
+    );
 
-    // Setup intersection observer if not exists
-    if (!this.intersectionObserver) {
-      this.intersectionObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          // If not intersecting (not visible), scroll into view
-          if (!entry.isIntersecting) {
-            entry.target.scrollIntoView({
-              behavior: 'smooth',
-              block: 'center',
-              inline: 'nearest'
-            });
-          }
-        });
-      }, {
-        threshold: 0,
-        rootMargin: '0px'
+    // Only scroll if not visible (one-time check, no continuous observation)
+    if (!isVisible) {
+      phraseSpan.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest'
       });
     }
-
-    // Observe new span
-    this.observedSpan = phraseSpan;
-    this.intersectionObserver.observe(phraseSpan);
   }
 
   clearHighlights() {
@@ -223,12 +211,6 @@ export class HighlightManager {
     document.querySelectorAll('.tts-phrase.tts-highlighted').forEach(el => {
       el.classList.remove('tts-highlighted');
     });
-
-    // Clean up intersection observer
-    if (this.observedSpan && this.intersectionObserver) {
-      this.intersectionObserver.unobserve(this.observedSpan);
-      this.observedSpan = null;
-    }
   }
 
   /**
