@@ -230,4 +230,24 @@ export class HighlightManager {
       this.observedSpan = null;
     }
   }
+
+  /**
+   * Transition highlights from one paragraph to another (for continuous playback)
+   * @param {HTMLElement} oldParagraph - The paragraph to restore
+   * @param {HTMLElement} newParagraph - The paragraph to prepare
+   * @param {Array} newTimeline - Timeline for the new paragraph
+   */
+  transitionToParagraph(oldParagraph, newParagraph, newTimeline) {
+    if (oldParagraph) {
+      this.clearHighlights();
+      this.restoreParagraph(oldParagraph);
+    }
+
+    if (newParagraph && newTimeline.length > 0) {
+      this.wrapPhrases(newParagraph, newTimeline);
+    }
+
+    this.state.setPlayingParagraph(newParagraph);
+    this.state.setPhraseTimeline(newTimeline);
+  }
 }

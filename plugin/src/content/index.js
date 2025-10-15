@@ -8,6 +8,9 @@ import { StreamParser } from './audio/StreamParser.js';
 import { SettingsStore } from '../shared/storage/SettingsStore.js';
 import { TTSClient } from '../shared/api/TTSClient.js';
 import { PLAYER_STATES } from '../shared/utils/constants.js';
+import { ParagraphQueue } from './queue/ParagraphQueue.js';
+import { PrefetchManager } from './prefetch/PrefetchManager.js';
+import { ContinuousPlaybackController } from './controllers/ContinuousPlaybackController.js';
 
 class TTSContentScript {
   constructor() {
@@ -15,6 +18,16 @@ class TTSContentScript {
     this.eventManager = new EventManager();
     this.highlightManager = new HighlightManager(this.state);
     this.audioQueue = new AudioQueue(this.state, this.highlightManager);
+    this.paragraphQueue = new ParagraphQueue();
+    this.prefetchManager = new PrefetchManager(SettingsStore);
+    this.continuousController = new ContinuousPlaybackController(
+      this.state,
+      this.audioQueue,
+      this.highlightManager,
+      this.prefetchManager,
+      this.paragraphQueue,
+      (text, paragraph) => this.synthesizeAndPlay(text, null, paragraph)
+    );
     this.playerControl = new PlayerControl(
       this.state,
       this.eventManager,
@@ -25,17 +38,28 @@ class TTSContentScript {
       this.eventManager,
       () => this.handlePlayClick()
     );
+
+    this.wireupContinuousPlayback();
   }
 
   init() {
     this.playButton.init();
   }
 
+  wireupContinuousPlayback() {
+    this.audioQueue.setOnQueueEmpty(() => {
+      this.continuousController.handleAudioQueueEmpty();
+    });
+
+    this.continuousController.onQueueComplete(() => {
+      this.state.setState(PLAYER_STATES.IDLE);
+      this.state.setContinuousMode(false);
+    });
+  }
+
   async handlePlayClick() {
     const paragraph = this.playButton.currentParagraph;
     if (!paragraph) return;
-
-    const text = paragraph.textContent.trim();
 
     this.audioQueue.clear();
     this.state.setPlayingParagraph(paragraph);
@@ -43,13 +67,25 @@ class TTSContentScript {
     this.state.setState(PLAYER_STATES.LOADING);
 
     try {
+      // Get following paragraphs for continuous playback
+      const followingParagraphs = this.getFollowingParagraphs(paragraph);
+
+      // Start continuous playback
       const settings = await SettingsStore.get();
-      await this.synthesizeAndPlay(text, settings);
+      await this.continuousController.playContinuous(paragraph, followingParagraphs);
     } catch (error) {
       console.error('TTS Error:', error);
       this.state.setState(PLAYER_STATES.IDLE);
       alert('Failed to connect to TTS server. Please check your settings.\n\nError: ' + error.message);
     }
+  }
+
+  getFollowingParagraphs(startParagraph) {
+    const all = Array.from(document.querySelectorAll('p'));
+    const startIndex = all.indexOf(startParagraph);
+    if (startIndex === -1) return [];
+
+    return all.slice(startIndex + 1).filter(p => p.textContent.trim().length > 0);
   }
 
   handlePlayerControlClick() {
@@ -67,7 +103,17 @@ class TTSContentScript {
     }
   }
 
-  async synthesizeAndPlay(text, settings) {
+  async synthesizeAndPlay(text, settings = null, paragraph = null) {
+    // Get settings if not provided
+    if (!settings) {
+      settings = await SettingsStore.get();
+    }
+
+    // Use provided paragraph or get from state
+    if (!paragraph) {
+      paragraph = this.state.getPlayingParagraph();
+    }
+
     const client = new TTSClient(settings.apiUrl, settings.apiKey);
     const response = await client.synthesizeStream(text);
 
@@ -99,9 +145,13 @@ class TTSContentScript {
     const phraseTimeline = StreamParser.buildPhraseTimeline(metadataArray);
     this.state.setPhraseTimeline(phraseTimeline);
 
-    const paragraph = this.state.getPlayingParagraph();
     if (paragraph && phraseTimeline.length > 0) {
       this.highlightManager.wrapPhrases(paragraph, phraseTimeline);
+    }
+
+    // After stream parsing completes, trigger prefetch
+    if (this.state.isContinuousMode()) {
+      this.continuousController.handleStreamComplete();
     }
 
     for (let i = 0; i < audioBlobs.length; i++) {
