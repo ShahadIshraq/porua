@@ -8,7 +8,7 @@ import {
   isReadableElement,
   getReadableElementsSelector,
   filterReadableElements
-} from '../readableElements.js';
+} from '../../../../src/shared/config/readableElements.js';
 
 describe('readableElements', () => {
   describe('READABLE_ELEMENTS_CONFIG', () => {
