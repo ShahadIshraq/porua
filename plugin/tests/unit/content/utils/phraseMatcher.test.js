@@ -1,4 +1,4 @@
-import { PhraseMatcher } from '../phraseMatcher.js';
+import { PhraseMatcher } from '../../../../src/content/utils/phraseMatcher.js';
 
 describe('PhraseMatcher', () => {
   describe('word-count based matching', () => {
