@@ -1,5 +1,6 @@
 import { createElement, getScrollPosition } from '../utils/dom.js';
 import { TIMEOUTS, Z_INDEX } from '../../shared/utils/constants.js';
+import { shouldShowPlayButton, isReadableElement } from '../../shared/config/readableElements.js';
 
 export class PlayButton {
   constructor(state, eventManager, onPlayClick) {
@@ -21,13 +22,13 @@ export class PlayButton {
 
   setupParagraphListeners() {
     this.eventManager.on(document, 'mouseenter', (e) => {
-      if (e.target.tagName === 'P' && e.target.textContent.trim().length > 0) {
+      if (shouldShowPlayButton(e.target)) {
         this.show(e.target);
       }
     }, true);
 
     this.eventManager.on(document, 'mouseleave', (e) => {
-      if (e.target.tagName === 'P' && e.target === this.currentParagraph) {
+      if (isReadableElement(e.target) && e.target === this.currentParagraph) {
         this.scheduleHide();
       }
     }, true);
