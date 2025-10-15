@@ -115,3 +115,177 @@ impl IntoResponse for TtsError {
 }
 
 pub type Result<T> = std::result::Result<T, TtsError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ===== Error Type Conversion Tests =====
+
+    #[test]
+    fn test_from_io_error() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+        let tts_err: TtsError = io_err.into();
+
+        assert!(matches!(tts_err, TtsError::Io(_)));
+        assert!(tts_err.to_string().contains("I/O error"));
+    }
+
+    #[test]
+    fn test_from_hound_error() {
+        // Create a mock hound error by trying to parse invalid WAV data
+        let invalid_wav = vec![0u8; 10];
+        let cursor = std::io::Cursor::new(invalid_wav);
+        let hound_result = hound::WavReader::new(cursor);
+
+        if let Err(hound_err) = hound_result {
+            let tts_err: TtsError = hound_err.into();
+            assert!(matches!(tts_err, TtsError::AudioParsing(_)));
+            assert!(tts_err.to_string().contains("Audio parsing error"));
+        }
+    }
+
+    #[test]
+    fn test_from_serde_json_error() {
+        let json_err = serde_json::from_str::<serde_json::Value>("invalid json").unwrap_err();
+        let tts_err: TtsError = json_err.into();
+
+        assert!(matches!(tts_err, TtsError::Unknown(_)));
+    }
+
+    #[test]
+    fn test_from_tokio_join_error() {
+        // Create a task that panics to generate a JoinError
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let result = runtime.block_on(async {
+            let handle = tokio::spawn(async {
+                panic!("test panic");
+            });
+            handle.await
+        });
+
+        if let Err(join_err) = result {
+            let tts_err: TtsError = join_err.into();
+            assert!(matches!(tts_err, TtsError::TaskJoin(_)));
+            assert!(tts_err.to_string().contains("Task execution error"));
+        }
+    }
+
+    // ===== HTTP Status Mapping Tests =====
+
+    #[test]
+    fn test_empty_text_returns_400() {
+        let err = TtsError::EmptyText;
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_invalid_speed_returns_400() {
+        let err = TtsError::InvalidSpeed(5.0);
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_invalid_request_returns_400() {
+        let err = TtsError::InvalidRequest("test".to_string());
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_unauthorized_returns_401() {
+        let err = TtsError::Unauthorized;
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn test_invalid_api_key_returns_401() {
+        let err = TtsError::InvalidApiKey;
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    }
+
+    #[test]
+    fn test_file_not_found_returns_404() {
+        let err = TtsError::FileNotFound("test.txt".to_string());
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_tts_engine_error_returns_500() {
+        let err = TtsError::TtsEngine("engine failed".to_string());
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn test_io_error_returns_500() {
+        let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+        let err = TtsError::Io(io_err);
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn test_pool_exhausted_returns_500() {
+        let err = TtsError::PoolExhausted;
+        let response = err.into_response();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    // ===== Error Message Tests =====
+
+    #[test]
+    fn test_empty_text_message() {
+        let err = TtsError::EmptyText;
+        assert_eq!(err.to_string(), "Text cannot be empty");
+    }
+
+    #[test]
+    fn test_invalid_speed_message() {
+        let err = TtsError::InvalidSpeed(5.5);
+        assert!(err.to_string().contains("5.5"));
+        assert!(err.to_string().contains("0.0-3.0"));
+    }
+
+    #[test]
+    fn test_tts_engine_error_message() {
+        let err = TtsError::TtsEngine("model not found".to_string());
+        assert!(err.to_string().contains("TTS engine error"));
+        assert!(err.to_string().contains("model not found"));
+    }
+
+    #[test]
+    fn test_file_not_found_message() {
+        let err = TtsError::FileNotFound("/path/to/file".to_string());
+        assert!(err.to_string().contains("File not found"));
+        assert!(err.to_string().contains("/path/to/file"));
+    }
+
+    // ===== Error Display Tests =====
+
+    #[test]
+    fn test_error_implements_display() {
+        let err = TtsError::EmptyText;
+        let display_str = format!("{}", err);
+        assert!(!display_str.is_empty());
+    }
+
+    #[test]
+    fn test_error_implements_debug() {
+        let err = TtsError::EmptyText;
+        let debug_str = format!("{:?}", err);
+        assert!(debug_str.contains("EmptyText"));
+    }
+
+    #[test]
+    fn test_error_implements_std_error() {
+        fn accepts_std_error(_: &dyn std::error::Error) {}
+        let err = TtsError::EmptyText;
+        accepts_std_error(&err);
+    }
+}

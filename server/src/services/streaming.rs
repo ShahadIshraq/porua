@@ -299,16 +299,23 @@ mod tests {
     #[test]
     fn test_create_metadata_part() {
         let metadata = ChunkMetadata {
+            version: Some("2.0".to_string()),
             chunk_index: 0,
             text: "Hello world".to_string(),
+            original_text: None,
             phrases: vec![PhraseMetadata {
                 text: "Hello world".to_string(),
+                original_text: None,
                 words: vec!["Hello".to_string(), "world".to_string()],
                 start_ms: 0.0,
                 duration_ms: 850.0,
+                char_offset_start: Some(0),
+                char_offset_end: Some(11),
             }],
             duration_ms: 850.0,
             start_offset_ms: 0.0,
+            validation: None,
+            debug_info: None,
         };
 
         let result = create_metadata_part(&metadata);

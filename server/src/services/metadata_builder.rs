@@ -211,3 +211,227 @@ fn validate_phrases(
         warnings,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hound::{WavWriter, WavSpec, SampleFormat};
+    use std::io::Cursor;
+
+    fn create_test_wav_with_duration(duration_ms: f64) -> Vec<u8> {
+        let sample_rate = 24000;
+        let channels = 1;
+        let num_samples = ((duration_ms / 1000.0) * sample_rate as f64) as u32;
+
+        let spec = WavSpec {
+            channels,
+            sample_rate,
+            bits_per_sample: 16,
+            sample_format: SampleFormat::Int,
+        };
+
+        let mut buffer = Vec::new();
+        {
+            let cursor = Cursor::new(&mut buffer);
+            let mut writer = WavWriter::new(cursor, spec).unwrap();
+
+            for _ in 0..(num_samples * channels as u32) {
+                writer.write_sample(0i16).unwrap();
+            }
+
+            writer.finalize().unwrap();
+        }
+
+        buffer
+    }
+
+    #[test]
+    fn test_build_metadata_single_phrase() {
+        let text = "Hello world";
+        let audio_bytes = create_test_wav_with_duration(1000.0);
+
+        let metadata = build_metadata(&audio_bytes, text, 0, 0.0).unwrap();
+
+        assert_eq!(metadata.chunk_index, 0);
+        assert_eq!(metadata.start_offset_ms, 0.0);
+        assert!((metadata.duration_ms - 1000.0).abs() < 10.0);
+        assert!(!metadata.phrases.is_empty());
+    }
+
+    #[test]
+    fn test_build_metadata_multiple_phrases() {
+        let text = "Hello world. How are you?";
+        let audio_bytes = create_test_wav_with_duration(2000.0);
+
+        let metadata = build_metadata(&audio_bytes, text, 0, 0.0).unwrap();
+
+        assert!(metadata.phrases.len() >= 2, "Expected at least 2 phrases");
+        assert!((metadata.duration_ms - 2000.0).abs() < 10.0);
+    }
+
+    #[test]
+    fn test_build_metadata_empty_text() {
+        let text = "";
+        let audio_bytes = create_test_wav_with_duration(100.0);
+
+        let metadata = build_metadata(&audio_bytes, text, 0, 0.0).unwrap();
+
+        // Empty text should still produce metadata
+        assert_eq!(metadata.text, "");
+    }
+
+    #[test]
+    fn test_build_metadata_duration_calculation() {
+        let text = "This is a test sentence.";
+        let audio_bytes = create_test_wav_with_duration(1500.0);
+
+        let metadata = build_metadata(&audio_bytes, text, 0, 0.0).unwrap();
+
+        // Total duration of phrases should equal audio duration
+        let total_phrase_duration: f64 = metadata.phrases.iter()
+            .map(|p| p.duration_ms)
+            .sum();
+
+        assert!(
+            (total_phrase_duration - metadata.duration_ms).abs() < 1.0,
+            "Expected phrase durations to sum to {}, got {}",
+            metadata.duration_ms, total_phrase_duration
+        );
+    }
+
+    #[test]
+    fn test_build_metadata_phrase_timing_sequential() {
+        let text = "First sentence. Second sentence.";
+        let audio_bytes = create_test_wav_with_duration(2000.0);
+
+        let metadata = build_metadata(&audio_bytes, text, 0, 0.0).unwrap();
+
+        // Verify phrases are sequential (no overlaps)
+        for i in 1..metadata.phrases.len() {
+            let prev_end = metadata.phrases[i - 1].start_ms + metadata.phrases[i - 1].duration_ms;
+            let curr_start = metadata.phrases[i].start_ms;
+
+            assert!(
+                (curr_start - prev_end).abs() < 0.1,
+                "Phrase {} starts at {}, but previous phrase ends at {}",
+                i, curr_start, prev_end
+            );
+        }
+    }
+
+    #[test]
+    fn test_build_metadata_with_chunk_index() {
+        let text = "Hello";
+        let audio_bytes = create_test_wav_with_duration(500.0);
+
+        let metadata = build_metadata(&audio_bytes, text, 5, 1000.0).unwrap();
+
+        assert_eq!(metadata.chunk_index, 5);
+        assert_eq!(metadata.start_offset_ms, 1000.0);
+    }
+
+    #[test]
+    fn test_build_metadata_char_offsets() {
+        let text = "Hello world.";
+        let audio_bytes = create_test_wav_with_duration(1000.0);
+
+        let metadata = build_metadata(&audio_bytes, text, 0, 0.0).unwrap();
+
+        for phrase in &metadata.phrases {
+            if let (Some(start), Some(end)) = (phrase.char_offset_start, phrase.char_offset_end) {
+                assert!(start < end, "Start offset should be less than end offset");
+                assert!(end <= text.len(), "End offset should not exceed text length");
+            }
+        }
+    }
+
+    #[test]
+    fn test_build_metadata_with_normalization() {
+        let text = "\u{201C}Hello world\u{201D}"; // Smart quotes
+        let audio_bytes = create_test_wav_with_duration(1000.0);
+
+        let metadata = build_metadata(&audio_bytes, text, 0, 0.0).unwrap();
+
+        // Should have original text preserved
+        assert!(metadata.original_text.is_some());
+        assert_ne!(metadata.text, text); // Normalized version should be different
+    }
+
+    #[test]
+    fn test_build_metadata_version() {
+        let text = "Test";
+        let audio_bytes = create_test_wav_with_duration(500.0);
+
+        let metadata = build_metadata(&audio_bytes, text, 0, 0.0).unwrap();
+
+        assert_eq!(metadata.version, Some("2.0".to_string()));
+    }
+
+    #[test]
+    fn test_build_metadata_validation_included() {
+        let text = "Test sentence.";
+        let audio_bytes = create_test_wav_with_duration(1000.0);
+
+        let metadata = build_metadata(&audio_bytes, text, 0, 0.0).unwrap();
+
+        assert!(metadata.validation.is_some());
+    }
+
+    #[test]
+    fn test_build_metadata_debug_info_included() {
+        let text = "Test sentence.";
+        let audio_bytes = create_test_wav_with_duration(1000.0);
+
+        let metadata = build_metadata(&audio_bytes, text, 0, 0.0).unwrap();
+
+        assert!(metadata.debug_info.is_some());
+        if let Some(debug) = metadata.debug_info {
+            assert_eq!(debug.tts_engine, "kokoro");
+            assert!(debug.phrase_count > 0);
+        }
+    }
+
+    #[test]
+    fn test_build_metadata_without_validation() {
+        let text = "Test";
+        let audio_bytes = create_test_wav_with_duration(500.0);
+
+        let metadata = build_metadata_with_options(&audio_bytes, text, 0, 0.0, false, true).unwrap();
+
+        assert!(metadata.validation.is_none());
+        assert!(metadata.debug_info.is_some());
+    }
+
+    #[test]
+    fn test_build_metadata_without_debug() {
+        let text = "Test";
+        let audio_bytes = create_test_wav_with_duration(500.0);
+
+        let metadata = build_metadata_with_options(&audio_bytes, text, 0, 0.0, true, false).unwrap();
+
+        assert!(metadata.validation.is_some());
+        assert!(metadata.debug_info.is_none());
+    }
+
+    #[test]
+    fn test_validate_phrases_valid() {
+        let text = "Hello world";
+        let audio_bytes = create_test_wav_with_duration(1000.0);
+
+        let metadata = build_metadata(&audio_bytes, text, 0, 0.0).unwrap();
+
+        if let Some(validation) = metadata.validation {
+            assert!(validation.valid || validation.warnings.len() > 0);
+        }
+    }
+
+    #[test]
+    fn test_build_metadata_invalid_audio() {
+        let text = "Test";
+        let invalid_audio = vec![0u8; 100]; // Invalid WAV data
+
+        let result = build_metadata(&invalid_audio, text, 0, 0.0);
+
+        assert!(result.is_err());
+    }
+}
