@@ -21,3 +21,6 @@ deadpool = "0.12"
 async-trait = "0.1"
 dirs = "5.0"
 unicode-normalization = "0.1"
+
+[dev-dependencies]
+tempfile = "3.8"

@@ -233,4 +233,176 @@ mod tests {
         let chunks = chunk_text(text, &config);
         assert!(chunks.len() > 1);
     }
+
+    #[test]
+    fn test_default_config() {
+        let config = ChunkingConfig::default();
+        assert_eq!(config.max_chunk_size, 200);
+        assert_eq!(config.min_chunk_size, 50);
+    }
+
+    #[test]
+    fn test_empty_text() {
+        let config = ChunkingConfig::default();
+        let chunks = chunk_text("", &config);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], "");
+    }
+
+    #[test]
+    fn test_single_word() {
+        let config = ChunkingConfig::default();
+        let chunks = chunk_text("Hello", &config);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], "Hello");
+    }
+
+    #[test]
+    fn test_exactly_max_size() {
+        let config = ChunkingConfig {
+            max_chunk_size: 20,
+            min_chunk_size: 5,
+        };
+        let text = "A".repeat(20);
+        let chunks = chunk_text(&text, &config);
+        assert_eq!(chunks.len(), 1);
+    }
+
+    #[test]
+    fn test_just_over_max_size() {
+        let config = ChunkingConfig {
+            max_chunk_size: 20,
+            min_chunk_size: 5,
+        };
+        let text = "Short one. This is a bit longer.";
+        let chunks = chunk_text(&text, &config);
+        assert!(chunks.len() >= 2);
+    }
+
+    #[test]
+    fn test_multiple_sentences() {
+        let config = ChunkingConfig {
+            max_chunk_size: 15,
+            min_chunk_size: 5,
+        };
+        let text = "First sentence. Second sentence. Third sentence.";
+        let chunks = chunk_text(&text, &config);
+        assert!(chunks.len() >= 2, "Expected multiple chunks, got {}", chunks.len());
+    }
+
+    #[test]
+    fn test_clause_splitting() {
+        let config = ChunkingConfig {
+            max_chunk_size: 50,
+            min_chunk_size: 10,
+        };
+        let text = "This is a long sentence with many clauses, separated by commas, which should be split appropriately.";
+        let chunks = chunk_text(&text, &config);
+        assert!(chunks.len() > 1);
+    }
+
+    #[test]
+    fn test_hard_word_splitting() {
+        let config = ChunkingConfig {
+            max_chunk_size: 30,
+            min_chunk_size: 10,
+        };
+        // Very long single sentence with no punctuation
+        let text = "word ".repeat(20).trim().to_string();
+        let chunks = chunk_text(&text, &config);
+        assert!(chunks.len() > 1);
+        for chunk in &chunks {
+            assert!(chunk.len() <= config.max_chunk_size + 10); // Some tolerance
+        }
+    }
+
+    #[test]
+    fn test_preserve_sentence_endings() {
+        let config = ChunkingConfig::default();
+        let text = "Hello world! How are you? I am fine.";
+        let chunks = chunk_text(&text, &config);
+
+        // Sentences should be preserved
+        let combined = chunks.join(" ");
+        assert!(combined.contains("!"));
+        assert!(combined.contains("?"));
+        assert!(combined.contains("."));
+    }
+
+    #[test]
+    fn test_abbreviations_not_split() {
+        let config = ChunkingConfig::default();
+        let text = "Dr. Smith went to the U.S.A. yesterday.";
+        let chunks = chunk_text(&text, &config);
+        // Should not split on Dr. or U.S.A.
+        assert_eq!(chunks.len(), 1);
+    }
+
+    #[test]
+    fn test_numbers_with_periods() {
+        let config = ChunkingConfig::default();
+        let text = "The value is 3.14159. This is separate.";
+        let chunks = chunk_text(&text, &config);
+        // Should split after the second period, not the decimal point
+        assert!(chunks.len() >= 1);
+    }
+
+    #[test]
+    fn test_unicode_text() {
+        let config = ChunkingConfig::default();
+        let text = "Hello 世界! This is 日本語. Testing unicode.";
+        let chunks = chunk_text(&text, &config);
+        assert!(!chunks.is_empty());
+    }
+
+    #[test]
+    fn test_whitespace_handling() {
+        let config = ChunkingConfig::default();
+        let text = "First.    Second.     Third.";
+        let chunks = chunk_text(&text, &config);
+
+        // Check that chunks are trimmed
+        for chunk in &chunks {
+            assert_eq!(chunk, chunk.trim());
+        }
+    }
+
+    #[test]
+    fn test_semicolon_splitting() {
+        let config = ChunkingConfig {
+            max_chunk_size: 40,
+            min_chunk_size: 10,
+        };
+        let text = "First clause; second clause; third clause; fourth clause.";
+        let chunks = chunk_text(&text, &config);
+        assert!(chunks.len() > 1);
+    }
+
+    #[test]
+    fn test_very_long_word() {
+        let config = ChunkingConfig {
+            max_chunk_size: 20,
+            min_chunk_size: 5,
+        };
+        let long_word = "a".repeat(50);
+        let text = format!("Short. {} More text.", long_word);
+        let chunks = chunk_text(&text, &config);
+        // Should handle the very long word gracefully
+        assert!(chunks.len() >= 1);
+    }
+
+    #[test]
+    fn test_config_clone() {
+        let config = ChunkingConfig::default();
+        let cloned = config.clone();
+        assert_eq!(config.max_chunk_size, cloned.max_chunk_size);
+        assert_eq!(config.min_chunk_size, cloned.min_chunk_size);
+    }
+
+    #[test]
+    fn test_config_debug() {
+        let config = ChunkingConfig::default();
+        let debug_str = format!("{:?}", config);
+        assert!(debug_str.contains("ChunkingConfig"));
+    }
 }

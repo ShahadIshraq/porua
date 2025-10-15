@@ -211,4 +211,143 @@ mod tests {
         assert!(keys.validate("valid-key-2"));
         assert!(!keys.validate("invalid-key"));
     }
+
+    #[test]
+    fn test_api_keys_from_file() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "key-1").unwrap();
+        writeln!(temp_file, "key-2").unwrap();
+        writeln!(temp_file, "# comment line").unwrap();
+        writeln!(temp_file, "").unwrap(); // empty line
+        writeln!(temp_file, "key-3").unwrap();
+        temp_file.flush().unwrap();
+
+        let keys = ApiKeys::from_file(temp_file.path()).unwrap();
+
+        assert_eq!(keys.count(), 3);
+        assert!(keys.validate("key-1"));
+        assert!(keys.validate("key-2"));
+        assert!(keys.validate("key-3"));
+        assert!(!keys.validate("# comment line"));
+    }
+
+    #[test]
+    fn test_api_keys_from_file_not_found() {
+        let result = ApiKeys::from_file("/nonexistent/path/to/file.txt");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_api_keys_from_empty_file() {
+        use tempfile::NamedTempFile;
+
+        let temp_file = NamedTempFile::new().unwrap();
+        let keys = ApiKeys::from_file(temp_file.path()).unwrap();
+
+        assert_eq!(keys.count(), 0);
+        assert!(!keys.is_enabled());
+    }
+
+    #[test]
+    fn test_api_keys_trim_whitespace() {
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        let mut temp_file = NamedTempFile::new().unwrap();
+        writeln!(temp_file, "  key-with-spaces  ").unwrap();
+        writeln!(temp_file, "\tkey-with-tabs\t").unwrap();
+        temp_file.flush().unwrap();
+
+        let keys = ApiKeys::from_file(temp_file.path()).unwrap();
+
+        assert_eq!(keys.count(), 2);
+        assert!(keys.validate("key-with-spaces"));
+        assert!(keys.validate("key-with-tabs"));
+        assert!(!keys.validate("  key-with-spaces  "));
+    }
+
+    #[test]
+    fn test_extract_api_key_x_api_key_header() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-api-key", "test-key-123".parse().unwrap());
+
+        let key = extract_api_key(&headers);
+
+        assert_eq!(key, Some("test-key-123".to_string()));
+    }
+
+    #[test]
+    fn test_extract_api_key_bearer_token() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", "Bearer test-token-456".parse().unwrap());
+
+        let key = extract_api_key(&headers);
+
+        assert_eq!(key, Some("test-token-456".to_string()));
+    }
+
+    #[test]
+    fn test_extract_api_key_no_header() {
+        let headers = HeaderMap::new();
+        let key = extract_api_key(&headers);
+
+        assert_eq!(key, None);
+    }
+
+    #[test]
+    fn test_extract_api_key_prefers_x_api_key() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-api-key", "x-api-key-value".parse().unwrap());
+        headers.insert("authorization", "Bearer bearer-value".parse().unwrap());
+
+        let key = extract_api_key(&headers);
+
+        // Should prefer X-API-Key header
+        assert_eq!(key, Some("x-api-key-value".to_string()));
+    }
+
+    #[test]
+    fn test_extract_api_key_invalid_bearer_format() {
+        let mut headers = HeaderMap::new();
+        headers.insert("authorization", "InvalidFormat token".parse().unwrap());
+
+        let key = extract_api_key(&headers);
+
+        assert_eq!(key, None);
+    }
+
+    #[test]
+    fn test_api_keys_case_sensitive() {
+        let mut key_set = HashSet::new();
+        key_set.insert("CaseSensitiveKey".to_string());
+
+        let keys = ApiKeys { keys: key_set };
+
+        assert!(keys.validate("CaseSensitiveKey"));
+        assert!(!keys.validate("casesensitivekey"));
+        assert!(!keys.validate("CASESENSITIVEKEY"));
+    }
+
+    #[test]
+    fn test_api_keys_clone() {
+        let mut key_set = HashSet::new();
+        key_set.insert("key-1".to_string());
+
+        let keys = ApiKeys { keys: key_set };
+        let cloned = keys.clone();
+
+        assert_eq!(cloned.count(), 1);
+        assert!(cloned.validate("key-1"));
+    }
+
+    #[test]
+    fn test_api_keys_debug_format() {
+        let keys = ApiKeys::empty();
+        let debug_str = format!("{:?}", keys);
+
+        assert!(debug_str.contains("ApiKeys"));
+    }
 }
