@@ -11,10 +11,14 @@ export class AudioQueue {
     this.isPlaying = false;
     this.pausedQueue = [];
     this.onQueueEmptyCallback = null;
+    this.onProgressCallback = null;
+    this.totalChunks = 0; // Total number of chunks for this playback session
+    this.completedChunks = 0; // Number of chunks that have finished playing
   }
 
   enqueue(audioBlob, metadata) {
     this.queue.push({ blob: audioBlob, metadata });
+    this.totalChunks++;
   }
 
   clear() {
@@ -26,6 +30,8 @@ export class AudioQueue {
     }
     this.currentMetadata = null;
     this.isPlaying = false;
+    this.totalChunks = 0;
+    this.completedChunks = 0;
   }
 
   async play() {
@@ -83,11 +89,13 @@ export class AudioQueue {
   setupAudioEvents(audioUrl) {
     this.currentAudio.onended = () => {
       URL.revokeObjectURL(audioUrl);
+      this.completedChunks++; // Increment completed chunks
       this.play();
     };
 
     this.currentAudio.onerror = () => {
       URL.revokeObjectURL(audioUrl);
+      this.completedChunks++; // Increment even on error to avoid stuck progress
       this.play();
     };
   }
@@ -101,16 +109,48 @@ export class AudioQueue {
       if (this.currentAudio && !this.currentAudio.paused) {
         const currentTimeMs = startOffsetMs + (this.currentAudio.currentTime * 1000);
         this.highlightManager.updateHighlight(currentTimeMs);
+
+        // Emit CUMULATIVE progress updates for the progress ring
+        if (this.onProgressCallback && this.totalChunks > 0) {
+          // Calculate progress: (completed chunks + current chunk progress) / total chunks
+          const currentChunkProgress = this.currentAudio.duration > 0
+            ? this.currentAudio.currentTime / this.currentAudio.duration
+            : 0;
+          const totalProgress = (this.completedChunks + currentChunkProgress) / this.totalChunks;
+
+          // Pass as if it's a single audio: currentTime and duration scaled to represent total
+          const virtualCurrentTime = totalProgress * 100;
+          const virtualDuration = 100;
+
+          this.onProgressCallback(virtualCurrentTime, virtualDuration);
+        }
       }
     });
 
     this.currentAudio.addEventListener('play', () => {
       this.highlightManager.updateHighlight(startOffsetMs);
+
+      // Emit initial cumulative progress on play
+      if (this.onProgressCallback && this.currentAudio && this.totalChunks > 0) {
+        const currentChunkProgress = this.currentAudio.duration > 0
+          ? this.currentAudio.currentTime / this.currentAudio.duration
+          : 0;
+        const totalProgress = (this.completedChunks + currentChunkProgress) / this.totalChunks;
+
+        const virtualCurrentTime = totalProgress * 100;
+        const virtualDuration = 100;
+
+        this.onProgressCallback(virtualCurrentTime, virtualDuration);
+      }
     });
   }
 
   setOnQueueEmpty(callback) {
     this.onQueueEmptyCallback = callback;
+  }
+
+  setOnProgress(callback) {
+    this.onProgressCallback = callback;
   }
 
   finish() {

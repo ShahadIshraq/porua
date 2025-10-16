@@ -8,14 +8,65 @@ export class PlayerControl {
     this.onButtonClick = onButtonClick;
     this.element = null;
     this.button = null;
+    this.progressRing = null;
+    this.progressArc = null;
+    this.circumference = 2 * Math.PI * 27; // 2πr where r=27
     this.isDragging = false;
     this.dragOffset = { x: 0, y: 0 };
+
+    // Progress smoothing
+    this.pendingProgress = null;
+    this.progressRafId = null;
+    this.lastProgressUpdate = 0;
 
     this.state.subscribe((newState) => this.updateUI(newState));
   }
 
+  createProgressRing() {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'tts-progress-ring');
+    svg.setAttribute('viewBox', '0 0 60 60');
+    svg.setAttribute('width', '60');
+    svg.setAttribute('height', '60');
+
+    // Background track (subtle gray circle)
+    const track = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    track.setAttribute('class', 'tts-progress-track');
+    track.setAttribute('cx', '30');
+    track.setAttribute('cy', '30');
+    track.setAttribute('r', '27');
+    track.setAttribute('fill', 'none');
+    track.setAttribute('stroke', 'rgba(255, 255, 255, 0.15)');
+    track.setAttribute('stroke-width', '3');
+
+    // Progress arc (white circle that fills)
+    const progress = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    progress.setAttribute('class', 'tts-progress-arc');
+    progress.setAttribute('cx', '30');
+    progress.setAttribute('cy', '30');
+    progress.setAttribute('r', '27');
+    progress.setAttribute('fill', 'none');
+    progress.setAttribute('stroke', 'rgba(255, 255, 255, 0.95)');
+    progress.setAttribute('stroke-width', '3');
+    progress.setAttribute('stroke-linecap', 'round');
+    progress.setAttribute('stroke-dasharray', this.circumference.toString());
+    progress.setAttribute('stroke-dashoffset', this.circumference.toString());
+
+    svg.appendChild(track);
+    svg.appendChild(progress);
+
+    this.progressArc = progress;
+
+    return svg;
+  }
+
   create() {
     const control = createElement('div', 'tts-player-control');
+
+    // Add progress ring first (behind button)
+    this.progressRing = this.createProgressRing();
+    control.appendChild(this.progressRing);
+
     this.button = createElement('button', 'tts-player-button');
     this.button.innerHTML = '▶';
 
@@ -76,20 +127,70 @@ export class PlayerControl {
     this.eventManager.off(document, 'mouseup', stopDrag);
   }
 
+  updateProgress(currentTime, duration) {
+    if (!this.progressArc || !duration || isNaN(duration) || duration === 0) {
+      return;
+    }
+
+    // Store pending progress data
+    this.pendingProgress = { currentTime, duration };
+
+    // Throttle updates using requestAnimationFrame
+    if (this.progressRafId !== null) {
+      return; // Already have a pending update
+    }
+
+    this.progressRafId = requestAnimationFrame(() => {
+      this.applyProgressUpdate();
+    });
+  }
+
+  applyProgressUpdate() {
+    this.progressRafId = null;
+
+    if (!this.pendingProgress || !this.progressArc) {
+      return;
+    }
+
+    const { currentTime, duration } = this.pendingProgress;
+    const percentage = Math.min(100, Math.max(0, (currentTime / duration) * 100));
+    const offset = this.circumference - (percentage / 100) * this.circumference;
+
+    // Use CSS for smooth animation instead of direct attribute updates
+    this.progressArc.style.strokeDashoffset = offset.toString();
+
+    this.pendingProgress = null;
+  }
+
+  resetProgress() {
+    // Cancel any pending progress updates
+    if (this.progressRafId !== null) {
+      cancelAnimationFrame(this.progressRafId);
+      this.progressRafId = null;
+    }
+    this.pendingProgress = null;
+
+    if (this.progressArc) {
+      this.progressArc.style.strokeDashoffset = this.circumference.toString();
+    }
+  }
+
   updateUI(state) {
     if (!this.button) return;
 
-    this.button.classList.remove('loading', 'playing');
+    this.button.classList.remove('loading', 'playing', 'paused');
 
     switch (state) {
       case PLAYER_STATES.IDLE:
         this.button.innerHTML = '▶';
         this.button.title = 'Play';
+        this.resetProgress();
         break;
       case PLAYER_STATES.LOADING:
         this.button.classList.add('loading');
         this.button.innerHTML = '<div class="tts-spinner"></div>';
         this.button.title = 'Loading...';
+        this.resetProgress();
         break;
       case PLAYER_STATES.PLAYING:
         this.button.classList.add('playing');
@@ -97,6 +198,7 @@ export class PlayerControl {
         this.button.title = 'Pause';
         break;
       case PLAYER_STATES.PAUSED:
+        this.button.classList.add('paused');
         this.button.innerHTML = '▶';
         this.button.title = 'Resume';
         break;
@@ -118,10 +220,19 @@ export class PlayerControl {
   }
 
   cleanup() {
+    // Cancel any pending progress animations
+    if (this.progressRafId !== null) {
+      cancelAnimationFrame(this.progressRafId);
+      this.progressRafId = null;
+    }
+
     if (this.element && this.element.parentNode) {
       this.element.parentNode.removeChild(this.element);
     }
     this.element = null;
     this.button = null;
+    this.progressRing = null;
+    this.progressArc = null;
+    this.pendingProgress = null;
   }
 }

@@ -57,6 +57,11 @@ class TTSContentScript {
       this.state.setState(PLAYER_STATES.IDLE);
       this.state.setContinuousMode(false);
     });
+
+    // Wire up progress updates from audio queue to player control
+    this.audioQueue.setOnProgress((currentTime, duration) => {
+      this.playerControl.updateProgress(currentTime, duration);
+    });
   }
 
   async handlePlayClick() {
@@ -171,5 +176,11 @@ class TTSContentScript {
   }
 }
 
-const ttsApp = new TTSContentScript();
-ttsApp.init();
+// Prevent multiple instances
+if (!window.__ttsAppInitialized) {
+  window.__ttsAppInitialized = true;
+  const ttsApp = new TTSContentScript();
+  ttsApp.init();
+} else {
+  console.warn('[TTS] Content script already initialized, skipping');
+}
