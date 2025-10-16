@@ -3,6 +3,7 @@ import {
   isReadableTag,
   hasMinimumTextContent,
   isElementVisible,
+  isInteractiveElement,
   shouldShowPlayButton,
   isReadableElement,
   filterReadableElements
@@ -92,6 +93,58 @@ describe('elementValidation', () => {
     it('should return false for elements without textContent', () => {
       const fakeElement = {};
       expect(hasMinimumTextContent(fakeElement)).toBe(false);
+    });
+  });
+
+  describe('isInteractiveElement', () => {
+    it('should return true for button elements', () => {
+      const button = document.createElement('button');
+      expect(isInteractiveElement(button)).toBe(true);
+    });
+
+    it('should return true for link elements', () => {
+      const link = document.createElement('a');
+      expect(isInteractiveElement(link)).toBe(true);
+    });
+
+    it('should return true for input elements', () => {
+      const input = document.createElement('input');
+      expect(isInteractiveElement(input)).toBe(true);
+    });
+
+    it('should return true for textarea elements', () => {
+      const textarea = document.createElement('textarea');
+      expect(isInteractiveElement(textarea)).toBe(true);
+    });
+
+    it('should return true for select elements', () => {
+      const select = document.createElement('select');
+      expect(isInteractiveElement(select)).toBe(true);
+    });
+
+    it('should return true for label elements', () => {
+      const label = document.createElement('label');
+      expect(isInteractiveElement(label)).toBe(true);
+    });
+
+    it('should return false for non-interactive elements', () => {
+      const p = document.createElement('p');
+      const div = document.createElement('div');
+      const span = document.createElement('span');
+
+      expect(isInteractiveElement(p)).toBe(false);
+      expect(isInteractiveElement(div)).toBe(false);
+      expect(isInteractiveElement(span)).toBe(false);
+    });
+
+    it('should return false for null or undefined', () => {
+      expect(isInteractiveElement(null)).toBe(false);
+      expect(isInteractiveElement(undefined)).toBe(false);
+    });
+
+    it('should return false for elements without tagName', () => {
+      const fakeElement = {};
+      expect(isInteractiveElement(fakeElement)).toBe(false);
     });
   });
 
@@ -222,6 +275,50 @@ describe('elementValidation', () => {
       blockquote.textContent = 'This is a quote with enough text to be readable.';
 
       expect(shouldShowPlayButton(blockquote)).toBe(true);
+    });
+
+    it('should return false for button elements even with sufficient text', () => {
+      const button = document.createElement('button');
+      button.textContent = 'This is a button with enough text content.';
+
+      expect(shouldShowPlayButton(button)).toBe(false);
+    });
+
+    it('should return false for link elements even with sufficient text', () => {
+      const link = document.createElement('a');
+      link.textContent = 'This is a link with enough text content.';
+
+      expect(shouldShowPlayButton(link)).toBe(false);
+    });
+
+    it('should return false for input elements', () => {
+      const input = document.createElement('input');
+      input.value = 'This is input text with enough content.';
+
+      expect(shouldShowPlayButton(input)).toBe(false);
+    });
+
+    it('should return false for textarea elements even with sufficient text', () => {
+      const textarea = document.createElement('textarea');
+      textarea.textContent = 'This is textarea text with enough content.';
+
+      expect(shouldShowPlayButton(textarea)).toBe(false);
+    });
+
+    it('should return false for select elements', () => {
+      const select = document.createElement('select');
+      const option = document.createElement('option');
+      option.textContent = 'Option with enough text';
+      select.appendChild(option);
+
+      expect(shouldShowPlayButton(select)).toBe(false);
+    });
+
+    it('should return false for label elements even with sufficient text', () => {
+      const label = document.createElement('label');
+      label.textContent = 'This is a label with enough text content.';
+
+      expect(shouldShowPlayButton(label)).toBe(false);
     });
   });
 
