@@ -12,6 +12,7 @@ use crate::chunking::{chunk_text, ChunkingConfig};
 use crate::error::{Result, TtsError};
 
 const BOUNDARY: &str = "tts_chunk_boundary";
+const MAX_TEXT_LENGTH: usize = 10_000;
 
 fn create_boundary_start() -> String {
     format!("\r\n--{}\r\n", BOUNDARY)
@@ -110,6 +111,13 @@ pub async fn generate_tts_stream(
     // Validate text
     if req.text.trim().is_empty() {
         return Err(TtsError::EmptyText);
+    }
+
+    // Validate text length to prevent DoS
+    if req.text.len() > MAX_TEXT_LENGTH {
+        return Err(TtsError::InvalidRequest(
+            format!("Text too long: {} chars (max {})", req.text.len(), MAX_TEXT_LENGTH)
+        ));
     }
 
     // Validate speed
@@ -349,5 +357,182 @@ mod tests {
         assert!(part_str.contains("Content-Length: 5"));
         // The actual audio bytes should be at the end
         assert!(part.ends_with(&audio_data));
+    }
+
+    // ===== Input Size Limit Tests for Streaming =====
+
+    fn validate_streaming_request(req: &TTSRequest) -> Result<()> {
+        // Validate text
+        if req.text.trim().is_empty() {
+            return Err(TtsError::EmptyText);
+        }
+
+        // Validate text length to prevent DoS
+        if req.text.len() > MAX_TEXT_LENGTH {
+            return Err(TtsError::InvalidRequest(
+                format!("Text too long: {} chars (max {})", req.text.len(), MAX_TEXT_LENGTH)
+            ));
+        }
+
+        // Validate speed
+        if req.speed <= 0.0 || req.speed > 3.0 {
+            return Err(TtsError::InvalidSpeed(req.speed));
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_streaming_rejects_empty_text() {
+        let req = TTSRequest {
+            text: "".to_string(),
+            voice: "af_heart".to_string(),
+            speed: 1.0,
+            enable_chunking: false,
+        };
+
+        let result = validate_streaming_request(&req);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            TtsError::EmptyText => {}, // Expected
+            other => panic!("Expected EmptyText error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_streaming_rejects_whitespace_only_text() {
+        let req = TTSRequest {
+            text: "   \n\t  ".to_string(),
+            voice: "af_heart".to_string(),
+            speed: 1.0,
+            enable_chunking: false,
+        };
+
+        let result = validate_streaming_request(&req);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            TtsError::EmptyText => {}, // Expected
+            other => panic!("Expected EmptyText error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_streaming_rejects_text_exceeding_max_length() {
+        // Create text that exceeds MAX_TEXT_LENGTH (10,000 chars)
+        let long_text = "a".repeat(MAX_TEXT_LENGTH + 1);
+
+        let req = TTSRequest {
+            text: long_text,
+            voice: "af_heart".to_string(),
+            speed: 1.0,
+            enable_chunking: false,
+        };
+
+        let result = validate_streaming_request(&req);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            TtsError::InvalidRequest(msg) => {
+                assert!(msg.contains("Text too long"));
+                assert!(msg.contains("10001 chars"));
+                assert!(msg.contains("max 10000"));
+            },
+            other => panic!("Expected InvalidRequest error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_streaming_accepts_text_at_max_length() {
+        // Create text exactly at MAX_TEXT_LENGTH (10,000 chars)
+        let text = "a".repeat(MAX_TEXT_LENGTH);
+
+        let req = TTSRequest {
+            text,
+            voice: "af_heart".to_string(),
+            speed: 1.0,
+            enable_chunking: false,
+        };
+
+        let result = validate_streaming_request(&req);
+        assert!(result.is_ok(), "Should accept text at max length");
+    }
+
+    #[test]
+    fn test_streaming_accepts_text_just_below_max_length() {
+        // Create text just below MAX_TEXT_LENGTH
+        let text = "a".repeat(MAX_TEXT_LENGTH - 1);
+
+        let req = TTSRequest {
+            text,
+            voice: "af_heart".to_string(),
+            speed: 1.0,
+            enable_chunking: false,
+        };
+
+        let result = validate_streaming_request(&req);
+        assert!(result.is_ok(), "Should accept text below max length");
+    }
+
+    #[test]
+    fn test_streaming_boundary_values() {
+        // Test various boundary values
+        let test_cases = vec![
+            (1, true),           // Minimum valid
+            (100, true),         // Normal short text
+            (9999, true),        // Just below max
+            (10000, true),       // Exactly at max
+            (10001, false),      // Just over max
+            (20000, false),      // Way over max
+        ];
+
+        for (length, should_pass_validation) in test_cases {
+            let text = "a".repeat(length);
+            let req = TTSRequest {
+                text,
+                voice: "af_heart".to_string(),
+                speed: 1.0,
+                enable_chunking: false,
+            };
+
+            let result = validate_streaming_request(&req);
+
+            if should_pass_validation {
+                assert!(result.is_ok(), "Length {} should pass validation", length);
+            } else {
+                assert!(result.is_err(), "Length {} should fail validation", length);
+                match result.unwrap_err() {
+                    TtsError::InvalidRequest(msg) => {
+                        assert!(msg.contains("Text too long"),
+                            "Expected 'Text too long' error for length {}, got: {}", length, msg);
+                    },
+                    other => panic!("Expected InvalidRequest for length {}, got: {:?}", length, other),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_streaming_rejects_excessively_long_text() {
+        // Test with very large text (100,000 chars - 10x the limit)
+        let very_long_text = "a".repeat(MAX_TEXT_LENGTH * 10);
+
+        let req = TTSRequest {
+            text: very_long_text,
+            voice: "af_heart".to_string(),
+            speed: 1.0,
+            enable_chunking: false,
+        };
+
+        let result = validate_streaming_request(&req);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            TtsError::InvalidRequest(msg) => {
+                assert!(msg.contains("Text too long"));
+            },
+            other => panic!("Expected InvalidRequest error, got: {:?}", other),
+        }
     }
 }
