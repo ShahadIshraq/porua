@@ -24,6 +24,12 @@ impl ApiKeys {
         }
     }
 
+    /// Create a new ApiKeys instance from a set of keys (for testing)
+    #[cfg(test)]
+    pub fn from_keys(keys: HashSet<String>) -> Self {
+        Self { keys }
+    }
+
     /// Load API keys from a file
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, std::io::Error> {
         let file = File::open(path)?;

@@ -5,6 +5,7 @@ pub mod chunking;
 pub mod error;
 pub mod kokoro;
 pub mod models;
+pub mod rate_limit;
 pub mod server;
 pub mod services;
 pub mod utils;

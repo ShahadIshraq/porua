@@ -18,6 +18,7 @@ use crate::error::{Result, TtsError};
 use crate::utils::temp_file::TempFile;
 use crate::models::{TTSRequest, VoiceInfo, VoicesResponse, HealthResponse, PoolStatsResponse};
 use crate::audio;
+use crate::rate_limit::PerKeyRateLimiter;
 
 // Constants
 const MAX_TEXT_LENGTH: usize = 10_000;
@@ -27,6 +28,7 @@ const MAX_TEXT_LENGTH: usize = 10_000;
 pub struct AppState {
     pub tts_pool: Arc<TTSPool>,
     pub api_keys: ApiKeys,
+    pub rate_limiter: Option<PerKeyRateLimiter>,
 }
 
 // HTTP Handlers
@@ -211,18 +213,28 @@ pub fn create_router(state: AppState) -> Router<()> {
     // Clone api_keys for middleware
     let api_keys_for_middleware = state.api_keys.clone();
 
-    Router::new()
+    let mut router = Router::new()
         .route("/tts", post(generate_tts))
         .route("/tts/stream", post(generate_tts_stream))
         .route("/voices", get(list_voices))
         .route("/health", get(health_check))
-        .route("/stats", get(pool_stats))
-        .layer(middleware::from_fn_with_state(
-            api_keys_for_middleware,
-            crate::auth::auth_middleware,
-        ))
-        .with_state(state)
-        .layer(cors)
+        .route("/stats", get(pool_stats));
+
+    // Apply rate limiting only if API keys are enabled
+    if let Some(rate_limiter) = state.rate_limiter.clone() {
+        router = router.layer(middleware::from_fn_with_state(
+            rate_limiter,
+            crate::rate_limit::rate_limit_middleware,
+        ));
+    }
+
+    // Apply authentication middleware
+    router = router.layer(middleware::from_fn_with_state(
+        api_keys_for_middleware,
+        crate::auth::auth_middleware,
+    ));
+
+    router.with_state(state).layer(cors)
 }
 
 #[cfg(test)]
