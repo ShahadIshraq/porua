@@ -386,6 +386,217 @@ describe('HighlightManager', () => {
     });
   });
 
+  describe('HTML preservation', () => {
+    it('should preserve link tags when wrapping phrases', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'Check out <a href="https://example.com">this link</a> for more info.';
+
+      const timeline = [
+        { phrase: 'Check out this link for', startTime: 0, endTime: 1000 }
+      ];
+
+      highlightManager.wrapPhrases(paragraph, timeline);
+
+      // Verify link is still present
+      const link = paragraph.querySelector('a[href="https://example.com"]');
+      expect(link).not.toBeNull();
+      expect(link.textContent).toBe('this link');
+      expect(link.href).toBe('https://example.com/');
+    });
+
+    it('should preserve strong tags when wrapping phrases', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'This is <strong>very important</strong> text.';
+
+      const timeline = [
+        { phrase: 'This is very important', startTime: 0, endTime: 1000 }
+      ];
+
+      highlightManager.wrapPhrases(paragraph, timeline);
+
+      // Verify strong tag is still present
+      const strong = paragraph.querySelector('strong');
+      expect(strong).not.toBeNull();
+      expect(strong.textContent).toBe('very important');
+    });
+
+    it('should preserve em tags when wrapping phrases', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'Text with <em>emphasis</em> here.';
+
+      const timeline = [
+        { phrase: 'Text with emphasis', startTime: 0, endTime: 1000 }
+      ];
+
+      highlightManager.wrapPhrases(paragraph, timeline);
+
+      // Verify em tag is still present
+      const em = paragraph.querySelector('em');
+      expect(em).not.toBeNull();
+      expect(em.textContent).toBe('emphasis');
+    });
+
+    it('should preserve nested inline elements', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'This is <strong>very <em>important</em></strong> text.';
+
+      const timeline = [
+        { phrase: 'very important', startTime: 0, endTime: 1000 }
+      ];
+
+      highlightManager.wrapPhrases(paragraph, timeline);
+
+      // Verify both tags are present
+      const strong = paragraph.querySelector('strong');
+      const em = paragraph.querySelector('em');
+      expect(strong).not.toBeNull();
+      expect(em).not.toBeNull();
+      expect(em.textContent).toBe('important');
+    });
+
+    it('should preserve multiple links in same paragraph', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'Visit <a href="https://google.com">Google</a> or <a href="https://yahoo.com">Yahoo</a>.';
+
+      const timeline = [
+        { phrase: 'Visit Google or Yahoo', startTime: 0, endTime: 1000 }
+      ];
+
+      highlightManager.wrapPhrases(paragraph, timeline);
+
+      // Verify both links are still in the document (they may be inside phrase spans)
+      const allLinks = paragraph.querySelectorAll('a');
+      expect(allLinks.length).toBeGreaterThanOrEqual(2);
+
+      // Check that we can find both URLs
+      const urls = Array.from(allLinks).map(l => l.href);
+      expect(urls.filter(url => url.includes('google.com')).length).toBeGreaterThanOrEqual(1);
+      expect(urls.filter(url => url.includes('yahoo.com')).length).toBeGreaterThanOrEqual(1);
+
+      // Verify link text content is preserved
+      const googleLink = Array.from(allLinks).find(l => l.href.includes('google.com'));
+      const yahooLink = Array.from(allLinks).find(l => l.href.includes('yahoo.com'));
+      expect(googleLink.textContent).toBe('Google');
+      expect(yahooLink.textContent).toBe('Yahoo');
+    });
+
+    it('should preserve link when phrase is exactly the link text', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'Click <a href="https://example.com">here</a> to continue.';
+
+      const timeline = [
+        { phrase: 'here', startTime: 0, endTime: 500 }
+      ];
+
+      highlightManager.wrapPhrases(paragraph, timeline);
+
+      // Verify link is present and wrapped
+      const link = paragraph.querySelector('a[href="https://example.com"]');
+      expect(link).not.toBeNull();
+      expect(link.textContent).toBe('here');
+    });
+
+    it('should preserve code tags', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'Use the <code>console.log()</code> function.';
+
+      const timeline = [
+        { phrase: 'Use the console log function', startTime: 0, endTime: 1000 }
+      ];
+
+      highlightManager.wrapPhrases(paragraph, timeline);
+
+      // Verify code tag is present
+      const code = paragraph.querySelector('code');
+      expect(code).not.toBeNull();
+      expect(code.textContent).toBe('console.log()');
+    });
+
+    it('should handle phrase spanning across link boundary', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'Hello <a href="#">world</a> test.';
+
+      const timeline = [
+        { phrase: 'Hello world test', startTime: 0, endTime: 1000 }
+      ];
+
+      highlightManager.wrapPhrases(paragraph, timeline);
+
+      // Verify link is still present
+      const link = paragraph.querySelector('a');
+      expect(link).not.toBeNull();
+      expect(link.textContent).toBe('world');
+
+      // Verify phrase span exists
+      const phraseSpan = paragraph.querySelector('.tts-phrase');
+      expect(phraseSpan).not.toBeNull();
+    });
+
+    it('should preserve complex nested structure', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'Text <strong>bold <a href="#">link</a> more</strong> end.';
+
+      const timeline = [
+        { phrase: 'Text bold link more', startTime: 0, endTime: 1000 }
+      ];
+
+      highlightManager.wrapPhrases(paragraph, timeline);
+
+      // Verify all elements are present
+      const strong = paragraph.querySelector('strong');
+      const link = paragraph.querySelector('a');
+      expect(strong).not.toBeNull();
+      expect(link).not.toBeNull();
+      expect(link.textContent).toBe('link');
+    });
+
+    it('should restore original HTML including links', () => {
+      const paragraph = document.createElement('p');
+      const originalHtml = 'Check <a href="#">this link</a> out.';
+      paragraph.innerHTML = originalHtml;
+
+      const timeline = [
+        { phrase: 'Check this link', startTime: 0, endTime: 1000 }
+      ];
+
+      highlightManager.wrapPhrases(paragraph, timeline);
+
+      // Verify link is still there
+      expect(paragraph.querySelector('a')).not.toBeNull();
+
+      // Restore
+      highlightManager.restoreParagraph(paragraph);
+
+      // Verify HTML is fully restored
+      expect(paragraph.innerHTML).toBe(originalHtml);
+    });
+
+    it('should handle multiple phrases with HTML preservation', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'Text <a href="#">link</a> and <strong>bold</strong> end.';
+
+      const timeline = [
+        { phrase: 'Text link', startTime: 0, endTime: 500 },
+        { phrase: 'and bold', startTime: 500, endTime: 1000 },
+        { phrase: 'end', startTime: 1000, endTime: 1500 }
+      ];
+
+      highlightManager.wrapPhrases(paragraph, timeline);
+
+      // Verify all original HTML is preserved
+      const link = paragraph.querySelector('a');
+      const strong = paragraph.querySelector('strong');
+      expect(link).not.toBeNull();
+      expect(strong).not.toBeNull();
+      expect(link.textContent).toBe('link');
+      expect(strong.textContent).toBe('bold');
+
+      // Verify all phrases are wrapped
+      const phrases = paragraph.querySelectorAll('.tts-phrase');
+      expect(phrases.length).toBe(3);
+    });
+  });
+
   describe('clearHighlights', () => {
     it('should remove highlight from current phrase', () => {
       const mockSpan = document.createElement('span');

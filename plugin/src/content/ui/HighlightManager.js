@@ -1,5 +1,6 @@
 import { escapeHtml } from '../utils/dom.js';
 import { PhraseMatcher } from '../utils/phraseMatcher.js';
+import { DOMTextMapper } from '../utils/DOMTextMapper.js';
 
 export class HighlightManager {
   constructor(state) {
@@ -12,12 +13,14 @@ export class HighlightManager {
       paragraph.dataset.originalHtml = paragraph.innerHTML;
     }
 
+    // Clear any existing phrase spans first
+    this.clearPhraseSpans(paragraph);
+
     const originalText = paragraph.textContent;
     const matcher = new PhraseMatcher(originalText);
+    const mapper = new DOMTextMapper(paragraph);
 
     let currentIndex = 0;
-    let html = '';
-    let wrappedCount = 0;
     const failedPhrases = [];
 
     for (let timelineIndex = 0; timelineIndex < timeline.length; timelineIndex++) {
@@ -36,39 +39,145 @@ export class HighlightManager {
         continue;
       }
 
-      // Add any gap text before this phrase
-      if (match.index > currentIndex) {
-        const gapText = originalText.substring(currentIndex, match.index);
-        html += escapeHtml(gapText);
+      // Try to wrap the phrase using Range API
+      try {
+        this.wrapPhraseWithRange(
+          mapper,
+          match.index,
+          match.index + match.length,
+          phraseData,
+          timelineIndex
+        );
+      } catch (e) {
+        // If Range API fails, fall back to manual wrapping
+        console.warn('Range API wrapping failed, falling back to manual wrapping:', e);
+        this.wrapPhraseManually(
+          paragraph,
+          match.index,
+          match.index + match.length,
+          phraseData,
+          timelineIndex
+        );
       }
 
-      // Extract actual matched text from original
-      const actualText = originalText.substring(
-        match.index,
-        match.index + match.length
-      );
-
-      // Create span with phrase data
-      html += `<span class="tts-phrase" `;
-      html += `data-start-time="${phraseData.startTime}" `;
-      html += `data-end-time="${phraseData.endTime}" `;
-      html += `data-phrase-index="${timelineIndex}"`;
-      html += `>${escapeHtml(actualText)}</span>`;
-
       currentIndex = match.index + match.length;
-      wrappedCount++;
     }
-
-    // Add any remaining text after last phrase
-    if (currentIndex < originalText.length) {
-      html += escapeHtml(originalText.substring(currentIndex));
-    }
-
-    // Update paragraph HTML
-    paragraph.innerHTML = html;
 
     // Setup DOM protection
     this.setupDOMProtection(paragraph);
+  }
+
+  /**
+   * Clear existing phrase spans without destroying other HTML.
+   */
+  clearPhraseSpans(paragraph) {
+    const phraseSpans = paragraph.querySelectorAll('.tts-phrase');
+    phraseSpans.forEach(span => {
+      // Unwrap: replace span with its contents
+      const parent = span.parentNode;
+      while (span.firstChild) {
+        parent.insertBefore(span.firstChild, span);
+      }
+      parent.removeChild(span);
+    });
+
+    // Normalize to merge adjacent text nodes
+    paragraph.normalize();
+  }
+
+  /**
+   * Wrap a phrase using the Range API (preserves HTML structure).
+   */
+  wrapPhraseWithRange(mapper, startPos, endPos, phraseData, timelineIndex) {
+    const range = mapper.createRangeFromTextOffset(startPos, endPos);
+    if (!range) {
+      throw new Error('Could not create range from text offsets');
+    }
+
+    // Create the phrase span
+    const phraseSpan = document.createElement('span');
+    phraseSpan.className = 'tts-phrase';
+    phraseSpan.dataset.startTime = phraseData.startTime;
+    phraseSpan.dataset.endTime = phraseData.endTime;
+    phraseSpan.dataset.phraseIndex = timelineIndex;
+
+    // surroundContents() only works if the range doesn't partially select nodes
+    // This works for most cases where phrases align with word boundaries
+    try {
+      range.surroundContents(phraseSpan);
+    } catch (e) {
+      // If surroundContents fails, we need manual wrapping
+      throw e;
+    }
+  }
+
+  /**
+   * Manually wrap a phrase when Range.surroundContents() fails.
+   * This handles cases where the phrase spans partial nodes.
+   */
+  wrapPhraseManually(paragraph, startPos, endPos, phraseData, timelineIndex) {
+    const mapper = new DOMTextMapper(paragraph);
+    const affectedNodes = mapper.getNodesInRange(startPos, endPos);
+
+    if (affectedNodes.length === 0) return;
+
+    // Case 1: Phrase is entirely within one text node
+    if (affectedNodes.length === 1) {
+      const { node, startOffset, endOffset } = affectedNodes[0];
+      this.wrapTextNodeRange(node, startOffset, endOffset, phraseData, timelineIndex);
+      return;
+    }
+
+    // Case 2: Phrase spans multiple text nodes
+    // Create a wrapper span and extract the content into it
+    const firstNode = affectedNodes[0];
+    const lastNode = affectedNodes[affectedNodes.length - 1];
+
+    const phraseSpan = document.createElement('span');
+    phraseSpan.className = 'tts-phrase';
+    phraseSpan.dataset.startTime = phraseData.startTime;
+    phraseSpan.dataset.endTime = phraseData.endTime;
+    phraseSpan.dataset.phraseIndex = timelineIndex;
+
+    // Create a range spanning the entire phrase
+    const range = document.createRange();
+    range.setStart(firstNode.node, firstNode.startOffset);
+    range.setEnd(lastNode.node, lastNode.endOffset);
+
+    // Extract contents and wrap them
+    const contents = range.extractContents();
+    phraseSpan.appendChild(contents);
+    range.insertNode(phraseSpan);
+
+    // Normalize to clean up any fragmented text nodes
+    paragraph.normalize();
+  }
+
+  /**
+   * Wrap a portion of a single text node.
+   */
+  wrapTextNodeRange(textNode, startOffset, endOffset, phraseData, timelineIndex) {
+    const text = textNode.textContent;
+    const before = text.slice(0, startOffset);
+    const target = text.slice(startOffset, endOffset);
+    const after = text.slice(endOffset);
+
+    const phraseSpan = document.createElement('span');
+    phraseSpan.className = 'tts-phrase';
+    phraseSpan.dataset.startTime = phraseData.startTime;
+    phraseSpan.dataset.endTime = phraseData.endTime;
+    phraseSpan.dataset.phraseIndex = timelineIndex;
+    phraseSpan.textContent = target;
+
+    const parent = textNode.parentNode;
+    const beforeNode = before ? document.createTextNode(before) : null;
+    const afterNode = after ? document.createTextNode(after) : null;
+
+    // Replace the text node with the three parts
+    if (beforeNode) parent.insertBefore(beforeNode, textNode);
+    parent.insertBefore(phraseSpan, textNode);
+    if (afterNode) parent.insertBefore(afterNode, textNode);
+    parent.removeChild(textNode);
   }
 
   /**
