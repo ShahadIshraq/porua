@@ -19,6 +19,9 @@ use crate::utils::temp_file::TempFile;
 use crate::models::{TTSRequest, VoiceInfo, VoicesResponse, HealthResponse, PoolStatsResponse};
 use crate::audio;
 
+// Constants
+const MAX_TEXT_LENGTH: usize = 10_000;
+
 // Shared application state
 #[derive(Clone)]
 pub struct AppState {
@@ -44,6 +47,13 @@ async fn generate_tts(
     // Validate text is not empty
     if req.text.trim().is_empty() {
         return Err(TtsError::EmptyText);
+    }
+
+    // Validate text length to prevent DoS
+    if req.text.len() > MAX_TEXT_LENGTH {
+        return Err(TtsError::InvalidRequest(
+            format!("Text too long: {} chars (max {})", req.text.len(), MAX_TEXT_LENGTH)
+        ));
     }
 
     // Validate speed is reasonable
@@ -213,5 +223,225 @@ pub fn create_router(state: AppState) -> Router<()> {
         ))
         .with_state(state)
         .layer(cors)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::TTSRequest;
+
+    // ===== Input Validation Unit Tests =====
+    // These tests verify validation logic without requiring a TTS pool
+
+    fn validate_tts_request(req: &TTSRequest) -> Result<()> {
+        // Validate text is not empty
+        if req.text.trim().is_empty() {
+            return Err(TtsError::EmptyText);
+        }
+
+        // Validate text length to prevent DoS
+        if req.text.len() > MAX_TEXT_LENGTH {
+            return Err(TtsError::InvalidRequest(
+                format!("Text too long: {} chars (max {})", req.text.len(), MAX_TEXT_LENGTH)
+            ));
+        }
+
+        // Validate speed is reasonable
+        if req.speed <= 0.0 || req.speed > 3.0 {
+            return Err(TtsError::InvalidSpeed(req.speed));
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_validate_rejects_empty_text() {
+        let req = TTSRequest {
+            text: "".to_string(),
+            voice: "af_heart".to_string(),
+            speed: 1.0,
+            enable_chunking: false,
+        };
+
+        let result = validate_tts_request(&req);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            TtsError::EmptyText => {}, // Expected
+            other => panic!("Expected EmptyText error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_rejects_whitespace_only_text() {
+        let req = TTSRequest {
+            text: "   \n\t  ".to_string(),
+            voice: "af_heart".to_string(),
+            speed: 1.0,
+            enable_chunking: false,
+        };
+
+        let result = validate_tts_request(&req);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            TtsError::EmptyText => {}, // Expected
+            other => panic!("Expected EmptyText error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_rejects_text_exceeding_max_length() {
+        // Create text that exceeds MAX_TEXT_LENGTH (10,000 chars)
+        let long_text = "a".repeat(MAX_TEXT_LENGTH + 1);
+
+        let req = TTSRequest {
+            text: long_text,
+            voice: "af_heart".to_string(),
+            speed: 1.0,
+            enable_chunking: false,
+        };
+
+        let result = validate_tts_request(&req);
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            TtsError::InvalidRequest(msg) => {
+                assert!(msg.contains("Text too long"));
+                assert!(msg.contains("10001 chars"));
+                assert!(msg.contains("max 10000"));
+            },
+            other => panic!("Expected InvalidRequest error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_accepts_text_at_max_length() {
+        // Create text exactly at MAX_TEXT_LENGTH (10,000 chars)
+        let text = "a".repeat(MAX_TEXT_LENGTH);
+
+        let req = TTSRequest {
+            text,
+            voice: "af_heart".to_string(),
+            speed: 1.0,
+            enable_chunking: false,
+        };
+
+        let result = validate_tts_request(&req);
+        assert!(result.is_ok(), "Should accept text at max length");
+    }
+
+    #[test]
+    fn test_validate_accepts_text_just_below_max_length() {
+        // Create text just below MAX_TEXT_LENGTH
+        let text = "a".repeat(MAX_TEXT_LENGTH - 1);
+
+        let req = TTSRequest {
+            text,
+            voice: "af_heart".to_string(),
+            speed: 1.0,
+            enable_chunking: false,
+        };
+
+        let result = validate_tts_request(&req);
+        assert!(result.is_ok(), "Should accept text below max length");
+    }
+
+    #[test]
+    fn test_validate_boundary_values() {
+        // Test various boundary values
+        let test_cases = vec![
+            (1, true),           // Minimum valid
+            (100, true),         // Normal short text
+            (9999, true),        // Just below max
+            (10000, true),       // Exactly at max
+            (10001, false),      // Just over max
+            (20000, false),      // Way over max
+        ];
+
+        for (length, should_pass_validation) in test_cases {
+            let text = "a".repeat(length);
+            let req = TTSRequest {
+                text,
+                voice: "af_heart".to_string(),
+                speed: 1.0,
+                enable_chunking: false,
+            };
+
+            let result = validate_tts_request(&req);
+
+            if should_pass_validation {
+                assert!(result.is_ok(), "Length {} should pass validation", length);
+            } else {
+                assert!(result.is_err(), "Length {} should fail validation", length);
+                match result.unwrap_err() {
+                    TtsError::InvalidRequest(msg) => {
+                        assert!(msg.contains("Text too long"),
+                            "Expected 'Text too long' error for length {}, got: {}", length, msg);
+                    },
+                    other => panic!("Expected InvalidRequest for length {}, got: {:?}", length, other),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_validate_with_chunking_respects_max_length() {
+        // Create text that exceeds MAX_TEXT_LENGTH with chunking enabled
+        let long_text = "a".repeat(MAX_TEXT_LENGTH + 1);
+
+        let req = TTSRequest {
+            text: long_text,
+            voice: "af_heart".to_string(),
+            speed: 1.0,
+            enable_chunking: true,  // Chunking enabled
+        };
+
+        let result = validate_tts_request(&req);
+        assert!(result.is_err());
+
+        // Should still be rejected even with chunking enabled
+        match result.unwrap_err() {
+            TtsError::InvalidRequest(msg) => {
+                assert!(msg.contains("Text too long"));
+            },
+            other => panic!("Expected InvalidRequest error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_validate_rejects_invalid_speed() {
+        let test_cases = vec![
+            (0.0, false),     // Zero speed
+            (-1.0, false),    // Negative speed
+            (0.5, true),      // Valid low speed
+            (1.0, true),      // Normal speed
+            (2.0, true),      // Valid high speed
+            (3.0, true),      // Maximum valid speed
+            (3.1, false),     // Just over max
+            (10.0, false),    // Way over max
+        ];
+
+        for (speed, should_be_valid) in test_cases {
+            let req = TTSRequest {
+                text: "Test text".to_string(),
+                voice: "af_heart".to_string(),
+                speed,
+                enable_chunking: false,
+            };
+
+            let result = validate_tts_request(&req);
+
+            if should_be_valid {
+                assert!(result.is_ok(), "Speed {} should be valid", speed);
+            } else {
+                assert!(result.is_err(), "Speed {} should be invalid", speed);
+                match result.unwrap_err() {
+                    TtsError::InvalidSpeed(_) => {}, // Expected
+                    other => panic!("Expected InvalidSpeed error for speed {}, got: {:?}", speed, other),
+                }
+            }
+        }
+    }
 }
 
