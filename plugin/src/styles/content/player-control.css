@@ -10,8 +10,8 @@
   width: 50px;
   height: 50px;
 
-  /* Appearance */
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.95), rgba(67, 56, 202, 0.95));
+  /* Appearance - IDLE/PAUSED: Static purple gradient */
+  background: linear-gradient(135deg, #6366f1, #4338ca);
   border-radius: 50%;
   box-shadow: var(--tts-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.3));
   cursor: move;
@@ -19,13 +19,69 @@
   /* Ensure it's on top */
   z-index: var(--tts-player-control-z, 1000000);
 
-  /* Animation */
-  transition: background 0.2s ease, box-shadow 0.2s ease;
+  /* Smooth transitions */
+  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .tts-player-control:hover {
-  background: linear-gradient(135deg, rgba(79, 70, 229, 0.95), rgba(67, 56, 202, 0.95));
+  background: linear-gradient(135deg, #4f46e5, #4338ca);
   box-shadow: var(--tts-shadow-lg, 0 6px 16px rgba(0, 0, 0, 0.4));
+  transform: scale(1.05);
+}
+
+/* SVG Progress Ring Container */
+.tts-progress-ring {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  top: -5px;
+  left: -5px;
+  pointer-events: none;
+  transform: rotate(-90deg); /* Start progress from top (12 o'clock) */
+}
+
+/* Background track (subtle gray circle) */
+.tts-progress-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.15);
+  stroke-width: 3;
+}
+
+/* Progress arc */
+.tts-progress-arc {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 3;
+  stroke-linecap: round;
+  /* Longer transition for ultra-smooth progress updates */
+  transition: stroke-dashoffset 0.25s linear, opacity 0.15s ease, stroke 0.2s ease;
+  will-change: stroke-dashoffset;
+}
+
+/* Hide progress arc in IDLE state only */
+.tts-player-control:has(.tts-player-button:not(.loading):not(.playing):not(.paused)) .tts-progress-arc {
+  opacity: 0;
+}
+
+/* Loading state: indeterminate spinner */
+.tts-player-control:has(.tts-player-button.loading) .tts-progress-arc {
+  stroke: rgba(255, 255, 255, 0.9);
+  stroke-dasharray: 42.41; /* 90° arc = 25% of circumference (169.65 * 0.25) */
+  stroke-dashoffset: 0;
+  animation: progress-spin 1.2s linear infinite;
+  opacity: 1;
+}
+
+/* Playing state: show progress with full brightness */
+.tts-player-control:has(.tts-player-button.playing) .tts-progress-arc {
+  stroke: rgba(255, 255, 255, 0.95);
+  opacity: 1;
+}
+
+/* Paused state: show progress with dimmed opacity to indicate paused */
+.tts-player-control:has(.tts-player-button.paused) .tts-progress-arc {
+  stroke: rgba(255, 255, 255, 0.7);
+  opacity: 1;
 }
 
 .tts-player-button {
@@ -70,58 +126,42 @@
   animation: spin 1.5s linear infinite;
 }
 
-/* Loading state for player control */
+/* LOADING state: Solid orange gradient (NO animation) */
 .tts-player-control:has(.tts-player-button.loading) {
-  background: linear-gradient(45deg, rgba(255, 215, 0, 0.95), rgba(255, 140, 0, 0.95), rgba(255, 69, 0, 0.95), rgba(255, 140, 0, 0.95), rgba(255, 215, 0, 0.95));
-  background-size: 400% 400%;
-  animation: gradient-shift-fast 6s linear infinite;
+  background: linear-gradient(135deg, #fb923c, #f97316);
 }
 
 .tts-player-control:has(.tts-player-button.loading):hover {
-  background: linear-gradient(45deg, rgba(255, 215, 0, 0.95), rgba(255, 140, 0, 0.95), rgba(255, 69, 0, 0.95), rgba(255, 140, 0, 0.95), rgba(255, 215, 0, 0.95));
-  background-size: 400% 400%;
-  animation: gradient-shift-fast 6s linear infinite;
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  transform: scale(1.05);
 }
 
-/* Playing state for player control */
+/* PLAYING state: Solid emerald gradient (NO animation) */
 .tts-player-control:has(.tts-player-button.playing) {
-  background: linear-gradient(45deg, rgba(110, 231, 183, 0.95), rgba(52, 211, 153, 0.95), rgba(16, 185, 129, 0.95), rgba(52, 211, 153, 0.95), rgba(110, 231, 183, 0.95));
-  background-size: 400% 400%;
-  animation: gradient-shift-fast 6s linear infinite;
+  background: linear-gradient(135deg, #34d399, #10b981);
 }
 
 .tts-player-control:has(.tts-player-button.playing):hover {
-  background: linear-gradient(45deg, rgba(110, 231, 183, 0.95), rgba(52, 211, 153, 0.95), rgba(16, 185, 129, 0.95), rgba(52, 211, 153, 0.95), rgba(110, 231, 183, 0.95));
-  background-size: 400% 400%;
-  animation: gradient-shift-fast 6s linear infinite;
+  background: linear-gradient(135deg, #10b981, #059669);
+  transform: scale(1.05);
 }
 
-@keyframes gradient-shift {
-  0% {
-    background-position: 0% 50%;
+/* Progress ring spinning animation for loading state */
+@keyframes progress-spin {
+  from {
+    transform: rotate(0deg);
   }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
+  to {
+    transform: rotate(360deg);
   }
 }
 
-@keyframes gradient-shift-fast {
-  0% {
-    background-position: 0% 0%;
+/* Spin animation for spinner */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
   }
-  25% {
-    background-position: 100% 0%;
-  }
-  50% {
-    background-position: 100% 100%;
-  }
-  75% {
-    background-position: 0% 100%;
-  }
-  100% {
-    background-position: 0% 0%;
+  to {
+    transform: rotate(360deg);
   }
 }
