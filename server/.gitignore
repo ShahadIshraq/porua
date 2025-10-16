@@ -2,6 +2,9 @@
 /target
 Cargo.lock
 
+# Environment configuration - DO NOT COMMIT
+.env
+
 # API keys - DO NOT COMMIT
 api_keys.txt
 
