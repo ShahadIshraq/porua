@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# TTS Server Installation Script
-# Automated installation of TTS Server binary and models
+# Porua Server Installation Script
+# Automated installation of Porua Server binary and models
 
 set -e  # Exit on any error
 
@@ -14,15 +14,15 @@ NC='\033[0m' # No Color
 
 # Banner
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}   TTS Server Installation Script${NC}"
+echo -e "${BLUE}   Porua Server Installation Script${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
 # Check if running as root (for system-wide installation)
 if [ "$EUID" -eq 0 ]; then
     INSTALL_MODE="system"
-    INSTALL_DIR="/usr/local/tts-server"
-    BIN_LINK="/usr/local/bin/tts_server"
+    INSTALL_DIR="/usr/local/porua"
+    BIN_LINK="/usr/local/bin/porua_server"
 else
     echo -e "${YELLOW}Not running as root. Choose installation mode:${NC}"
     echo "  1) System-wide installation (requires sudo)"
@@ -32,14 +32,14 @@ else
     case $choice in
         1)
             INSTALL_MODE="system"
-            INSTALL_DIR="/usr/local/tts-server"
-            BIN_LINK="/usr/local/bin/tts_server"
+            INSTALL_DIR="/usr/local/porua"
+            BIN_LINK="/usr/local/bin/porua_server"
             NEEDS_SUDO=true
             ;;
         2)
             INSTALL_MODE="user"
-            INSTALL_DIR="$HOME/.local/tts-server"
-            BIN_LINK="$HOME/.local/bin/tts_server"
+            INSTALL_DIR="$HOME/.local/porua"
+            BIN_LINK="$HOME/.local/bin/porua_server"
             NEEDS_SUDO=false
             ;;
         *)
@@ -90,7 +90,7 @@ fi
 echo -e "${GREEN}✓ Sufficient disk space available${NC}"
 
 # Check if binary exists in package
-if [ ! -f "bin/tts_server" ]; then
+if [ ! -f "bin/porua_server" ]; then
     echo -e "${RED}✗ Binary not found. Are you in the correct directory?${NC}"
     echo -e "${YELLOW}Please run this script from the extracted package directory.${NC}"
     exit 1
@@ -119,10 +119,10 @@ echo ""
 
 # Step 3: Copy binary
 echo -e "${YELLOW}Step 3/7:${NC} Installing binary..."
-run_cmd cp bin/tts_server "$INSTALL_DIR/bin/"
-run_cmd chmod +x "$INSTALL_DIR/bin/tts_server"
+run_cmd cp bin/porua_server "$INSTALL_DIR/bin/"
+run_cmd chmod +x "$INSTALL_DIR/bin/porua_server"
 
-BINARY_SIZE=$(du -h "$INSTALL_DIR/bin/tts_server" | cut -f1)
+BINARY_SIZE=$(du -h "$INSTALL_DIR/bin/porua_server" | cut -f1)
 echo -e "${GREEN}✓ Binary installed${NC} (${BINARY_SIZE})"
 echo ""
 
@@ -148,7 +148,7 @@ echo ""
 
 # Step 6: Create symlink
 echo -e "${YELLOW}Step 6/7:${NC} Creating binary symlink..."
-run_cmd ln -sf "$INSTALL_DIR/bin/tts_server" "$BIN_LINK"
+run_cmd ln -sf "$INSTALL_DIR/bin/porua_server" "$BIN_LINK"
 echo -e "${GREEN}✓ Symlink created: $BIN_LINK${NC}"
 echo ""
 
@@ -174,7 +174,7 @@ else
 
     if [[ "$add_to_profile" =~ ^[Yy]$ ]]; then
         echo "" >> "$SHELL_RC"
-        echo "# TTS Server configuration" >> "$SHELL_RC"
+        echo "# Porua Server configuration" >> "$SHELL_RC"
         echo "export TTS_MODEL_DIR=\"$INSTALL_DIR/models\"" >> "$SHELL_RC"
         echo "export TTS_POOL_SIZE=2  # Adjust based on your needs" >> "$SHELL_RC"
         echo "" >> "$SHELL_RC"
@@ -210,7 +210,7 @@ echo ""
 
 # Summary
 echo -e "${GREEN}Installation summary:${NC}"
-echo -e "  Binary:      $INSTALL_DIR/bin/tts_server"
+echo -e "  Binary:      $INSTALL_DIR/bin/porua_server"
 echo -e "  Models:      $INSTALL_DIR/models/"
 echo -e "  Symlink:     $BIN_LINK"
 echo -e "  Total size:  $(du -sh "$INSTALL_DIR" | cut -f1)"
@@ -223,7 +223,7 @@ echo -e "${YELLOW}Verifying installation...${NC}"
 export TTS_MODEL_DIR="$INSTALL_DIR/models"
 
 # Test if binary is accessible
-if command -v tts_server &> /dev/null; then
+if command -v porua_server &> /dev/null; then
     echo -e "${GREEN}✓ Binary is in PATH${NC}"
 
     # Quick version check
@@ -241,10 +241,10 @@ echo -e "${GREEN}Quick Start Guide${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 echo -e "${YELLOW}1. Test CLI mode:${NC}"
-echo -e "   TTS_MODEL_DIR=\"$INSTALL_DIR/models\" tts_server \"Hello world!\""
+echo -e "   TTS_MODEL_DIR=\"$INSTALL_DIR/models\" porua_server \"Hello world!\""
 echo ""
 echo -e "${YELLOW}2. Start HTTP server:${NC}"
-echo -e "   TTS_MODEL_DIR=\"$INSTALL_DIR/models\" tts_server --server --port 3000"
+echo -e "   TTS_MODEL_DIR=\"$INSTALL_DIR/models\" porua_server --server --port 3000"
 echo ""
 echo -e "${YELLOW}3. Test API:${NC}"
 echo -e "   curl -X POST http://localhost:3000/tts \\"
@@ -288,5 +288,5 @@ if [[ "$run_test" =~ ^[Yy]$ ]]; then
     echo ""
 fi
 
-echo -e "${GREEN}Installation complete! Enjoy using TTS Server.${NC}"
+echo -e "${GREEN}Installation complete! Enjoy using Porua Server.${NC}"
 echo ""

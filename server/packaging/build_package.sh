@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# TTS Server Packaging Script
+# Porua Server Packaging Script
 # This script builds the server, packages it with models, and creates a distributable archive
 
 set -e  # Exit on any error
@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}========================================${NC}"
-echo -e "${BLUE}TTS Server Packaging Script${NC}"
+echo -e "${BLUE}Porua Server Packaging Script${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
 
@@ -41,7 +41,7 @@ echo -e "${GREEN}Platform:${NC} $PLATFORM-$ARCH"
 echo ""
 
 # Package name
-PACKAGE_NAME="tts-server-v${VERSION}-${PLATFORM}-${ARCH}"
+PACKAGE_NAME="porua-server-v${VERSION}-${PLATFORM}-${ARCH}"
 PACKAGE_DIR="dist/${PACKAGE_NAME}"
 
 # Change to server root directory (in case script is run from packaging/)
@@ -65,11 +65,11 @@ echo ""
 
 # Step 3: Copy binary
 echo -e "${YELLOW}Step 3/6:${NC} Copying binary..."
-cp target/release/tts_server "$PACKAGE_DIR/bin/"
-chmod +x "$PACKAGE_DIR/bin/tts_server"
+cp target/release/porua_server "$PACKAGE_DIR/bin/"
+chmod +x "$PACKAGE_DIR/bin/porua_server"
 
 # Get binary size
-BINARY_SIZE=$(du -h "$PACKAGE_DIR/bin/tts_server" | cut -f1)
+BINARY_SIZE=$(du -h "$PACKAGE_DIR/bin/porua_server" | cut -f1)
 echo -e "${GREEN}✓ Binary copied${NC} (${BINARY_SIZE})"
 echo ""
 
@@ -108,20 +108,20 @@ fi
 
 # Create a simple README in the root
 cat > "$PACKAGE_DIR/README.txt" << 'EOF'
-TTS Server - Text-to-Speech HTTP Server
+Porua Server - Text-to-Speech HTTP Server
 ========================================
 
 QUICK START:
 Run ./install.sh for automatic installation, then:
 
-  tts_server --server --port 3000
+  porua_server --server --port 3000
   curl -X POST http://localhost:3000/tts \
     -H "Content-Type: application/json" \
     -d '{"text": "Hello world!", "voice": "bf_lily"}' \
     --output test.wav
 
 PACKAGE CONTENTS:
-bin/tts_server       - Binary executable
+bin/porua_server       - Binary executable
 models/              - TTS model files
 docs/README.md       - Full documentation
 INSTALL.md           - Installation guide

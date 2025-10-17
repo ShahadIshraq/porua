@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "TTS Reader",
+  "name": "Porua",
   "version": "1.0.0",
   "description": "Text-to-speech reader for web pages",
   "icons": {
@@ -15,7 +15,7 @@
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
     },
-    "default_title": "TTS Reader Settings"
+    "default_title": "Porua Settings"
   },
   "content_scripts": [
     {
