@@ -25,7 +25,7 @@ impl ApiKeys {
     }
 
     /// Create a new ApiKeys instance from a set of keys (for testing)
-    #[cfg(test)]
+    #[allow(dead_code)]
     pub fn from_keys(keys: HashSet<String>) -> Self {
         Self { keys }
     }

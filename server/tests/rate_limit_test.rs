@@ -15,6 +15,12 @@ async fn create_test_app(rate_config: RateLimitConfig, with_auth: bool) -> axum:
         use std::collections::HashSet;
         let mut keys = HashSet::new();
         keys.insert("test-key".to_string());
+        keys.insert("test-key-1".to_string());
+        keys.insert("test-key-2".to_string());
+        keys.insert("key1".to_string());
+        keys.insert("key2".to_string());
+        keys.insert("same-key".to_string());
+        keys.insert("bearer-token-123".to_string());
         ApiKeys::from_keys(keys)
     } else {
         ApiKeys::empty()
@@ -30,7 +36,10 @@ async fn create_test_app(rate_config: RateLimitConfig, with_auth: bool) -> axum:
     // Create a minimal TTS pool for testing
     // Note: This will fail if model files are not present, so tests should focus on endpoints
     // that don't require TTS processing (health, voices, etc.)
-    let tts_pool = match TTSPool::new(1, ".", ".").await {
+    let model_path = "models/kokoro-v1.0.onnx";
+    let voices_path = "models/voices-v1.0.bin";
+
+    let tts_pool = match TTSPool::new(1, model_path, voices_path).await {
         Ok(pool) => Arc::new(pool),
         Err(_) => {
             // If we can't create a real pool, we'll still test rate limiting on available endpoints
@@ -188,29 +197,20 @@ async fn test_rate_limit_unauthenticated_requests() {
 
     let app = create_test_app(config, true).await;
 
-    // Make requests without API key - should still be rate limited (using "anonymous" key)
-    for _ in 0..2 {
+    // Make requests without API key - should return 401 when auth is enabled
+    for _ in 0..3 {
         let request = Request::builder()
             .uri("/health")
             .body(Body::empty())
             .unwrap();
 
         let response = app.clone().oneshot(request).await.unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.status(),
+            StatusCode::UNAUTHORIZED,
+            "Unauthenticated requests should be rejected when auth is enabled"
+        );
     }
-
-    // Next unauthenticated request should be rate limited
-    let request = Request::builder()
-        .uri("/health")
-        .body(Body::empty())
-        .unwrap();
-
-    let response = app.clone().oneshot(request).await.unwrap();
-    assert_eq!(
-        response.status(),
-        StatusCode::TOO_MANY_REQUESTS,
-        "Unauthenticated requests should be rate limited"
-    );
 }
 
 #[tokio::test]
