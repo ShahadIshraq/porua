@@ -1,4 +1,4 @@
-import { TTSClient } from '../../shared/api/TTSClient.js';
+import { ttsService } from '../../shared/services/TTSService.js';
 
 /**
  * Manages prefetching and caching of audio data for upcoming paragraphs
@@ -31,12 +31,8 @@ export class PrefetchManager {
     this.pendingFetches.set(normalizedText, abortController);
 
     try {
-      const settings = await this.settingsStore.get();
-      const client = new TTSClient(settings.apiUrl, settings.apiKey);
-
-      // Use streaming endpoint but collect all parts
-      // This gives us both audio and metadata
-      const response = await client.synthesizeStream(normalizedText, {
+      // Use TTSService for synthesis with abort signal
+      const response = await ttsService.synthesizeStream(normalizedText, {
         signal: abortController.signal
       });
 

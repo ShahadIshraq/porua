@@ -1,5 +1,6 @@
 import { SettingsStore } from '../shared/storage/SettingsStore.js';
-import { TTSClient } from '../shared/api/TTSClient.js';
+import { ttsService } from '../shared/services/TTSService.js';
+import { VoiceSelector } from './VoiceSelector.js';
 
 export class SettingsForm {
   constructor(formElement, statusMessage) {
@@ -13,11 +14,16 @@ export class SettingsForm {
 
     this.isApiKeyModified = false;
     this.hasStoredKey = false;
+
+    // Initialize VoiceSelector
+    const voiceSelectorContainer = formElement.querySelector('#voice-selector-container');
+    this.voiceSelector = new VoiceSelector(voiceSelectorContainer, statusMessage);
   }
 
-  init() {
+  async init() {
     this.loadSettings();
     this.setupEventListeners();
+    await this.voiceSelector.init();
   }
 
   setupEventListeners() {
@@ -87,13 +93,9 @@ export class SettingsForm {
     this.testButton.textContent = 'Testing...';
 
     try {
-      let apiKey = this.apiKeyInput.value.trim();
-      if (!apiKey) {
-        apiKey = await SettingsStore.getApiKey();
-      }
-
-      const client = new TTSClient(apiUrl, apiKey);
-      const data = await client.checkHealth();
+      // Force refresh TTSService with potential new settings
+      ttsService.reset();
+      const data = await ttsService.checkHealth();
 
       if (data.status === 'ok') {
         this.statusMessage.show('Connection successful!', 'success');
@@ -143,5 +145,11 @@ export class SettingsForm {
     this.apiKeyInput.focus();
     this.isApiKeyModified = true;
     this.changeButton.style.display = 'none';
+  }
+
+  cleanup() {
+    if (this.voiceSelector) {
+      this.voiceSelector.cleanup();
+    }
   }
 }

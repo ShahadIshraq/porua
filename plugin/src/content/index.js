@@ -6,7 +6,7 @@ import { HighlightManager } from './ui/HighlightManager.js';
 import { AudioQueue } from './audio/AudioQueue.js';
 import { StreamParser } from './audio/StreamParser.js';
 import { SettingsStore } from '../shared/storage/SettingsStore.js';
-import { TTSClient } from '../shared/api/TTSClient.js';
+import { ttsService } from '../shared/services/TTSService.js';
 import { PLAYER_STATES } from '../shared/utils/constants.js';
 import { ParagraphQueue } from './queue/ParagraphQueue.js';
 import { PrefetchManager } from './prefetch/PrefetchManager.js';
@@ -111,18 +111,13 @@ class TTSContentScript {
   }
 
   async synthesizeAndPlay(text, settings = null, paragraph = null) {
-    // Get settings if not provided
-    if (!settings) {
-      settings = await SettingsStore.get();
-    }
-
     // Use provided paragraph or get from state
     if (!paragraph) {
       paragraph = this.state.getPlayingParagraph();
     }
 
-    const client = new TTSClient(settings.apiUrl, settings.apiKey);
-    const response = await client.synthesizeStream(text);
+    // Use TTSService for synthesis
+    const response = await ttsService.synthesizeStream(text);
 
     const contentType = response.headers.get('Content-Type');
     if (!contentType || !contentType.includes('multipart')) {
