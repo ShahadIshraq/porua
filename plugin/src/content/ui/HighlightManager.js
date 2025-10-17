@@ -6,6 +6,8 @@ export class HighlightManager {
   constructor(state) {
     this.state = state;
     this.mutationObserver = null;
+    // WeakMap cache for DOMTextMapper instances to improve performance
+    this.mapperCache = new WeakMap();
   }
 
   wrapPhrases(paragraph, timeline) {
@@ -14,11 +16,22 @@ export class HighlightManager {
     }
 
     // Clear any existing phrase spans first
+    const existingPhrases = paragraph.querySelectorAll('.tts-phrase');
+    if (existingPhrases.length > 0) {
+      console.warn('Re-wrapping paragraph that already has phrase spans. This may indicate duplicate wrapping calls.');
+    }
     this.clearPhraseSpans(paragraph);
 
     const originalText = paragraph.textContent;
     const matcher = new PhraseMatcher(originalText);
-    const mapper = new DOMTextMapper(paragraph);
+
+    // Get or create mapper from cache
+    let mapper = this.mapperCache.get(paragraph);
+    if (!mapper || mapper.getPlainText() !== originalText) {
+      // Create new mapper if cache is empty or text has changed
+      mapper = new DOMTextMapper(paragraph);
+      this.mapperCache.set(paragraph, mapper);
+    }
 
     let currentIndex = 0;
     const failedPhrases = [];
@@ -69,16 +82,24 @@ export class HighlightManager {
 
   /**
    * Clear existing phrase spans without destroying other HTML.
+   * Unwraps all .tts-phrase spans while preserving their content and other HTML elements.
+   * Uses DocumentFragment for better performance with large documents.
+   *
+   * @param {HTMLElement} paragraph - The paragraph element to clear phrase spans from
    */
   clearPhraseSpans(paragraph) {
-    const phraseSpans = paragraph.querySelectorAll('.tts-phrase');
+    const phraseSpans = Array.from(paragraph.querySelectorAll('.tts-phrase'));
+
     phraseSpans.forEach(span => {
-      // Unwrap: replace span with its contents
       const parent = span.parentNode;
+      if (!parent) return;
+
+      // Use DocumentFragment to batch DOM operations
+      const fragment = document.createDocumentFragment();
       while (span.firstChild) {
-        parent.insertBefore(span.firstChild, span);
+        fragment.appendChild(span.firstChild);
       }
-      parent.removeChild(span);
+      parent.replaceChild(fragment, span);
     });
 
     // Normalize to merge adjacent text nodes
@@ -87,11 +108,19 @@ export class HighlightManager {
 
   /**
    * Wrap a phrase using the Range API (preserves HTML structure).
+   * This is the preferred method as it maintains the original DOM structure.
+   *
+   * @param {DOMTextMapper} mapper - Text-to-DOM position mapper
+   * @param {number} startPos - Start position in plain text
+   * @param {number} endPos - End position in plain text
+   * @param {Object} phraseData - Phrase metadata containing startTime, endTime, and phrase text
+   * @param {number} timelineIndex - Index in the phrase timeline
+   * @throws {Error} If range cannot be created or surroundContents fails due to partial node selection
    */
   wrapPhraseWithRange(mapper, startPos, endPos, phraseData, timelineIndex) {
     const range = mapper.createRangeFromTextOffset(startPos, endPos);
     if (!range) {
-      throw new Error('Could not create range from text offsets');
+      throw new Error(`Could not create range from text offsets [${startPos}, ${endPos}]`);
     }
 
     // Create the phrase span
@@ -106,20 +135,36 @@ export class HighlightManager {
     try {
       range.surroundContents(phraseSpan);
     } catch (e) {
-      // If surroundContents fails, we need manual wrapping
+      // Only catch specific DOM exceptions related to partial node selection
+      if (e instanceof DOMException &&
+          (e.name === 'InvalidStateError' || e.name === 'HierarchyRequestError')) {
+        // Expected error when phrase spans partial nodes, let caller handle with manual wrapping
+        throw e;
+      }
+      // Unexpected error, log and rethrow
+      console.error('Unexpected error in surroundContents:', e);
       throw e;
     }
   }
 
   /**
    * Manually wrap a phrase when Range.surroundContents() fails.
-   * This handles cases where the phrase spans partial nodes.
+   * This handles cases where the phrase spans partial nodes or crosses element boundaries.
+   *
+   * @param {HTMLElement} paragraph - The paragraph element containing the text
+   * @param {number} startPos - Start position in plain text
+   * @param {number} endPos - End position in plain text
+   * @param {Object} phraseData - Phrase metadata containing startTime, endTime, and phrase text
+   * @param {number} timelineIndex - Index in the phrase timeline
    */
   wrapPhraseManually(paragraph, startPos, endPos, phraseData, timelineIndex) {
     const mapper = new DOMTextMapper(paragraph);
     const affectedNodes = mapper.getNodesInRange(startPos, endPos);
 
-    if (affectedNodes.length === 0) return;
+    if (affectedNodes.length === 0) {
+      console.warn(`No nodes found in range [${startPos}, ${endPos}] for phrase: "${phraseData.phrase}"`);
+      return;
+    }
 
     // Case 1: Phrase is entirely within one text node
     if (affectedNodes.length === 1) {
@@ -154,7 +199,14 @@ export class HighlightManager {
   }
 
   /**
-   * Wrap a portion of a single text node.
+   * Wrap a portion of a single text node by splitting it into three parts.
+   * This is used when a phrase is contained entirely within one text node.
+   *
+   * @param {Text} textNode - The text node to split and wrap
+   * @param {number} startOffset - Start offset within the text node
+   * @param {number} endOffset - End offset within the text node
+   * @param {Object} phraseData - Phrase metadata containing startTime, endTime, and phrase text
+   * @param {number} timelineIndex - Index in the phrase timeline
    */
   wrapTextNodeRange(textNode, startOffset, endOffset, phraseData, timelineIndex) {
     const text = textNode.textContent;
@@ -182,6 +234,9 @@ export class HighlightManager {
 
   /**
    * Setup MutationObserver to detect external DOM changes.
+   * If phrase spans are removed by external code, this will attempt to re-wrap them.
+   *
+   * @param {HTMLElement} paragraph - The paragraph element to monitor for changes
    */
   setupDOMProtection(paragraph) {
     // Disconnect existing observer

@@ -11,6 +11,10 @@ export class DOMTextMapper {
 
   /**
    * Build mapping from plain text positions to DOM text nodes.
+   *
+   * Note: Zero-length text nodes are intentionally skipped as they don't contribute
+   * to the visible text content. This ensures accurate mapping between character
+   * positions and DOM nodes.
    */
   buildMap() {
     let textPosition = 0;
