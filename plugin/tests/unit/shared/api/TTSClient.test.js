@@ -78,6 +78,165 @@ describe('TTSClient', () => {
     });
   });
 
+  describe('getVoices', () => {
+    it('should call /voices endpoint', async () => {
+      const mockVoices = {
+        voices: [
+          { id: 'af_nova', name: 'Nova', gender: 'Female', language: 'AmericanEnglish' },
+          { id: 'bf_lily', name: 'Lily', gender: 'Female', language: 'BritishEnglish' }
+        ]
+      };
+      const mockResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockVoices)
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      await client.getVoices();
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/voices',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json'
+          })
+        })
+      );
+    });
+
+    it('should return parsed voice list', async () => {
+      const mockVoices = {
+        voices: [
+          { id: 'af_nova', name: 'Nova', gender: 'Female', language: 'AmericanEnglish' },
+          { id: 'bf_lily', name: 'Lily', gender: 'Female', language: 'BritishEnglish' }
+        ]
+      };
+      const mockResponse = {
+        ok: true,
+        json: vi.fn().mockResolvedValue(mockVoices)
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      const result = await client.getVoices();
+
+      expect(result).toEqual(mockVoices);
+      expect(result.voices).toHaveLength(2);
+    });
+
+    it('should throw APIError on non-ok response', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 500,
+        text: vi.fn().mockResolvedValue('Failed to load voices')
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      await expect(client.getVoices()).rejects.toThrow(APIError);
+    });
+  });
+
+  describe('getVoiceSampleUrl', () => {
+    it('should construct correct sample URL', () => {
+      const url = client.getVoiceSampleUrl('af_nova');
+      expect(url).toBe('http://localhost:3000/samples/af_nova.wav');
+    });
+
+    it('should work with different voice IDs', () => {
+      const url1 = client.getVoiceSampleUrl('bf_lily');
+      const url2 = client.getVoiceSampleUrl('am_eric');
+      const url3 = client.getVoiceSampleUrl('bm_george');
+
+      expect(url1).toBe('http://localhost:3000/samples/bf_lily.wav');
+      expect(url2).toBe('http://localhost:3000/samples/am_eric.wav');
+      expect(url3).toBe('http://localhost:3000/samples/bm_george.wav');
+    });
+
+    it('should use client baseUrl', () => {
+      const customClient = new TTSClient('https://api.example.com:8080');
+      const url = customClient.getVoiceSampleUrl('af_nova');
+
+      expect(url).toBe('https://api.example.com:8080/samples/af_nova.wav');
+    });
+  });
+
+  describe('fetchVoiceSample', () => {
+    it('should call /samples endpoint with voice ID', async () => {
+      const mockBlob = new Blob(['audio data'], { type: 'audio/wav' });
+      const mockResponse = {
+        ok: true,
+        blob: vi.fn().mockResolvedValue(mockBlob)
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      await client.fetchVoiceSample('af_nova');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/samples/af_nova.wav',
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            'Content-Type': 'application/json',
+            'X-API-Key': 'test-api-key'
+          })
+        })
+      );
+    });
+
+    it('should return audio blob', async () => {
+      const mockBlob = new Blob(['audio data'], { type: 'audio/wav' });
+      const mockResponse = {
+        ok: true,
+        blob: vi.fn().mockResolvedValue(mockBlob)
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      const result = await client.fetchVoiceSample('af_nova');
+
+      expect(result).toBe(mockBlob);
+      expect(mockResponse.blob).toHaveBeenCalled();
+    });
+
+    it('should work with different voice IDs', async () => {
+      const mockBlob = new Blob(['audio data'], { type: 'audio/wav' });
+      const mockResponse = {
+        ok: true,
+        blob: vi.fn().mockResolvedValue(mockBlob)
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      await client.fetchVoiceSample('bf_lily');
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'http://localhost:3000/samples/bf_lily.wav',
+        expect.any(Object)
+      );
+    });
+
+    it('should include API key in request', async () => {
+      const mockBlob = new Blob(['audio data'], { type: 'audio/wav' });
+      const mockResponse = {
+        ok: true,
+        blob: vi.fn().mockResolvedValue(mockBlob)
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      await client.fetchVoiceSample('af_nova');
+
+      const callArgs = global.fetch.mock.calls[0];
+      expect(callArgs[1].headers['X-API-Key']).toBe('test-api-key');
+    });
+
+    it('should throw APIError on non-ok response', async () => {
+      const mockResponse = {
+        ok: false,
+        status: 404,
+        text: vi.fn().mockResolvedValue('Sample not found')
+      };
+      global.fetch.mockResolvedValue(mockResponse);
+
+      await expect(client.fetchVoiceSample('unknown_voice')).rejects.toThrow(APIError);
+    });
+  });
+
   describe('synthesizeStream', () => {
     it('should call /tts/stream endpoint with POST', async () => {
       const mockResponse = { ok: true, body: {} };
