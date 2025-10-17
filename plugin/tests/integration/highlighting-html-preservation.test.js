@@ -355,4 +355,104 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       expect(paragraph.querySelector('strong')).not.toBeNull();
     });
   });
+
+  describe('External DOM modifications and caching', () => {
+    it('should handle external DOM modifications between wrapping calls', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'Original text with <a href="#">link</a>.';
+      container.appendChild(paragraph);
+
+      const timeline1 = [{ phrase: 'Original text with link', startTime: 0, endTime: 1000 }];
+      highlightManager.wrapPhrases(paragraph, timeline1);
+
+      // Verify first wrap worked
+      expect(paragraph.querySelector('.tts-phrase')).not.toBeNull();
+      expect(paragraph.querySelector('a[href="#"]')).not.toBeNull();
+
+      // External modification - restore paragraph
+      highlightManager.restoreParagraph(paragraph);
+
+      // Add new link externally
+      const newLink = document.createElement('a');
+      newLink.href = '#new';
+      newLink.textContent = ' new link';
+      paragraph.appendChild(newLink);
+
+      // Wrap again with updated content
+      const timeline2 = [{ phrase: 'Original text with link new link', startTime: 0, endTime: 2000 }];
+      highlightManager.wrapPhrases(paragraph, timeline2);
+
+      // Should handle gracefully - both links should exist
+      expect(paragraph.querySelector('a[href="#"]')).not.toBeNull();
+      expect(paragraph.querySelector('a[href="#new"]')).not.toBeNull();
+      expect(paragraph.querySelector('.tts-phrase')).not.toBeNull();
+    });
+
+    it('should use cached DOMTextMapper for identical content', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'Test content <a href="#">link</a>.';
+      container.appendChild(paragraph);
+
+      const timeline = [{ phrase: 'Test content link', startTime: 0, endTime: 1000 }];
+
+      // First wrap - creates cache entry
+      highlightManager.wrapPhrases(paragraph, timeline);
+      expect(paragraph.querySelector('.tts-phrase')).not.toBeNull();
+
+      // Restore paragraph completely (as it happens in real usage)
+      highlightManager.restoreParagraph(paragraph);
+      expect(paragraph.querySelector('.tts-phrase')).toBeNull();
+
+      // Second wrap - should use cached mapper since text content hasn't changed
+      highlightManager.wrapPhrases(paragraph, timeline);
+
+      // Should successfully wrap again
+      expect(paragraph.querySelector('.tts-phrase')).not.toBeNull();
+      expect(paragraph.querySelector('a[href="#"]')).not.toBeNull();
+    });
+
+    it('should invalidate cache when text content changes', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'Original text.';
+      container.appendChild(paragraph);
+
+      const timeline1 = [{ phrase: 'Original text', startTime: 0, endTime: 1000 }];
+      highlightManager.wrapPhrases(paragraph, timeline1);
+
+      // Restore and change content
+      highlightManager.restoreParagraph(paragraph);
+      paragraph.innerHTML = 'Modified text with <strong>emphasis</strong>.';
+
+      const timeline2 = [{ phrase: 'Modified text with emphasis', startTime: 0, endTime: 1500 }];
+      highlightManager.wrapPhrases(paragraph, timeline2);
+
+      // Should handle new content correctly
+      expect(paragraph.querySelector('.tts-phrase')).not.toBeNull();
+      expect(paragraph.querySelector('strong')).not.toBeNull();
+      expect(paragraph.textContent).toContain('Modified text');
+    });
+
+    it('should warn when re-wrapping without clearing', () => {
+      const paragraph = document.createElement('p');
+      paragraph.innerHTML = 'Test text.';
+      container.appendChild(paragraph);
+
+      const timeline = [{ phrase: 'Test text', startTime: 0, endTime: 1000 }];
+
+      // Spy on console.warn
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // First wrap
+      highlightManager.wrapPhrases(paragraph, timeline);
+      expect(warnSpy).not.toHaveBeenCalled();
+
+      // Second wrap without clearing (should trigger warning)
+      highlightManager.wrapPhrases(paragraph, timeline);
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Re-wrapping paragraph that already has phrase spans')
+      );
+
+      warnSpy.mockRestore();
+    });
+  });
 });
