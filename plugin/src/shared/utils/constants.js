@@ -15,7 +15,8 @@ export const PLAYER_STATES = {
 
 export const DEFAULT_SETTINGS = {
   apiUrl: 'http://localhost:3000',
-  voice: 'bf_lily',
+  selectedVoiceId: 'bf_lily',
+  selectedVoiceName: 'Lily',
   speed: 1.0
 };
 
