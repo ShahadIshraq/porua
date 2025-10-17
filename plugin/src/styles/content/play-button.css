@@ -11,8 +11,8 @@
   width: 32px;
   height: 32px;
 
-  /* Appearance */
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  /* Appearance - Pink-coral gradient matching icon theme */
+  background: linear-gradient(135deg, #ec4899 0%, #fb7185 50%, #fb923c 100%);
   color: white;
   border-radius: 50%;
   box-shadow: var(--tts-shadow-sm, 0 2px 8px rgba(0, 0, 0, 0.3));
@@ -41,7 +41,7 @@
   opacity: 1;
   transform: scale(1.1);
   box-shadow: var(--tts-shadow-lg, 0 4px 12px rgba(0, 0, 0, 0.4));
-  background: linear-gradient(135deg, #5a67d8 0%, #6b3fa0 100%);
+  background: linear-gradient(135deg, #db2777 0%, #ec4899 50%, #f97316 100%);
 }
 
 .tts-play-button:active {
