@@ -371,6 +371,16 @@ cargo fmt
 cargo test
 ```
 
+### Generate Voice Samples
+
+Regenerate all 28 English voice sample files in the `samples/` directory:
+
+```bash
+cargo run --release --bin generate_samples
+```
+
+This utility binary generates ~10-second sample audio files for all English voices. The binary is located in `src/bin/generate_samples.rs` following Rust's convention of placing additional executable targets in the `src/bin/` directory (separate from the main binary in `src/main.rs`).
+
 
 ## Configuration
 
