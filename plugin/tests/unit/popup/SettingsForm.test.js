@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsForm } from '../../../src/popup/SettingsForm.js';
 import { SettingsStore } from '../../../src/shared/storage/SettingsStore.js';
-import { TTSClient } from '../../../src/shared/api/TTSClient.js';
+import { ttsService } from '../../../src/shared/services/TTSService.js';
 
 // Mock dependencies
 vi.mock('../../../src/shared/storage/SettingsStore.js');
-vi.mock('../../../src/shared/api/TTSClient.js');
+vi.mock('../../../src/shared/services/TTSService.js', () => ({
+  ttsService: {
+    checkHealth: vi.fn(),
+    reset: vi.fn()
+  }
+}));
 
 describe('SettingsForm', () => {
   let settingsForm;
@@ -45,6 +50,11 @@ describe('SettingsForm', () => {
     mockFormElement.appendChild(mockToggleButton);
     mockFormElement.appendChild(mockChangeButton);
 
+    // Create voice selector container
+    const mockVoiceSelectorContainer = document.createElement('div');
+    mockVoiceSelectorContainer.id = 'voice-selector-container';
+    mockFormElement.appendChild(mockVoiceSelectorContainer);
+
     mockFormElement.querySelector = vi.fn((selector) => {
       switch (selector) {
         case '#api-url':
@@ -57,6 +67,8 @@ describe('SettingsForm', () => {
           return mockToggleButton;
         case '#change-key':
           return mockChangeButton;
+        case '#voice-selector-container':
+          return mockVoiceSelectorContainer;
         default:
           return null;
       }
@@ -76,6 +88,7 @@ describe('SettingsForm', () => {
     SettingsStore.get = vi.fn();
     SettingsStore.set = vi.fn();
     SettingsStore.getApiKey = vi.fn();
+    SettingsStore.getSelectedVoice = vi.fn().mockResolvedValue({ id: 'bf_lily', name: 'Lily' });
 
     settingsForm = new SettingsForm(mockFormElement, mockStatusMessage);
   });
@@ -339,10 +352,7 @@ describe('SettingsForm', () => {
 
     it('should disable test button during test', async () => {
       mockApiUrlInput.value = 'http://test.com';
-      const mockClient = {
-        checkHealth: vi.fn().mockResolvedValue({ status: 'ok' })
-      };
-      TTSClient.mockImplementation(() => mockClient);
+      ttsService.checkHealth.mockResolvedValue({ status: 'ok' });
 
       const testPromise = settingsForm.testConnection();
 
@@ -354,10 +364,7 @@ describe('SettingsForm', () => {
 
     it('should re-enable test button after test', async () => {
       mockApiUrlInput.value = 'http://test.com';
-      const mockClient = {
-        checkHealth: vi.fn().mockResolvedValue({ status: 'ok' })
-      };
-      TTSClient.mockImplementation(() => mockClient);
+      ttsService.checkHealth.mockResolvedValue({ status: 'ok' });
 
       await settingsForm.testConnection();
 
@@ -365,42 +372,27 @@ describe('SettingsForm', () => {
       expect(mockTestButton.textContent).toBe('Test Connection');
     });
 
-    it('should use stored API key if input empty', async () => {
+    it('should reset ttsService before testing', async () => {
       mockApiUrlInput.value = 'http://test.com';
-      mockApiKeyInput.value = '';
-      SettingsStore.getApiKey.mockResolvedValue('stored-key');
-
-      const mockClient = {
-        checkHealth: vi.fn().mockResolvedValue({ status: 'ok' })
-      };
-      TTSClient.mockImplementation(() => mockClient);
+      ttsService.checkHealth.mockResolvedValue({ status: 'ok' });
 
       await settingsForm.testConnection();
 
-      expect(SettingsStore.getApiKey).toHaveBeenCalled();
-      expect(TTSClient).toHaveBeenCalledWith('http://test.com', 'stored-key');
+      expect(ttsService.reset).toHaveBeenCalled();
     });
 
-    it('should use input API key if provided', async () => {
+    it('should call ttsService checkHealth', async () => {
       mockApiUrlInput.value = 'http://test.com';
-      mockApiKeyInput.value = 'input-key';
-
-      const mockClient = {
-        checkHealth: vi.fn().mockResolvedValue({ status: 'ok' })
-      };
-      TTSClient.mockImplementation(() => mockClient);
+      ttsService.checkHealth.mockResolvedValue({ status: 'ok' });
 
       await settingsForm.testConnection();
 
-      expect(TTSClient).toHaveBeenCalledWith('http://test.com', 'input-key');
+      expect(ttsService.checkHealth).toHaveBeenCalled();
     });
 
     it('should show success message on successful connection', async () => {
       mockApiUrlInput.value = 'http://test.com';
-      const mockClient = {
-        checkHealth: vi.fn().mockResolvedValue({ status: 'ok' })
-      };
-      TTSClient.mockImplementation(() => mockClient);
+      ttsService.checkHealth.mockResolvedValue({ status: 'ok' });
 
       await settingsForm.testConnection();
 
@@ -412,10 +404,7 @@ describe('SettingsForm', () => {
 
     it('should show error for unexpected response', async () => {
       mockApiUrlInput.value = 'http://test.com';
-      const mockClient = {
-        checkHealth: vi.fn().mockResolvedValue({ status: 'error' })
-      };
-      TTSClient.mockImplementation(() => mockClient);
+      ttsService.checkHealth.mockResolvedValue({ status: 'error' });
 
       await settingsForm.testConnection();
 
@@ -429,10 +418,7 @@ describe('SettingsForm', () => {
       mockApiUrlInput.value = 'http://test.com';
       const error = new Error('Unauthorized');
       error.status = 401;
-      const mockClient = {
-        checkHealth: vi.fn().mockRejectedValue(error)
-      };
-      TTSClient.mockImplementation(() => mockClient);
+      ttsService.checkHealth.mockRejectedValue(error);
 
       await settingsForm.testConnection();
 
@@ -446,10 +432,7 @@ describe('SettingsForm', () => {
       mockApiUrlInput.value = 'http://test.com';
       const error = new Error('Forbidden');
       error.status = 403;
-      const mockClient = {
-        checkHealth: vi.fn().mockRejectedValue(error)
-      };
-      TTSClient.mockImplementation(() => mockClient);
+      ttsService.checkHealth.mockRejectedValue(error);
 
       await settingsForm.testConnection();
 
@@ -461,10 +444,7 @@ describe('SettingsForm', () => {
 
     it('should show connection error for other errors', async () => {
       mockApiUrlInput.value = 'http://test.com';
-      const mockClient = {
-        checkHealth: vi.fn().mockRejectedValue(new Error('Network error'))
-      };
-      TTSClient.mockImplementation(() => mockClient);
+      ttsService.checkHealth.mockRejectedValue(new Error('Network error'));
 
       await settingsForm.testConnection();
 
