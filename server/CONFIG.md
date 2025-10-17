@@ -1,8 +1,8 @@
-# TTS Server Configuration Guide
+# Porua Server Configuration Guide
 
 ## Environment-based Configuration
 
-The TTS server supports configuration via environment variables and `.env` files.
+The Porua server supports configuration via environment variables and `.env` files.
 
 ### Quick Start
 
@@ -40,8 +40,8 @@ The TTS server supports configuration via environment variables and `.env` files
 
 *Default locations checked:
 - `./api_keys.txt`
-- `~/.tts-server/api_keys.txt`
-- `/etc/tts-server/api_keys.txt`
+- `~/.porua/api_keys.txt`
+- `/etc/porua/api_keys.txt`
 
 ### Rate Limiting Configuration
 
@@ -56,7 +56,7 @@ The TTS server supports configuration via environment variables and `.env` files
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `RUST_LOG` | `tts_server=info,ort=warn,kokoros=warn` | Log level configuration |
+| `RUST_LOG` | `porua_server=info,ort=warn,kokoros=warn` | Log level configuration |
 
 Valid log levels: `error`, `warn`, `info`, `debug`, `trace`
 
@@ -65,8 +65,8 @@ Examples:
 # Debug logs for all modules
 RUST_LOG=debug
 
-# Debug logs for tts_server only
-RUST_LOG=tts_server=debug
+# Debug logs for porua_server only
+RUST_LOG=porua_server=debug
 
 # Info logs for everything
 RUST_LOG=info
@@ -99,7 +99,7 @@ cargo run -- --server --port 8080
 ```bash
 # .env
 TTS_POOL_SIZE=4
-TTS_API_KEY_FILE=/etc/tts-server/api_keys.txt
+TTS_API_KEY_FILE=/etc/porua/api_keys.txt
 RATE_LIMIT_PER_SECOND=20
 RATE_LIMIT_BURST_SIZE=50
 RUST_LOG=info
@@ -107,13 +107,13 @@ RUST_LOG=info
 
 Create API keys file:
 ```bash
-# /etc/tts-server/api_keys.txt
+# /etc/porua/api_keys.txt
 prod-key-abc123
 prod-key-def456
 ```
 
 ```bash
-./target/release/tts_server --server
+./target/release/porua_server --server
 ```
 
 ### Example 3: High-Throughput Server
@@ -126,7 +126,7 @@ RATE_LIMIT_BURST_SIZE=100
 ```
 
 ```bash
-./target/release/tts_server --server
+./target/release/porua_server --server
 ```
 
 ## Docker Configuration
@@ -135,17 +135,17 @@ When running in Docker, you can:
 
 1. **Use environment variables:**
    ```bash
-   docker run -e TTS_POOL_SIZE=4 -e RATE_LIMIT_PER_SECOND=20 tts-server
+   docker run -e TTS_POOL_SIZE=4 -e RATE_LIMIT_PER_SECOND=20 porua-server
    ```
 
 2. **Use .env file:**
    ```bash
-   docker run --env-file .env tts-server
+   docker run --env-file .env porua-server
    ```
 
 3. **Mount configuration files:**
    ```bash
-   docker run -v $(pwd)/.env:/app/.env tts-server
+   docker run -v $(pwd)/.env:/app/.env porua-server
    ```
 
 ## Troubleshooting

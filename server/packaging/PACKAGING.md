@@ -1,4 +1,4 @@
-# TTS Server - Packaging Guide
+# Porua Server - Packaging Guide
 
 ## Quick Start
 
@@ -7,7 +7,7 @@
 ./build_package.sh
 ```
 
-Output: `dist/tts-server-v0.1.0-[platform]-[arch].tar.gz` and `.zip`
+Output: `dist/porua-server-v0.1.0-[platform]-[arch].tar.gz` and `.zip`
 
 ## What the Script Does
 
@@ -20,8 +20,8 @@ Output: `dist/tts-server-v0.1.0-[platform]-[arch].tar.gz` and `.zip`
 ## Package Contents
 
 ```
-tts-server-v0.1.0-[platform]-[arch]/
-├── bin/tts_server              # Binary (~29 MB)
+porua-server-v0.1.0-[platform]-[arch]/
+├── bin/porua_server            # Binary (~29 MB)
 ├── models/
 │   ├── kokoro-v1.0.onnx        # Model (310 MB)
 │   └── voices-v1.0.bin         # Voices (27 MB)
@@ -37,9 +37,9 @@ tts-server-v0.1.0-[platform]-[arch]/
 ## Platform Detection
 
 The script automatically detects your platform:
-- macOS Apple Silicon: `tts-server-v0.1.0-macos-arm64`
-- macOS Intel: `tts-server-v0.1.0-macos-x86_64`
-- Linux: `tts-server-v0.1.0-linux-x86_64`
+- macOS Apple Silicon: `porua-server-v0.1.0-macos-arm64`
+- macOS Intel: `porua-server-v0.1.0-macos-x86_64`
+- Linux: `porua-server-v0.1.0-linux-x86_64`
 
 ## Prerequisites
 
@@ -66,7 +66,7 @@ cargo build --release
 mkdir -p dist/my-package/{bin,models,docs}
 
 # 3. Copy files
-cp target/release/tts_server dist/my-package/bin/
+cp target/release/porua_server dist/my-package/bin/
 cp models/*.{onnx,bin} dist/my-package/models/
 cp README.md dist/my-package/docs/
 cp INSTALL.md install.sh dist/my-package/
@@ -90,14 +90,14 @@ gh release create v0.1.0 \
   dist/*.tar.gz \
   dist/*.zip \
   dist/*.sha256 \
-  --title "TTS Server v0.1.0"
+  --title "Porua Server v0.1.0"
 ```
 
 ### Checksum Verification
 
 Users verify package integrity:
 ```bash
-shasum -a 256 -c tts-server-v0.1.0-macos-arm64.tar.gz.sha256
+shasum -a 256 -c porua-server-v0.1.0-macos-arm64.tar.gz.sha256
 ```
 
 ## Release Checklist
@@ -124,7 +124,7 @@ cargo build --release
 ```
 
 **Package too large:**
-- Binary: ~29 MB (use `strip target/release/tts_server` to reduce)
+- Binary: ~29 MB (use `strip target/release/porua_server` to reduce)
 - Models: ~337 MB (cannot compress, required by ONNX)
 
 **Permission denied:**
@@ -165,4 +165,4 @@ Version is read from `Cargo.toml`:
 version = "0.1.0"  # Update for new releases
 ```
 
-Package name updates automatically: `tts-server-v{VERSION}-{PLATFORM}-{ARCH}`
+Package name updates automatically: `porua-server-v{VERSION}-{PLATFORM}-{ARCH}`

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "TTS Reader",
+  "name": "Porua",
   "version": "1.0.0",
   "description": "Text-to-speech reader for web pages",
   "icons": {
@@ -15,7 +15,7 @@
       "48": "icons/icon-48.png",
       "128": "icons/icon-128.png"
     },
-    "default_title": "TTS Reader Settings"
+    "default_title": "Porua Settings"
   },
   "content_scripts": [
     {
@@ -34,7 +34,7 @@
   "host_permissions": ["http://localhost/*", "https://*/*"],
   "browser_specific_settings": {
     "gecko": {
-      "id": "tts-reader@example.com",
+      "id": "porua@example.com",
       "strict_min_version": "109.0"
     }
   }

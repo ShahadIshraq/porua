@@ -1,4 +1,4 @@
-# TTS Reader Extension - Restructured
+# Porua - Text-to-Speech Browser Extension
 
 This is a modernized, modular browser extension for text-to-speech functionality.
 

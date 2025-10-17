@@ -322,9 +322,9 @@ The server automatically searches for models in the following locations (in prio
 
 1. **`TTS_MODEL_DIR` environment variable** ← Recommended for production
 2. `/opt/models` (AWS Lambda standard location)
-3. `/usr/local/share/tts-server/models`
-4. `/opt/tts-server/models`
-5. `~/.tts-server/models`
+3. `/usr/local/share/porua/models`
+4. `/opt/porua/models`
+5. `~/.porua/models`
 6. `models/` (current directory)
 7. `../../models/` (relative to binary location)
 
