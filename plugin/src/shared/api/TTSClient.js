@@ -11,6 +11,34 @@ export class TTSClient {
     return response.json();
   }
 
+  /**
+   * Fetch list of available voices from server
+   * @returns {Promise<{voices: Array<{id: string, name: string, gender: string, language: string, description: string, sample_url: string}>}>}
+   */
+  async getVoices() {
+    const response = await this.fetch('/voices');
+    return response.json();
+  }
+
+  /**
+   * Get the full URL for a voice sample
+   * @param {string} voiceId - Voice identifier (e.g., 'af_alloy')
+   * @returns {string} Full URL to sample audio file
+   */
+  getVoiceSampleUrl(voiceId) {
+    return `${this.baseUrl}/samples/${voiceId}.wav`;
+  }
+
+  /**
+   * Fetch a voice sample with authentication
+   * @param {string} voiceId - Voice identifier (e.g., 'af_alloy')
+   * @returns {Promise<Blob>} Audio blob
+   */
+  async fetchVoiceSample(voiceId) {
+    const response = await this.fetch(`/samples/${voiceId}.wav`);
+    return await response.blob();
+  }
+
   async synthesizeStream(text, options = {}) {
     return await this.fetch('/tts/stream', {
       method: 'POST',
