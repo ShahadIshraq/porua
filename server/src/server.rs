@@ -469,5 +469,69 @@ mod tests {
             }
         }
     }
+
+    #[tokio::test]
+    async fn test_list_voices_only_returns_english() {
+        let voices_response = list_voices().await;
+        let voices = voices_response.0.voices;
+
+        // Should return exactly 28 English voices
+        assert_eq!(voices.len(), 28, "Expected 28 English voices");
+
+        // All voices should be American or British English
+        for voice in &voices {
+            assert!(
+                voice.language == "AmericanEnglish" || voice.language == "BritishEnglish",
+                "Voice {} has non-English language: {}",
+                voice.id,
+                voice.language
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_list_voices_includes_sample_url() {
+        let voices_response = list_voices().await;
+        let voices = voices_response.0.voices;
+
+        for voice in &voices {
+            // sample_url should not be empty
+            assert!(!voice.sample_url.is_empty(), "Voice {} missing sample_url", voice.id);
+
+            // sample_url should follow format: /samples/{voice_id}.wav
+            let expected_url = format!("/samples/{}.wav", voice.id);
+            assert_eq!(
+                voice.sample_url, expected_url,
+                "Voice {} has incorrect sample_url format",
+                voice.id
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_list_voices_includes_all_english_voices() {
+        let voices_response = list_voices().await;
+        let voices = voices_response.0.voices;
+
+        // Expected voice IDs (28 English voices)
+        let expected_ids = vec![
+            "af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica",
+            "af_kore", "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
+            "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam",
+            "am_michael", "am_onyx", "am_puck", "am_santa",
+            "bf_alice", "bf_emma", "bf_isabella", "bf_lily",
+            "bm_daniel", "bm_fable", "bm_george", "bm_lewis",
+        ];
+
+        let voice_ids: Vec<&str> = voices.iter().map(|v| v.id.as_str()).collect();
+
+        for expected_id in expected_ids {
+            assert!(
+                voice_ids.contains(&expected_id),
+                "Missing expected English voice: {}",
+                expected_id
+            );
+        }
+    }
 }
 
