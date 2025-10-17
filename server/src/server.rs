@@ -159,8 +159,14 @@ async fn generate_tts_chunked(
 
 /// List all available voices
 async fn list_voices() -> Json<VoicesResponse> {
+    use crate::kokoro::voice_config::Language;
+
     let voices = Voice::all()
         .iter()
+        .filter(|voice| {
+            let config = voice.config();
+            matches!(config.language, Language::AmericanEnglish | Language::BritishEnglish)
+        })
         .map(|voice| {
             let config = voice.config();
             VoiceInfo {
@@ -169,6 +175,7 @@ async fn list_voices() -> Json<VoicesResponse> {
                 gender: format!("{:?}", config.gender),
                 language: format!("{:?}", config.language),
                 description: config.description.to_string(),
+                sample_url: format!("/samples/{}.wav", config.id),
             }
         })
         .collect();
