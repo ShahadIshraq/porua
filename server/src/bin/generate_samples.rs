@@ -1,4 +1,4 @@
-use tts_server::kokoro::{TTS, voice_config::{Voice, Language}};
+use tts_server::kokoro::{TTS, voice_config::Voice};
 use std::path::Path;
 
 const SAMPLE_TEXT: &str = "Hello, I'm here to help you read any text on the web. Whether it's an article, a blog post, or a long document, I can read it aloud for you in a natural and clear voice. Just select the text you want to hear, and I'll take care of the rest.";
@@ -11,24 +11,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Initializing TTS engine...");
     let tts = TTS::new(model_path, voices_path).await?;
 
-    // Get English voices only
-    let english_voices: Vec<Voice> = Voice::all()
-        .into_iter()
-        .filter(|voice| {
-            let config = voice.config();
-            matches!(config.language, Language::AmericanEnglish | Language::BritishEnglish)
-        })
-        .collect();
+    // Get all configured voices
+    let voices: Vec<Voice> = Voice::all().into_iter().collect();
 
     // Create samples directory
     let samples_dir = Path::new("samples");
     std::fs::create_dir_all(samples_dir)?;
 
-    println!("\nGenerating {} voice samples...", english_voices.len());
+    println!("\nGenerating {} voice samples...", voices.len());
     println!("Sample text: \"{}\"", SAMPLE_TEXT);
     println!();
 
-    for voice in &english_voices {
+    for voice in &voices {
         let voice_id = voice.id();
         let output_path = samples_dir.join(format!("{}.wav", voice_id));
 

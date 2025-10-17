@@ -1,3 +1,28 @@
+// Voice configuration for Kokoro TTS v1.0
+//
+// This file contains the subset of voices we support in our application.
+// The Kokoro-82M model supports 54 voices across 9 languages, but we currently
+// only include English voices (American and British).
+//
+// ## Kokoro TTS Resources
+// - Model: https://huggingface.co/hexgrad/Kokoro-82M
+// - Complete voice list: https://huggingface.co/hexgrad/Kokoro-82M/blob/main/VOICES.md
+// - GitHub: https://github.com/hexgrad/kokoro
+//
+// ## Voice Naming Convention
+// Voice IDs follow the pattern: {language}{gender}_{name}
+// - Language codes: a=American, b=British, e=European, f=French, h=Hindi, i=Italian, j=Japanese, p=Portuguese, z=Chinese
+// - Gender codes: f=Female, m=Male
+// - Examples: af_heart (American Female - Heart), bm_lewis (British Male - Lewis)
+//
+// ## Adding New Voices
+// To add support for more voices from Kokoro:
+// 1. Add the language variant to the Language enum below
+// 2. Add the voice to the Voice enum (follow existing naming pattern)
+// 3. Add the voice configuration in the config() method
+// 4. Add the voice to the all() array
+// 5. The voice will automatically be available in the /voices endpoint and generate_samples
+
 /// Gender of the voice
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Gender {
@@ -10,13 +35,6 @@ pub enum Gender {
 pub enum Language {
     AmericanEnglish,
     BritishEnglish,
-    European,
-    French,
-    Hindi,
-    Italian,
-    Japanese,
-    Portuguese,
-    Chinese,
 }
 
 /// Voice configuration with metadata
@@ -51,7 +69,7 @@ impl VoiceConfig {
 #[allow(dead_code)]
 pub const VOICES_FILE_PATH: &str = "models/voices-v1.0.bin";
 
-/// Voice enum representing all available voices in Kokoro TTS v1.0
+/// Voice enum representing all available voices
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Voice {
     // American Female voices
@@ -89,46 +107,6 @@ pub enum Voice {
     BritishMaleFable,
     BritishMaleGeorge,
     BritishMaleLewis,
-
-    // European voices
-    EuropeanFemaleDora,
-    EuropeanMaleAlex,
-    EuropeanMaleSanta,
-
-    // French voices
-    FrenchFemaleSiwis,
-
-    // Hindi voices
-    HindiFemalealpha,
-    HindiFemalebeta,
-    HindiMaleOmega,
-    HindiMalePsi,
-
-    // Italian voices
-    ItalianFemaleSara,
-    ItalianMaleNicola,
-
-    // Japanese voices
-    JapaneseFemaleAlpha,
-    JapaneseFemaleGongitsune,
-    JapaneseFemaleNezumi,
-    JapaneseFemaleTebukuro,
-    JapaneseMaleKumo,
-
-    // Portuguese voices
-    PortugueseFemaleDora,
-    PortugueseMaleAlex,
-    PortugueseMaleSanta,
-
-    // Chinese voices
-    ChineseFemaleXiaobei,
-    ChineseFemaleXiaoni,
-    ChineseFemaleXiaoxiao,
-    ChineseFemaleXiaoyi,
-    ChineseMaleYunjian,
-    ChineseMaleYunxi,
-    ChineseMaleYunxia,
-    ChineseMaleYunyang,
 }
 
 impl Voice {
@@ -170,46 +148,6 @@ impl Voice {
             Voice::BritishMaleFable => VoiceConfig::new("bm_fable", "Fable", Gender::Male, Language::BritishEnglish, "British male voice - Fable"),
             Voice::BritishMaleGeorge => VoiceConfig::new("bm_george", "George", Gender::Male, Language::BritishEnglish, "British male voice - George"),
             Voice::BritishMaleLewis => VoiceConfig::new("bm_lewis", "Lewis", Gender::Male, Language::BritishEnglish, "British male voice - Lewis"),
-
-            // European voices
-            Voice::EuropeanFemaleDora => VoiceConfig::new("ef_dora", "Dora", Gender::Female, Language::European, "European female voice - Dora"),
-            Voice::EuropeanMaleAlex => VoiceConfig::new("em_alex", "Alex", Gender::Male, Language::European, "European male voice - Alex"),
-            Voice::EuropeanMaleSanta => VoiceConfig::new("em_santa", "Santa", Gender::Male, Language::European, "European male voice - Santa"),
-
-            // French voices
-            Voice::FrenchFemaleSiwis => VoiceConfig::new("ff_siwis", "Siwis", Gender::Female, Language::French, "French female voice - Siwis"),
-
-            // Hindi voices
-            Voice::HindiFemalealpha => VoiceConfig::new("hf_alpha", "Alpha", Gender::Female, Language::Hindi, "Hindi female voice - Alpha"),
-            Voice::HindiFemalebeta => VoiceConfig::new("hf_beta", "Beta", Gender::Female, Language::Hindi, "Hindi female voice - Beta"),
-            Voice::HindiMaleOmega => VoiceConfig::new("hm_omega", "Omega", Gender::Male, Language::Hindi, "Hindi male voice - Omega"),
-            Voice::HindiMalePsi => VoiceConfig::new("hm_psi", "Psi", Gender::Male, Language::Hindi, "Hindi male voice - Psi"),
-
-            // Italian voices
-            Voice::ItalianFemaleSara => VoiceConfig::new("if_sara", "Sara", Gender::Female, Language::Italian, "Italian female voice - Sara"),
-            Voice::ItalianMaleNicola => VoiceConfig::new("im_nicola", "Nicola", Gender::Male, Language::Italian, "Italian male voice - Nicola"),
-
-            // Japanese voices
-            Voice::JapaneseFemaleAlpha => VoiceConfig::new("jf_alpha", "Alpha", Gender::Female, Language::Japanese, "Japanese female voice - Alpha"),
-            Voice::JapaneseFemaleGongitsune => VoiceConfig::new("jf_gongitsune", "Gongitsune", Gender::Female, Language::Japanese, "Japanese female voice - Gongitsune"),
-            Voice::JapaneseFemaleNezumi => VoiceConfig::new("jf_nezumi", "Nezumi", Gender::Female, Language::Japanese, "Japanese female voice - Nezumi"),
-            Voice::JapaneseFemaleTebukuro => VoiceConfig::new("jf_tebukuro", "Tebukuro", Gender::Female, Language::Japanese, "Japanese female voice - Tebukuro"),
-            Voice::JapaneseMaleKumo => VoiceConfig::new("jm_kumo", "Kumo", Gender::Male, Language::Japanese, "Japanese male voice - Kumo"),
-
-            // Portuguese voices
-            Voice::PortugueseFemaleDora => VoiceConfig::new("pf_dora", "Dora", Gender::Female, Language::Portuguese, "Portuguese female voice - Dora"),
-            Voice::PortugueseMaleAlex => VoiceConfig::new("pm_alex", "Alex", Gender::Male, Language::Portuguese, "Portuguese male voice - Alex"),
-            Voice::PortugueseMaleSanta => VoiceConfig::new("pm_santa", "Santa", Gender::Male, Language::Portuguese, "Portuguese male voice - Santa"),
-
-            // Chinese voices
-            Voice::ChineseFemaleXiaobei => VoiceConfig::new("zf_xiaobei", "Xiaobei", Gender::Female, Language::Chinese, "Chinese female voice - Xiaobei"),
-            Voice::ChineseFemaleXiaoni => VoiceConfig::new("zf_xiaoni", "Xiaoni", Gender::Female, Language::Chinese, "Chinese female voice - Xiaoni"),
-            Voice::ChineseFemaleXiaoxiao => VoiceConfig::new("zf_xiaoxiao", "Xiaoxiao", Gender::Female, Language::Chinese, "Chinese female voice - Xiaoxiao"),
-            Voice::ChineseFemaleXiaoyi => VoiceConfig::new("zf_xiaoyi", "Xiaoyi", Gender::Female, Language::Chinese, "Chinese female voice - Xiaoyi"),
-            Voice::ChineseMaleYunjian => VoiceConfig::new("zm_yunjian", "Yunjian", Gender::Male, Language::Chinese, "Chinese male voice - Yunjian"),
-            Voice::ChineseMaleYunxi => VoiceConfig::new("zm_yunxi", "Yunxi", Gender::Male, Language::Chinese, "Chinese male voice - Yunxi"),
-            Voice::ChineseMaleYunxia => VoiceConfig::new("zm_yunxia", "Yunxia", Gender::Male, Language::Chinese, "Chinese male voice - Yunxia"),
-            Voice::ChineseMaleYunyang => VoiceConfig::new("zm_yunyang", "Yunyang", Gender::Male, Language::Chinese, "Chinese male voice - Yunyang"),
         }
     }
 
@@ -219,7 +157,7 @@ impl Voice {
     }
 
     /// Get all available voices as an array
-    pub const fn all() -> [Voice; 54] {
+    pub const fn all() -> [Voice; 28] {
         [
             Voice::AmericanFemaleAlloy,
             Voice::AmericanFemaleAoede,
@@ -249,32 +187,6 @@ impl Voice {
             Voice::BritishMaleFable,
             Voice::BritishMaleGeorge,
             Voice::BritishMaleLewis,
-            Voice::EuropeanFemaleDora,
-            Voice::EuropeanMaleAlex,
-            Voice::EuropeanMaleSanta,
-            Voice::FrenchFemaleSiwis,
-            Voice::HindiFemalealpha,
-            Voice::HindiFemalebeta,
-            Voice::HindiMaleOmega,
-            Voice::HindiMalePsi,
-            Voice::ItalianFemaleSara,
-            Voice::ItalianMaleNicola,
-            Voice::JapaneseFemaleAlpha,
-            Voice::JapaneseFemaleGongitsune,
-            Voice::JapaneseFemaleNezumi,
-            Voice::JapaneseFemaleTebukuro,
-            Voice::JapaneseMaleKumo,
-            Voice::PortugueseFemaleDora,
-            Voice::PortugueseMaleAlex,
-            Voice::PortugueseMaleSanta,
-            Voice::ChineseFemaleXiaobei,
-            Voice::ChineseFemaleXiaoni,
-            Voice::ChineseFemaleXiaoxiao,
-            Voice::ChineseFemaleXiaoyi,
-            Voice::ChineseMaleYunjian,
-            Voice::ChineseMaleYunxi,
-            Voice::ChineseMaleYunxia,
-            Voice::ChineseMaleYunyang,
         ]
     }
 

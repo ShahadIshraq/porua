@@ -160,14 +160,8 @@ async fn generate_tts_chunked(
 
 /// List all available voices
 async fn list_voices() -> Json<VoicesResponse> {
-    use crate::kokoro::voice_config::Language;
-
     let voices = Voice::all()
         .iter()
-        .filter(|voice| {
-            let config = voice.config();
-            matches!(config.language, Language::AmericanEnglish | Language::BritishEnglish)
-        })
         .map(|voice| {
             let config = voice.config();
             VoiceInfo {
@@ -471,18 +465,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_list_voices_only_returns_english() {
+    async fn test_list_voices_returns_all_configured_voices() {
         let voices_response = list_voices().await;
         let voices = voices_response.0.voices;
 
-        // Should return exactly 28 English voices
-        assert_eq!(voices.len(), 28, "Expected 28 English voices");
+        // Should return exactly 28 voices (all configured voices)
+        assert_eq!(voices.len(), 28, "Expected 28 voices");
 
-        // All voices should be American or British English
+        // All voices should be American or British English (based on current config)
         for voice in &voices {
             assert!(
                 voice.language == "AmericanEnglish" || voice.language == "BritishEnglish",
-                "Voice {} has non-English language: {}",
+                "Voice {} has unexpected language: {}",
                 voice.id,
                 voice.language
             );
@@ -509,11 +503,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_list_voices_includes_all_english_voices() {
+    async fn test_list_voices_includes_all_configured_voice_ids() {
         let voices_response = list_voices().await;
         let voices = voices_response.0.voices;
 
-        // Expected voice IDs (28 English voices)
+        // Expected voice IDs (all 28 configured voices)
         let expected_ids = vec![
             "af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica",
             "af_kore", "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
@@ -528,7 +522,7 @@ mod tests {
         for expected_id in expected_ids {
             assert!(
                 voice_ids.contains(&expected_id),
-                "Missing expected English voice: {}",
+                "Missing expected voice: {}",
                 expected_id
             );
         }
