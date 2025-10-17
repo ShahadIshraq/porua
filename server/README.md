@@ -1,6 +1,6 @@
 # TTS Server
 
-A high-performance, Rust-based Text-to-Speech HTTP server using the Kokoro TTS engine with 54 voice options across multiple languages.
+A high-performance, Rust-based Text-to-Speech HTTP server using the Kokoro TTS engine with 28 English voices.
 
 ## Overview
 
@@ -92,6 +92,7 @@ Available endpoints:
   POST   /tts          - Generate speech from text
   POST   /tts/stream   - Generate speech with streaming response
   GET    /voices       - List available voices
+  GET    /samples/*    - Voice sample audio files
   GET    /health       - Health check
   GET    /stats        - Pool statistics
 
@@ -100,7 +101,7 @@ Pool configuration:
   Set TTS_POOL_SIZE environment variable to change
 ```
 
-**Note:** Voice listings are hidden by default. To see all 54 voices during startup, use `RUST_LOG=kokoros=info`.
+**Note:** Voice listings are hidden by default. To see all voices during startup, use `RUST_LOG=kokoros=info`.
 
 ### 2. Test the API
 
@@ -247,7 +248,7 @@ curl -X POST http://localhost:3003/tts/stream \
 
 #### `GET /voices` - List Available Voices
 
-Get all 54 available voices with metadata.
+Get 28 English voices (American and British) with metadata and sample URLs.
 
 **Response:**
 ```json
@@ -258,7 +259,8 @@ Get all 54 available voices with metadata.
       "name": "Lily",
       "gender": "Female",
       "language": "BritishEnglish",
-      "description": "British female voice - Lily"
+      "description": "British female voice - Lily",
+      "sample_url": "/samples/bf_lily.wav"
     },
     ...
   ]
@@ -268,6 +270,19 @@ Get all 54 available voices with metadata.
 **Example:**
 ```bash
 curl http://localhost:3003/voices | jq '.voices[] | select(.gender == "Female")'
+```
+
+#### `GET /samples/{voice_id}.wav` - Voice Sample Audio
+
+Download voice sample audio files (~10 seconds each).
+
+**Response:**
+- **Success (200)**: WAV audio file
+- **Error (404)**: File not found
+
+**Example:**
+```bash
+curl http://localhost:3003/samples/bf_lily.wav --output lily_sample.wav
 ```
 
 #### `GET /health` - Health Check
