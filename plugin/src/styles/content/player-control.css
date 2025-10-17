@@ -10,8 +10,8 @@
   width: 50px;
   height: 50px;
 
-  /* Appearance - IDLE/PAUSED: Static purple gradient */
-  background: linear-gradient(135deg, #6366f1, #4338ca);
+  /* Appearance - IDLE/PAUSED: Pink-coral gradient matching icon theme */
+  background: linear-gradient(135deg, #ec4899 0%, #fb7185 50%, #fb923c 100%);
   border-radius: 50%;
   box-shadow: var(--tts-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.3));
   cursor: move;
@@ -24,7 +24,7 @@
 }
 
 .tts-player-control:hover {
-  background: linear-gradient(135deg, #4f46e5, #4338ca);
+  background: linear-gradient(135deg, #db2777 0%, #ec4899 50%, #f97316 100%);
   box-shadow: var(--tts-shadow-lg, 0 6px 16px rgba(0, 0, 0, 0.4));
   transform: scale(1.05);
 }
