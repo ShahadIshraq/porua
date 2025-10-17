@@ -11,6 +11,7 @@ api_keys.txt
 # Output files
 output.wav
 *.wav
+!samples/*.wav
 
 # Temp files
 /tmp
