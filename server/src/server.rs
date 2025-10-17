@@ -7,6 +7,7 @@ use axum::{
 };
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
+use tower_http::services::ServeDir;
 
 use crate::kokoro::{
     voice_config::Voice,
@@ -220,12 +221,18 @@ pub fn create_router(state: AppState) -> Router<()> {
     // Clone api_keys for middleware
     let api_keys_for_middleware = state.api_keys.clone();
 
+    // Create static file service for audio samples
+    // Samples are served from server/samples/ directory
+    let samples_service = ServeDir::new("samples")
+        .append_index_html_on_directories(false);
+
     let mut router = Router::new()
         .route("/tts", post(generate_tts))
         .route("/tts/stream", post(generate_tts_stream))
         .route("/voices", get(list_voices))
         .route("/health", get(health_check))
-        .route("/stats", get(pool_stats));
+        .route("/stats", get(pool_stats))
+        .nest_service("/samples", samples_service);
 
     // Apply rate limiting only if API keys are enabled
     if let Some(rate_limiter) = state.rate_limiter.clone() {
