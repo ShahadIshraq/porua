@@ -25,7 +25,9 @@ describe('SettingsStore', () => {
   describe('get', () => {
     it('should return default settings when storage is empty', async () => {
       chrome.storage.sync.get.mockResolvedValue({
-        apiUrl: DEFAULT_SETTINGS.apiUrl
+        apiUrl: DEFAULT_SETTINGS.apiUrl,
+        selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
       });
       chrome.storage.local.get.mockResolvedValue({
         encryptedApiKey: ''
@@ -35,6 +37,8 @@ describe('SettingsStore', () => {
 
       expect(settings.apiUrl).toBe(DEFAULT_SETTINGS.apiUrl);
       expect(settings.apiKey).toBe('');
+      expect(settings.selectedVoiceId).toBe(DEFAULT_SETTINGS.selectedVoiceId);
+      expect(settings.selectedVoiceName).toBe(DEFAULT_SETTINGS.selectedVoiceName);
     });
 
     it('should retrieve apiUrl from sync storage', async () => {
@@ -81,14 +85,18 @@ describe('SettingsStore', () => {
 
     it('should request correct default values from sync storage', async () => {
       chrome.storage.sync.get.mockResolvedValue({
-        apiUrl: DEFAULT_SETTINGS.apiUrl
+        apiUrl: DEFAULT_SETTINGS.apiUrl,
+        selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
       });
       chrome.storage.local.get.mockResolvedValue({ encryptedApiKey: '' });
 
       await SettingsStore.get();
 
       expect(chrome.storage.sync.get).toHaveBeenCalledWith({
-        apiUrl: DEFAULT_SETTINGS.apiUrl
+        apiUrl: DEFAULT_SETTINGS.apiUrl,
+        selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
       });
     });
 
@@ -115,9 +123,9 @@ describe('SettingsStore', () => {
 
       await SettingsStore.set({ apiUrl: newUrl, apiKey: '' });
 
-      expect(chrome.storage.sync.set).toHaveBeenCalledWith({
-        apiUrl: newUrl
-      });
+      expect(chrome.storage.sync.set).toHaveBeenCalledWith(
+        expect.objectContaining({ apiUrl: newUrl })
+      );
     });
 
     it('should encrypt and store API key in local storage', async () => {
@@ -176,7 +184,54 @@ describe('SettingsStore', () => {
 
       await SettingsStore.set({ apiUrl, apiKey });
 
-      expect(chrome.storage.sync.set).toHaveBeenCalledWith({ apiUrl });
+      expect(chrome.storage.sync.set).toHaveBeenCalledWith(
+        expect.objectContaining({ apiUrl })
+      );
+      expect(Encryption.encrypt).toHaveBeenCalledWith(apiKey);
+      expect(chrome.storage.local.set).toHaveBeenCalledWith({
+        encryptedApiKey: encryptedKey
+      });
+    });
+
+    it('should store voice selection in sync storage', async () => {
+      const voiceId = 'af_nova';
+      const voiceName = 'Nova';
+      chrome.storage.sync.set.mockResolvedValue(undefined);
+
+      await SettingsStore.set({
+        selectedVoiceId: voiceId,
+        selectedVoiceName: voiceName
+      });
+
+      expect(chrome.storage.sync.set).toHaveBeenCalledWith({
+        selectedVoiceId: voiceId,
+        selectedVoiceName: voiceName
+      });
+    });
+
+    it('should store all settings together', async () => {
+      const apiUrl = 'http://test.com';
+      const apiKey = 'test-key';
+      const voiceId = 'af_nova';
+      const voiceName = 'Nova';
+      const encryptedKey = 'encrypted-test-key';
+
+      chrome.storage.sync.set.mockResolvedValue(undefined);
+      chrome.storage.local.set.mockResolvedValue(undefined);
+      Encryption.encrypt.mockResolvedValue(encryptedKey);
+
+      await SettingsStore.set({
+        apiUrl,
+        apiKey,
+        selectedVoiceId: voiceId,
+        selectedVoiceName: voiceName
+      });
+
+      expect(chrome.storage.sync.set).toHaveBeenCalledWith({
+        apiUrl,
+        selectedVoiceId: voiceId,
+        selectedVoiceName: voiceName
+      });
       expect(Encryption.encrypt).toHaveBeenCalledWith(apiKey);
       expect(chrome.storage.local.set).toHaveBeenCalledWith({
         encryptedApiKey: encryptedKey
@@ -270,6 +325,80 @@ describe('SettingsStore', () => {
     });
   });
 
+  describe('getSelectedVoice', () => {
+    it('should return selected voice from sync storage', async () => {
+      const voiceId = 'af_nova';
+      const voiceName = 'Nova';
+      chrome.storage.sync.get.mockResolvedValue({
+        selectedVoiceId: voiceId,
+        selectedVoiceName: voiceName
+      });
+
+      const voice = await SettingsStore.getSelectedVoice();
+
+      expect(voice.id).toBe(voiceId);
+      expect(voice.name).toBe(voiceName);
+    });
+
+    it('should return default voice when not set', async () => {
+      chrome.storage.sync.get.mockResolvedValue({
+        selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
+      });
+
+      const voice = await SettingsStore.getSelectedVoice();
+
+      expect(voice.id).toBe(DEFAULT_SETTINGS.selectedVoiceId);
+      expect(voice.name).toBe(DEFAULT_SETTINGS.selectedVoiceName);
+    });
+
+    it('should request with correct defaults', async () => {
+      chrome.storage.sync.get.mockResolvedValue({
+        selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
+      });
+
+      await SettingsStore.getSelectedVoice();
+
+      expect(chrome.storage.sync.get).toHaveBeenCalledWith({
+        selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
+      });
+    });
+  });
+
+  describe('setSelectedVoice', () => {
+    it('should store voice selection in sync storage', async () => {
+      const voiceId = 'bm_george';
+      const voiceName = 'George';
+      chrome.storage.sync.set.mockResolvedValue(undefined);
+
+      await SettingsStore.setSelectedVoice(voiceId, voiceName);
+
+      expect(chrome.storage.sync.set).toHaveBeenCalledWith({
+        selectedVoiceId: voiceId,
+        selectedVoiceName: voiceName
+      });
+    });
+
+    it('should handle voice change', async () => {
+      // Set a voice
+      chrome.storage.sync.set.mockResolvedValue(undefined);
+      await SettingsStore.setSelectedVoice('af_nova', 'Nova');
+
+      // Get the voice back
+      chrome.storage.sync.get.mockResolvedValue({
+        selectedVoiceId: 'af_nova',
+        selectedVoiceName: 'Nova'
+      });
+
+      const voice = await SettingsStore.getSelectedVoice();
+
+      expect(voice.id).toBe('af_nova');
+      expect(voice.name).toBe('Nova');
+    });
+  });
+
   describe('integration scenarios', () => {
     it('should handle complete save and retrieve flow', async () => {
       const testUrl = 'http://test.example.com';
@@ -284,7 +413,11 @@ describe('SettingsStore', () => {
       await SettingsStore.set({ apiUrl: testUrl, apiKey: testKey });
 
       // Mock get
-      chrome.storage.sync.get.mockResolvedValue({ apiUrl: testUrl });
+      chrome.storage.sync.get.mockResolvedValue({
+        apiUrl: testUrl,
+        selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
+      });
       chrome.storage.local.get.mockResolvedValue({
         encryptedApiKey: encryptedTestKey
       });
@@ -313,13 +446,53 @@ describe('SettingsStore', () => {
 
       // Get should return empty key
       chrome.storage.sync.get.mockResolvedValue({
-        apiUrl: DEFAULT_SETTINGS.apiUrl
+        apiUrl: DEFAULT_SETTINGS.apiUrl,
+        selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
       });
       chrome.storage.local.get.mockResolvedValue({ encryptedApiKey: '' });
 
       const settings = await SettingsStore.get();
 
       expect(settings.apiKey).toBe('');
+    });
+
+    it('should handle full settings including voice', async () => {
+      const testUrl = 'http://test.com';
+      const testKey = 'test-key';
+      const voiceId = 'af_alloy';
+      const voiceName = 'Alloy';
+      const encryptedTestKey = 'encrypted-key';
+
+      // Save everything
+      chrome.storage.sync.set.mockResolvedValue(undefined);
+      chrome.storage.local.set.mockResolvedValue(undefined);
+      Encryption.encrypt.mockResolvedValue(encryptedTestKey);
+
+      await SettingsStore.set({
+        apiUrl: testUrl,
+        apiKey: testKey,
+        selectedVoiceId: voiceId,
+        selectedVoiceName: voiceName
+      });
+
+      // Retrieve everything
+      chrome.storage.sync.get.mockResolvedValue({
+        apiUrl: testUrl,
+        selectedVoiceId: voiceId,
+        selectedVoiceName: voiceName
+      });
+      chrome.storage.local.get.mockResolvedValue({
+        encryptedApiKey: encryptedTestKey
+      });
+      Encryption.decrypt.mockResolvedValue(testKey);
+
+      const settings = await SettingsStore.get();
+
+      expect(settings.apiUrl).toBe(testUrl);
+      expect(settings.apiKey).toBe(testKey);
+      expect(settings.selectedVoiceId).toBe(voiceId);
+      expect(settings.selectedVoiceName).toBe(voiceName);
     });
   });
 });
