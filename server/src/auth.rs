@@ -11,6 +11,8 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
+use crate::utils::header_utils::extract_api_key;
+
 #[derive(Debug, Clone)]
 pub struct ApiKeys {
     keys: HashSet<String>,
@@ -169,28 +171,6 @@ pub async fn auth_middleware(
     }
 }
 
-/// Extract API key from headers
-/// Supports both X-API-Key header and Authorization: Bearer header
-fn extract_api_key(headers: &HeaderMap) -> Option<String> {
-    // Try X-API-Key header first
-    if let Some(key) = headers.get("x-api-key") {
-        if let Ok(key_str) = key.to_str() {
-            return Some(key_str.to_string());
-        }
-    }
-
-    // Try Authorization: Bearer header
-    if let Some(auth) = headers.get("authorization") {
-        if let Ok(auth_str) = auth.to_str() {
-            if let Some(stripped) = auth_str.strip_prefix("Bearer ") {
-                return Some(stripped.to_string());
-            }
-        }
-    }
-
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,13 +255,13 @@ mod tests {
         assert!(!keys.validate("  key-with-spaces  "));
     }
 
+    // Tests for extract_api_key moved to utils::header_utils
+
     #[test]
     fn test_extract_api_key_x_api_key_header() {
         let mut headers = HeaderMap::new();
         headers.insert("x-api-key", "test-key-123".parse().unwrap());
-
         let key = extract_api_key(&headers);
-
         assert_eq!(key, Some("test-key-123".to_string()));
     }
 
@@ -289,9 +269,7 @@ mod tests {
     fn test_extract_api_key_bearer_token() {
         let mut headers = HeaderMap::new();
         headers.insert("authorization", "Bearer test-token-456".parse().unwrap());
-
         let key = extract_api_key(&headers);
-
         assert_eq!(key, Some("test-token-456".to_string()));
     }
 
@@ -299,7 +277,6 @@ mod tests {
     fn test_extract_api_key_no_header() {
         let headers = HeaderMap::new();
         let key = extract_api_key(&headers);
-
         assert_eq!(key, None);
     }
 
@@ -308,10 +285,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert("x-api-key", "x-api-key-value".parse().unwrap());
         headers.insert("authorization", "Bearer bearer-value".parse().unwrap());
-
         let key = extract_api_key(&headers);
-
-        // Should prefer X-API-Key header
         assert_eq!(key, Some("x-api-key-value".to_string()));
     }
 
@@ -319,7 +293,6 @@ mod tests {
     fn test_extract_api_key_invalid_bearer_format() {
         let mut headers = HeaderMap::new();
         headers.insert("authorization", "InvalidFormat token".parse().unwrap());
-
         let key = extract_api_key(&headers);
 
         assert_eq!(key, None);
