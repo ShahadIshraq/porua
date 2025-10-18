@@ -39,8 +39,8 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'The domestic cat Felis catus', startTime: 0, endTime: 2000 },
-        { phrase: 'is a small carnivorous mammal', startTime: 2000, endTime: 4000 }
+        { text: 'The domestic cat Felis catus', startTime: 0, endTime: 2000 },
+        { text: 'is a small carnivorous mammal', startTime: 2000, endTime: 4000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -66,11 +66,11 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'In physics energy is', startTime: 0, endTime: 1500 },
-        { phrase: 'the quantitative property that', startTime: 1500, endTime: 3000 },
-        { phrase: 'must be transferred to', startTime: 3000, endTime: 4000 },
-        { phrase: 'an object in order', startTime: 4000, endTime: 5000 },
-        { phrase: 'to perform work', startTime: 5000, endTime: 6000 }
+        { text: 'In physics energy is', startTime: 0, endTime: 1500 },
+        { text: 'the quantitative property that', startTime: 1500, endTime: 3000 },
+        { text: 'must be transferred to', startTime: 3000, endTime: 4000 },
+        { text: 'an object in order', startTime: 4000, endTime: 5000 },
+        { text: 'to perform work', startTime: 5000, endTime: 6000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -96,8 +96,8 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'Use the Array map method', startTime: 0, endTime: 2000 },
-        { phrase: 'to transform array elements', startTime: 2000, endTime: 4000 }
+        { text: 'Use the Array map method', startTime: 0, endTime: 2000 },
+        { text: 'to transform array elements', startTime: 2000, endTime: 4000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -119,8 +119,8 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'To be or not to be', startTime: 0, endTime: 1500 },
-        { phrase: 'said Shakespeare', startTime: 1500, endTime: 2500 }
+        { text: 'To be or not to be', startTime: 0, endTime: 1500 },
+        { text: 'said Shakespeare', startTime: 1500, endTime: 2500 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -143,8 +143,8 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'Visit our website', startTime: 0, endTime: 1000 },
-        { phrase: 'for more information', startTime: 1000, endTime: 2000 }
+        { text: 'Visit our website', startTime: 0, endTime: 1000 },
+        { text: 'for more information', startTime: 1000, endTime: 2000 }
       ];
 
       // Wrap phrases (simulating playback start)
@@ -191,8 +191,8 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'Check link one', startTime: 0, endTime: 500 },
-        { phrase: 'and link two', startTime: 500, endTime: 1000 }
+        { text: 'Check link one', startTime: 0, endTime: 500 },
+        { text: 'and link two', startTime: 500, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -225,7 +225,7 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'Start with a link', startTime: 0, endTime: 1000 }
+        { text: 'Start with a link', startTime: 0, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -244,7 +244,7 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'End with a link', startTime: 0, endTime: 1000 }
+        { text: 'End with a link', startTime: 0, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -260,7 +260,7 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'Bold Italic Code', startTime: 0, endTime: 1000 }
+        { text: 'Bold Italic Code', startTime: 0, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -276,7 +276,7 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'Text more text', startTime: 0, endTime: 1000 }
+        { text: 'Text more text', startTime: 0, endTime: 1000 }
       ];
 
       expect(() => {
@@ -290,7 +290,7 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'Text very nested content', startTime: 0, endTime: 1000 }
+        { text: 'Text very nested content', startTime: 0, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -308,10 +308,10 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'As John Doe explains', startTime: 0, endTime: 1500 },
-        { phrase: 'in his recent article', startTime: 1500, endTime: 3000 },
-        { phrase: 'the key to success', startTime: 3000, endTime: 4500 },
-        { phrase: 'is persistence', startTime: 4500, endTime: 6000 }
+        { text: 'As John Doe explains', startTime: 0, endTime: 1500 },
+        { text: 'in his recent article', startTime: 1500, endTime: 3000 },
+        { text: 'the key to success', startTime: 3000, endTime: 4500 },
+        { text: 'is persistence', startTime: 4500, endTime: 6000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -328,9 +328,9 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'Install with npm install', startTime: 0, endTime: 2000 },
-        { phrase: 'or see the documentation', startTime: 2000, endTime: 4000 },
-        { phrase: 'for more details', startTime: 4000, endTime: 5000 }
+        { text: 'Install with npm install', startTime: 0, endTime: 2000 },
+        { text: 'or see the documentation', startTime: 2000, endTime: 4000 },
+        { text: 'for more details', startTime: 4000, endTime: 5000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -345,8 +345,8 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       container.appendChild(paragraph);
 
       const timeline = [
-        { phrase: 'According to Reuters and BBC', startTime: 0, endTime: 2000 },
-        { phrase: 'the event was unprecedented', startTime: 2000, endTime: 4000 }
+        { text: 'According to Reuters and BBC', startTime: 0, endTime: 2000 },
+        { text: 'the event was unprecedented', startTime: 2000, endTime: 4000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -362,7 +362,7 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       paragraph.innerHTML = 'Original text with <a href="#">link</a>.';
       container.appendChild(paragraph);
 
-      const timeline1 = [{ phrase: 'Original text with link', startTime: 0, endTime: 1000 }];
+      const timeline1 = [{ text: 'Original text with link', startTime: 0, endTime: 1000 }];
       highlightManager.wrapPhrases(paragraph, timeline1);
 
       // Verify first wrap worked
@@ -379,7 +379,7 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       paragraph.appendChild(newLink);
 
       // Wrap again with updated content
-      const timeline2 = [{ phrase: 'Original text with link new link', startTime: 0, endTime: 2000 }];
+      const timeline2 = [{ text: 'Original text with link new link', startTime: 0, endTime: 2000 }];
       highlightManager.wrapPhrases(paragraph, timeline2);
 
       // Should handle gracefully - both links should exist
@@ -393,7 +393,7 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       paragraph.innerHTML = 'Test content <a href="#">link</a>.';
       container.appendChild(paragraph);
 
-      const timeline = [{ phrase: 'Test content link', startTime: 0, endTime: 1000 }];
+      const timeline = [{ text: 'Test content link', startTime: 0, endTime: 1000 }];
 
       // First wrap - creates cache entry
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -416,14 +416,14 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       paragraph.innerHTML = 'Original text.';
       container.appendChild(paragraph);
 
-      const timeline1 = [{ phrase: 'Original text', startTime: 0, endTime: 1000 }];
+      const timeline1 = [{ text: 'Original text', startTime: 0, endTime: 1000 }];
       highlightManager.wrapPhrases(paragraph, timeline1);
 
       // Restore and change content
       highlightManager.restoreParagraph(paragraph);
       paragraph.innerHTML = 'Modified text with <strong>emphasis</strong>.';
 
-      const timeline2 = [{ phrase: 'Modified text with emphasis', startTime: 0, endTime: 1500 }];
+      const timeline2 = [{ text: 'Modified text with emphasis', startTime: 0, endTime: 1500 }];
       highlightManager.wrapPhrases(paragraph, timeline2);
 
       // Should handle new content correctly
@@ -432,27 +432,22 @@ describe('HighlightManager - HTML Preservation Integration', () => {
       expect(paragraph.textContent).toContain('Modified text');
     });
 
-    it('should warn when re-wrapping without clearing', () => {
+    it('should handle re-wrapping without issues', () => {
       const paragraph = document.createElement('p');
       paragraph.innerHTML = 'Test text.';
       container.appendChild(paragraph);
 
-      const timeline = [{ phrase: 'Test text', startTime: 0, endTime: 1000 }];
-
-      // Spy on console.warn
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const timeline = [{ text: 'Test text', startTime: 0, endTime: 1000 }];
 
       // First wrap
       highlightManager.wrapPhrases(paragraph, timeline);
-      expect(warnSpy).not.toHaveBeenCalled();
+      const firstWrap = paragraph.querySelectorAll('.tts-phrase');
+      expect(firstWrap.length).toBeGreaterThan(0);
 
-      // Second wrap without clearing (should trigger warning)
+      // Second wrap should clear and re-wrap successfully
       highlightManager.wrapPhrases(paragraph, timeline);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Re-wrapping paragraph that already has phrase spans')
-      );
-
-      warnSpy.mockRestore();
+      const secondWrap = paragraph.querySelectorAll('.tts-phrase');
+      expect(secondWrap.length).toBeGreaterThan(0);
     });
   });
 });

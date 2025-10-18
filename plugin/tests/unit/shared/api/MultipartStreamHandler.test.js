@@ -21,10 +21,10 @@ describe('MultipartStreamHandler', () => {
         {
           type: 'metadata',
           metadata: {
-            duration: 1.5,
+            duration_ms: 1500,
             phrases: [
-              { text: 'Hello', start_time: 0.0, end_time: 0.5 },
-              { text: 'world', start_time: 0.5, end_time: 1.0 }
+              { text: 'Hello', start_ms: 0, duration_ms: 500 },
+              { text: 'world', start_ms: 500, duration_ms: 500 }
             ]
           }
         },
@@ -35,9 +35,9 @@ describe('MultipartStreamHandler', () => {
         {
           type: 'metadata',
           metadata: {
-            duration: 1.0,
+            duration_ms: 1000,
             phrases: [
-              { text: 'test', start_time: 0.0, end_time: 0.5 }
+              { text: 'test', start_ms: 0, duration_ms: 500 }
             ]
           }
         },
@@ -77,26 +77,26 @@ describe('MultipartStreamHandler', () => {
       expect(result.audioBlobs[1]).toBeInstanceOf(Blob);
 
       // Verify metadata
-      expect(result.metadataArray[0].duration).toBe(1.5);
-      expect(result.metadataArray[1].duration).toBe(1.0);
+      expect(result.metadataArray[0].duration_ms).toBe(1500);
+      expect(result.metadataArray[1].duration_ms).toBe(1000);
 
       // Verify phrase timeline
       expect(result.phraseTimeline[0]).toEqual({
         text: 'Hello',
-        startTime: 0.0,
-        endTime: 0.5,
+        startTime: 0,
+        endTime: 500,
         chunkIndex: 0
       });
       expect(result.phraseTimeline[1]).toEqual({
         text: 'world',
-        startTime: 0.5,
-        endTime: 1.0,
+        startTime: 500,
+        endTime: 1000,
         chunkIndex: 1
       });
       expect(result.phraseTimeline[2]).toEqual({
         text: 'test',
-        startTime: 1.5, // Accumulated from previous chunk
-        endTime: 2.0,
+        startTime: 1500, // Accumulated from previous chunk
+        endTime: 2000,
         chunkIndex: 2
       });
     });
@@ -351,10 +351,10 @@ describe('MultipartStreamHandler', () => {
         {
           type: 'metadata',
           metadata: {
-            duration: 1.0,
+            duration_ms: 1000,
             phrases: [
-              { text: 'Hello' },  // Missing start_time and end_time
-              { text: 'world', start_time: 0.5 }  // Missing end_time
+              { text: 'Hello' },  // Missing start_ms and duration_ms
+              { text: 'world', start_ms: 500 }  // Missing duration_ms
             ]
           }
         },
@@ -383,8 +383,8 @@ describe('MultipartStreamHandler', () => {
       expect(result.phraseTimeline).toHaveLength(2);
       expect(result.phraseTimeline[0].startTime).toBe(0);
       expect(result.phraseTimeline[0].endTime).toBe(0);
-      expect(result.phraseTimeline[1].startTime).toBe(0.5);
-      expect(result.phraseTimeline[1].endTime).toBe(0);
+      expect(result.phraseTimeline[1].startTime).toBe(500);
+      expect(result.phraseTimeline[1].endTime).toBe(500);
     });
   });
 });

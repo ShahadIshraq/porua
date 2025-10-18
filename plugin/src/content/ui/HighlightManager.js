@@ -16,10 +16,6 @@ export class HighlightManager {
     }
 
     // Clear any existing phrase spans first
-    const existingPhrases = paragraph.querySelectorAll('.tts-phrase');
-    if (existingPhrases.length > 0) {
-      console.warn('Re-wrapping paragraph that already has phrase spans. This may indicate duplicate wrapping calls.');
-    }
     this.clearPhraseSpans(paragraph);
 
     const originalText = paragraph.textContent;
@@ -38,7 +34,7 @@ export class HighlightManager {
 
     for (let timelineIndex = 0; timelineIndex < timeline.length; timelineIndex++) {
       const phraseData = timeline[timelineIndex];
-      const phraseText = phraseData.phrase;
+      const phraseText = phraseData.text;
 
       // Use word-count matcher
       const match = matcher.find(phraseText, currentIndex);
@@ -63,7 +59,6 @@ export class HighlightManager {
         );
       } catch (e) {
         // If Range API fails, fall back to manual wrapping
-        console.warn('Range API wrapping failed, falling back to manual wrapping:', e);
         this.wrapPhraseManually(
           paragraph,
           match.index,
@@ -162,7 +157,6 @@ export class HighlightManager {
     const affectedNodes = mapper.getNodesInRange(startPos, endPos);
 
     if (affectedNodes.length === 0) {
-      console.warn(`No nodes found in range [${startPos}, ${endPos}] for phrase: "${phraseData.phrase}"`);
       return;
     }
 
@@ -313,17 +307,13 @@ export class HighlightManager {
       return;
     }
 
-    let foundMatch = false;
     for (const span of phraseSpans) {
       const startTime = parseFloat(span.dataset.startTime);
       const endTime = parseFloat(span.dataset.endTime);
-      const phraseIndex = span.dataset.phraseIndex;
-      const phraseText = span.textContent;
 
       const isInRange = currentTimeMs >= startTime && currentTimeMs < endTime;
 
       if (isInRange) {
-        foundMatch = true;
         const currentHighlight = this.state.getHighlightedPhrase();
 
         // Check if current highlight is still valid (attached to DOM)
