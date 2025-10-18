@@ -1,4 +1,5 @@
 import { APIError } from '../utils/errors.js';
+import { validateSpeed } from '../utils/validation.js';
 
 export class TTSClient {
   constructor(baseUrl, apiKey = '') {
@@ -40,23 +41,29 @@ export class TTSClient {
   }
 
   async synthesizeStream(text, options = {}) {
+    const speed = options.speed || 1.0;
+    const validatedSpeed = validateSpeed(speed);
+
     return await this.fetch('/tts/stream', {
       method: 'POST',
       body: JSON.stringify({
         text,
         voice: options.voice || 'bf_lily',
-        speed: options.speed || 1.0
+        speed: validatedSpeed
       })
     });
   }
 
   async synthesize(text, options = {}) {
+    const speed = options.speed || 1.0;
+    const validatedSpeed = validateSpeed(speed);
+
     return await this.fetch('/tts', {
       method: 'POST',
       body: JSON.stringify({
         text,
         voice: options.voice || 'bf_lily',
-        speed: options.speed || 1.0
+        speed: validatedSpeed
       }),
       signal: options.signal
     });
