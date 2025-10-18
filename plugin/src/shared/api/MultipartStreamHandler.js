@@ -89,17 +89,21 @@ function buildPhraseTimeline(metadataArray) {
     }
 
     for (const phrase of metadata.phrases) {
+      const startMs = phrase.start_ms || 0;
+      const durationMs = phrase.duration_ms || 0;
+      const endMs = startMs + durationMs;
+
       timeline.push({
         text: phrase.text,
-        startTime: accumulatedDuration + (phrase.start_time || 0),
-        endTime: accumulatedDuration + (phrase.end_time || 0),
+        startTime: accumulatedDuration + startMs,
+        endTime: accumulatedDuration + endMs,
         chunkIndex: timeline.length
       });
     }
 
     // Accumulate duration for next chunk
-    if (metadata.duration) {
-      accumulatedDuration += metadata.duration;
+    if (metadata.duration_ms) {
+      accumulatedDuration += metadata.duration_ms;
     }
   }
 

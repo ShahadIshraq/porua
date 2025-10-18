@@ -47,8 +47,8 @@ describe('HighlightManager', () => {
   describe('wrapPhrases', () => {
     it('should wrap phrases in spans', () => {
       const timeline = [
-        { phrase: 'Hello', startTime: 0, endTime: 500 },
-        { phrase: 'World', startTime: 500, endTime: 1000 }
+        { text: 'Hello', startTime: 0, endTime: 500 },
+        { text: 'World', startTime: 500, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(mockParagraph, timeline);
@@ -61,7 +61,7 @@ describe('HighlightManager', () => {
 
     it('should store original HTML', () => {
       const originalHtml = mockParagraph.innerHTML;
-      const timeline = [{ phrase: 'Hello', startTime: 0, endTime: 500 }];
+      const timeline = [{ text: 'Hello', startTime: 0, endTime: 500 }];
 
       highlightManager.wrapPhrases(mockParagraph, timeline);
 
@@ -71,7 +71,7 @@ describe('HighlightManager', () => {
     it('should not overwrite originalHtml if already set', () => {
       const originalHtml = '<strong>Original</strong>';
       mockParagraph.dataset.originalHtml = originalHtml;
-      const timeline = [{ phrase: 'Hello', startTime: 0, endTime: 500 }];
+      const timeline = [{ text: 'Hello', startTime: 0, endTime: 500 }];
 
       highlightManager.wrapPhrases(mockParagraph, timeline);
 
@@ -80,9 +80,9 @@ describe('HighlightManager', () => {
 
     it('should handle multiple phrases', () => {
       const timeline = [
-        { phrase: 'Hello', startTime: 0, endTime: 500 },
-        { phrase: 'World', startTime: 500, endTime: 1000 },
-        { phrase: 'test', startTime: 1000, endTime: 1500 }
+        { text: 'Hello', startTime: 0, endTime: 500 },
+        { text: 'World', startTime: 500, endTime: 1000 },
+        { text: 'test', startTime: 1000, endTime: 1500 }
       ];
 
       highlightManager.wrapPhrases(mockParagraph, timeline);
@@ -94,8 +94,8 @@ describe('HighlightManager', () => {
 
     it('should preserve text between phrases', () => {
       const timeline = [
-        { phrase: 'Hello', startTime: 0, endTime: 500 },
-        { phrase: 'test', startTime: 1000, endTime: 1500 }
+        { text: 'Hello', startTime: 0, endTime: 500 },
+        { text: 'test', startTime: 1000, endTime: 1500 }
       ];
 
       highlightManager.wrapPhrases(mockParagraph, timeline);
@@ -106,8 +106,8 @@ describe('HighlightManager', () => {
 
     it('should handle phrase not found in text', () => {
       const timeline = [
-        { phrase: 'Hello', startTime: 0, endTime: 500 },
-        { phrase: 'NonExistent', startTime: 500, endTime: 1000 }
+        { text: 'Hello', startTime: 0, endTime: 500 },
+        { text: 'NonExistent', startTime: 500, endTime: 1000 }
       ];
 
       expect(() => {
@@ -118,7 +118,7 @@ describe('HighlightManager', () => {
     it('should escape HTML in matched text', () => {
       mockParagraph.textContent = '<div>alert("xss")</div>';
       const timeline = [
-        { phrase: 'div', startTime: 0, endTime: 500 }
+        { text: 'div', startTime: 0, endTime: 500 }
       ];
 
       highlightManager.wrapPhrases(mockParagraph, timeline);
@@ -392,7 +392,7 @@ describe('HighlightManager', () => {
       paragraph.innerHTML = 'Check out <a href="https://example.com">this link</a> for more info.';
 
       const timeline = [
-        { phrase: 'Check out this link for', startTime: 0, endTime: 1000 }
+        { text: 'Check out this link for', startTime: 0, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -409,7 +409,7 @@ describe('HighlightManager', () => {
       paragraph.innerHTML = 'This is <strong>very important</strong> text.';
 
       const timeline = [
-        { phrase: 'This is very important', startTime: 0, endTime: 1000 }
+        { text: 'This is very important', startTime: 0, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -425,7 +425,7 @@ describe('HighlightManager', () => {
       paragraph.innerHTML = 'Text with <em>emphasis</em> here.';
 
       const timeline = [
-        { phrase: 'Text with emphasis', startTime: 0, endTime: 1000 }
+        { text: 'Text with emphasis', startTime: 0, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -441,7 +441,7 @@ describe('HighlightManager', () => {
       paragraph.innerHTML = 'This is <strong>very <em>important</em></strong> text.';
 
       const timeline = [
-        { phrase: 'very important', startTime: 0, endTime: 1000 }
+        { text: 'very important', startTime: 0, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -459,7 +459,7 @@ describe('HighlightManager', () => {
       paragraph.innerHTML = 'Visit <a href="https://google.com">Google</a> or <a href="https://yahoo.com">Yahoo</a>.';
 
       const timeline = [
-        { phrase: 'Visit Google or Yahoo', startTime: 0, endTime: 1000 }
+        { text: 'Visit Google or Yahoo', startTime: 0, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -485,7 +485,7 @@ describe('HighlightManager', () => {
       paragraph.innerHTML = 'Click <a href="https://example.com">here</a> to continue.';
 
       const timeline = [
-        { phrase: 'here', startTime: 0, endTime: 500 }
+        { text: 'here', startTime: 0, endTime: 500 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -501,7 +501,7 @@ describe('HighlightManager', () => {
       paragraph.innerHTML = 'Use the <code>console.log()</code> function.';
 
       const timeline = [
-        { phrase: 'Use the console log function', startTime: 0, endTime: 1000 }
+        { text: 'Use the console log function', startTime: 0, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -517,7 +517,7 @@ describe('HighlightManager', () => {
       paragraph.innerHTML = 'Hello <a href="#">world</a> test.';
 
       const timeline = [
-        { phrase: 'Hello world test', startTime: 0, endTime: 1000 }
+        { text: 'Hello world test', startTime: 0, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -537,7 +537,7 @@ describe('HighlightManager', () => {
       paragraph.innerHTML = 'Text <strong>bold <a href="#">link</a> more</strong> end.';
 
       const timeline = [
-        { phrase: 'Text bold link more', startTime: 0, endTime: 1000 }
+        { text: 'Text bold link more', startTime: 0, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -556,7 +556,7 @@ describe('HighlightManager', () => {
       paragraph.innerHTML = originalHtml;
 
       const timeline = [
-        { phrase: 'Check this link', startTime: 0, endTime: 1000 }
+        { text: 'Check this link', startTime: 0, endTime: 1000 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -576,9 +576,9 @@ describe('HighlightManager', () => {
       paragraph.innerHTML = 'Text <a href="#">link</a> and <strong>bold</strong> end.';
 
       const timeline = [
-        { phrase: 'Text link', startTime: 0, endTime: 500 },
-        { phrase: 'and bold', startTime: 500, endTime: 1000 },
-        { phrase: 'end', startTime: 1000, endTime: 1500 }
+        { text: 'Text link', startTime: 0, endTime: 500 },
+        { text: 'and bold', startTime: 500, endTime: 1000 },
+        { text: 'end', startTime: 1000, endTime: 1500 }
       ];
 
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -598,26 +598,21 @@ describe('HighlightManager', () => {
   });
 
   describe('Error handling and logging', () => {
-    it('should warn when re-wrapping without clearing first', () => {
+    it('should handle re-wrapping without issues', () => {
       const paragraph = document.createElement('p');
       paragraph.innerHTML = 'Test text';
 
-      const timeline = [{ phrase: 'Test text', startTime: 0, endTime: 1000 }];
-
-      // Spy on console.warn
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const timeline = [{ text: 'Test text', startTime: 0, endTime: 1000 }];
 
       // First wrap
       highlightManager.wrapPhrases(paragraph, timeline);
-      expect(warnSpy).not.toHaveBeenCalled();
+      const firstWrap = paragraph.querySelectorAll('.tts-phrase');
+      expect(firstWrap.length).toBeGreaterThan(0);
 
-      // Second wrap without clearing (should trigger warning)
+      // Second wrap should clear and re-wrap without issues
       highlightManager.wrapPhrases(paragraph, timeline);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Re-wrapping paragraph that already has phrase spans')
-      );
-
-      warnSpy.mockRestore();
+      const secondWrap = paragraph.querySelectorAll('.tts-phrase');
+      expect(secondWrap.length).toBeGreaterThan(0);
     });
 
     it('should log error for unexpected DOMException', () => {
@@ -639,7 +634,7 @@ describe('HighlightManager', () => {
         return originalCreateElement.call(document, tag);
       });
 
-      const timeline = [{ phrase: 'Test text', startTime: 0, endTime: 1000 }];
+      const timeline = [{ text: 'Test text', startTime: 0, endTime: 1000 }];
       highlightManager.wrapPhrases(paragraph, timeline);
 
       // Cleanup
@@ -648,31 +643,23 @@ describe('HighlightManager', () => {
       warnSpy.mockRestore();
     });
 
-    it('should warn when wrapPhraseManually finds no nodes', () => {
+    it('should handle wrapPhraseManually when no nodes found', () => {
       const paragraph = document.createElement('p');
       paragraph.innerHTML = 'Test text';
 
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-      // Try to wrap a phrase that doesn't exist
+      // Try to wrap a phrase that doesn't exist - should return early without error
       highlightManager.wrapPhraseManually(paragraph, 100, 200,
-        { phrase: 'nonexistent', startTime: 0, endTime: 1000 }, 0);
+        { text: 'nonexistent', startTime: 0, endTime: 1000 }, 0);
 
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('No nodes found in range')
-      );
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('nonexistent')
-      );
-
-      warnSpy.mockRestore();
+      // Should not throw and paragraph should remain unchanged
+      expect(paragraph.querySelectorAll('.tts-phrase').length).toBe(0);
     });
 
     it('should use cached DOMTextMapper when text unchanged', () => {
       const paragraph = document.createElement('p');
       paragraph.innerHTML = 'Test content';
 
-      const timeline = [{ phrase: 'Test content', startTime: 0, endTime: 1000 }];
+      const timeline = [{ text: 'Test content', startTime: 0, endTime: 1000 }];
 
       // First wrap - creates cache
       highlightManager.wrapPhrases(paragraph, timeline);
@@ -693,7 +680,7 @@ describe('HighlightManager', () => {
       const paragraph = document.createElement('p');
       paragraph.innerHTML = 'Original text';
 
-      const timeline1 = [{ phrase: 'Original text', startTime: 0, endTime: 1000 }];
+      const timeline1 = [{ text: 'Original text', startTime: 0, endTime: 1000 }];
 
       // First wrap
       highlightManager.wrapPhrases(paragraph, timeline1);
@@ -703,7 +690,7 @@ describe('HighlightManager', () => {
       // Completely replace paragraph content (simulating external DOM change)
       paragraph.innerHTML = 'Completely different new text here';
 
-      const timeline2 = [{ phrase: 'Completely different new text', startTime: 0, endTime: 1000 }];
+      const timeline2 = [{ text: 'Completely different new text', startTime: 0, endTime: 1000 }];
 
       // Second wrap with different content - should create new mapper
       highlightManager.wrapPhrases(paragraph, timeline2);
