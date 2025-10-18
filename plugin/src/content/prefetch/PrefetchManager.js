@@ -1,5 +1,7 @@
 import { ttsService } from '../../shared/services/TTSService.js';
 import { parseMultipartStream } from '../../shared/api/MultipartStreamHandler.js';
+import { CACHE_CONFIG } from '../../shared/utils/constants.js';
+import { Logger } from '../../shared/utils/logger.js';
 
 /**
  * Manages prefetching and caching of audio data for upcoming paragraphs
@@ -9,7 +11,7 @@ export class PrefetchManager {
     this.settingsStore = settingsStore;
     this.cache = new Map();
     this.pendingFetches = new Map();
-    this.maxCacheSize = 3;
+    this.maxCacheSize = CACHE_CONFIG.MAX_PREFETCH_CACHE_SIZE;
   }
 
   /**
@@ -61,7 +63,7 @@ export class PrefetchManager {
       if (error.name === 'AbortError') {
         return;
       }
-      console.error('Prefetch failed:', error);
+      Logger.error('PrefetchManager', 'Prefetch failed', error);
       throw error;
     } finally {
       this.pendingFetches.delete(normalizedText);

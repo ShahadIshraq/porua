@@ -1,4 +1,5 @@
-import { PLAYER_STATES } from '../../shared/utils/constants.js';
+import { PLAYER_STATES, CACHE_CONFIG } from '../../shared/utils/constants.js';
+import { Logger } from '../../shared/utils/logger.js';
 
 /**
  * Manages continuous playback of multiple paragraphs with prefetching
@@ -37,7 +38,7 @@ export class ContinuousPlaybackController {
       const text = startParagraph.textContent.trim();
       await this.synthesizeAndPlayFn(text, startParagraph);
     } catch (error) {
-      console.error('Failed to start continuous playback:', error);
+      Logger.error('ContinuousPlaybackController', 'Failed to start continuous playback', error);
       this.stop();
       throw error;
     }
@@ -70,11 +71,11 @@ export class ContinuousPlaybackController {
   }
 
   /**
-   * Trigger prefetch for the next 2 paragraphs
+   * Trigger prefetch for the next paragraphs
    */
   async triggerPrefetch() {
-    // Get next 2 paragraphs for prefetching
-    const upcomingParagraphs = this.paragraphQueue.getUpcomingParagraphs(2);
+    // Get next paragraphs for prefetching
+    const upcomingParagraphs = this.paragraphQueue.getUpcomingParagraphs(CACHE_CONFIG.PREFETCH_LOOKAHEAD);
 
     if (upcomingParagraphs.length === 0) return;
 
@@ -89,7 +90,7 @@ export class ContinuousPlaybackController {
 
       // Start prefetch in background (don't await)
       this.prefetchManager.prefetch(text).catch(err => {
-        console.error('Background prefetch failed:', err);
+        Logger.error('ContinuousPlaybackController', 'Background prefetch failed', err);
       });
     }
   }
@@ -117,7 +118,7 @@ export class ContinuousPlaybackController {
       this.triggerPrefetch();
     } else {
       // Cache miss - fetch on-demand
-      console.warn('Cache miss for paragraph, fetching on-demand');
+      Logger.warn('ContinuousPlaybackController', 'Cache miss for paragraph, fetching on-demand');
       this.state.setState(PLAYER_STATES.LOADING);
 
       try {
@@ -133,7 +134,7 @@ export class ContinuousPlaybackController {
         // Trigger prefetch for next
         this.triggerPrefetch();
       } catch (error) {
-        console.error('Failed to load paragraph:', error);
+        Logger.error('ContinuousPlaybackController', 'Failed to load paragraph', error);
 
         // Try to skip to next paragraph
         if (this.paragraphQueue.hasNext()) {
