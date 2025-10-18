@@ -1,76 +1,26 @@
-/**
- * Logging utility with configurable levels.
- */
-
-export const LOG_LEVELS = {
-  ERROR: 0,
-  WARN: 1,
-  INFO: 2,
-  DEBUG: 3,
-  TRACE: 4
-};
-
-const LEVEL_NAMES = {
-  [LOG_LEVELS.ERROR]: 'ERROR',
-  [LOG_LEVELS.WARN]: 'WARN',
-  [LOG_LEVELS.INFO]: 'INFO',
-  [LOG_LEVELS.DEBUG]: 'DEBUG',
-  [LOG_LEVELS.TRACE]: 'TRACE'
-};
-
 export class Logger {
-  constructor(name, level = LOG_LEVELS.INFO) {
-    this.name = name;
-    this.level = level;
+  static levels = { ERROR: 0, WARN: 1, INFO: 2, DEBUG: 3 };
+  static currentLevel = this.levels.INFO;
+
+  static error(context, message, error = null) {
+    console.error(`[${context}] ${message}`, error || '');
   }
 
-  setLevel(level) {
-    this.level = level;
-  }
-
-  error(...args) {
-    if (this.level >= LOG_LEVELS.ERROR) {
-      console.error(`[${this.name}]`, ...args);
+  static warn(context, message) {
+    if (this.currentLevel >= this.levels.WARN) {
+      console.warn(`[${context}] ${message}`);
     }
   }
 
-  warn(...args) {
-    if (this.level >= LOG_LEVELS.WARN) {
-      console.warn(`[${this.name}]`, ...args);
+  static info(context, message) {
+    if (this.currentLevel >= this.levels.INFO) {
+      console.log(`[${context}] ${message}`);
     }
   }
 
-  info(...args) {
-    if (this.level >= LOG_LEVELS.INFO) {
-      console.log(`[${this.name}]`, ...args);
-    }
-  }
-
-  debug(...args) {
-    if (this.level >= LOG_LEVELS.DEBUG) {
-      console.log(`[${this.name}]`, ...args);
-    }
-  }
-
-  trace(...args) {
-    if (this.level >= LOG_LEVELS.TRACE) {
-      console.log(`[${this.name}]`, ...args);
+  static debug(context, message, data = null) {
+    if (this.currentLevel >= this.levels.DEBUG) {
+      console.log(`[${context}] ${message}`, data || '');
     }
   }
 }
-
-/**
- * Global log level configuration.
- * Can be set via: window.TTS_DEBUG = true
- */
-const getGlobalLogLevel = () => {
-  if (typeof window !== 'undefined' && window.TTS_DEBUG) {
-    return LOG_LEVELS.DEBUG;
-  }
-  return LOG_LEVELS.INFO;
-};
-
-// Export pre-configured loggers
-export const createLogger = (name) => {
-  return new Logger(name, getGlobalLogLevel());
-};
