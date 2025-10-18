@@ -1,2 +1,2 @@
-pub mod streaming;
 pub mod metadata_builder;
+pub mod streaming;

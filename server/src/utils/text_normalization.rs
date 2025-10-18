@@ -2,7 +2,6 @@
 ///
 /// This module handles normalization of Unicode characters (smart quotes, dashes, etc.)
 /// while preserving the original text for client-side matching.
-
 use unicode_normalization::UnicodeNormalization;
 
 #[derive(Debug, Clone)]
@@ -44,17 +43,16 @@ pub fn normalize_for_tts(text: &str) -> NormalizationResult {
                 for _ in 0..(normalized.len() - current_len) {
                     char_mapping.push(orig_idx);
                 }
-            },
+            }
             // Left and right single quotes → ASCII apostrophe
-            '\u{2018}' | '\u{2019}' | '\u{02BC}' | '\u{02BB}' |
-            '\u{02BD}' | '\u{02C8}' | '\u{02CA}' | '\u{02CB}' |
-            '\u{0060}' | '\u{00B4}' => {
+            '\u{2018}' | '\u{2019}' | '\u{02BC}' | '\u{02BB}' | '\u{02BD}' | '\u{02C8}'
+            | '\u{02CA}' | '\u{02CB}' | '\u{0060}' | '\u{00B4}' => {
                 let current_len = normalized.len();
                 normalized.push('\'');
                 for _ in 0..(normalized.len() - current_len) {
                     char_mapping.push(orig_idx);
                 }
-            },
+            }
             // En dash and em dash → ASCII hyphen
             '\u{2013}' | '\u{2014}' => {
                 let current_len = normalized.len();
@@ -62,7 +60,7 @@ pub fn normalize_for_tts(text: &str) -> NormalizationResult {
                 for _ in 0..(normalized.len() - current_len) {
                     char_mapping.push(orig_idx);
                 }
-            },
+            }
             // Non-breaking space → regular space
             '\u{00A0}' => {
                 let current_len = normalized.len();
@@ -70,7 +68,7 @@ pub fn normalize_for_tts(text: &str) -> NormalizationResult {
                 for _ in 0..(normalized.len() - current_len) {
                     char_mapping.push(orig_idx);
                 }
-            },
+            }
             // Ellipsis → three dots (handle in main loop to maintain mapping)
             '\u{2026}' => {
                 let current_len = normalized.len();
@@ -79,7 +77,7 @@ pub fn normalize_for_tts(text: &str) -> NormalizationResult {
                 for _ in 0..(normalized.len() - current_len) {
                     char_mapping.push(orig_idx);
                 }
-            },
+            }
             // Soft hyphen → remove (don't add to normalized or mapping)
             '\u{00AD}' => continue,
             // Other characters → keep as-is
@@ -111,7 +109,10 @@ pub fn normalize_for_tts(text: &str) -> NormalizationResult {
 
 /// Get information about what normalization was performed
 pub fn get_normalization_info(result: &NormalizationResult) -> NormalizationInfo {
-    let changes_count = result.original.chars().zip(result.normalized.chars())
+    let changes_count = result
+        .original
+        .chars()
+        .zip(result.normalized.chars())
         .filter(|(a, b)| a != b)
         .count();
 
@@ -151,12 +152,11 @@ pub fn map_normalized_to_original(
             // Check if this character might have been normalized
             let orig_normalized_str = match orig_ch {
                 '\u{201C}' | '\u{201D}' | '\u{201E}' | '\u{201F}' => "\"",
-                '\u{2018}' | '\u{2019}' | '\u{02BC}' | '\u{02BB}' |
-                '\u{02BD}' | '\u{02C8}' | '\u{02CA}' | '\u{02CB}' |
-                '\u{0060}' | '\u{00B4}' => "'",
+                '\u{2018}' | '\u{2019}' | '\u{02BC}' | '\u{02BB}' | '\u{02BD}' | '\u{02C8}'
+                | '\u{02CA}' | '\u{02CB}' | '\u{0060}' | '\u{00B4}' => "'",
                 '\u{2013}' | '\u{2014}' => "-",
                 '\u{00A0}' => " ",
-                '\u{2026}' => "...", // ellipsis maps to three characters
+                '\u{2026}' => "...",    // ellipsis maps to three characters
                 '\u{00AD}' => continue, // soft hyphen - skip
                 _ => {
                     // For other characters, create a temporary string
@@ -217,11 +217,9 @@ pub fn extract_original_phrase(
         let norm_end = norm_pos + normalized_phrase.len();
 
         // Try to map back to original
-        if let Some((orig_start, orig_end)) = map_normalized_to_original(
-            norm_pos,
-            norm_end,
-            full_text_result,
-        ) {
+        if let Some((orig_start, orig_end)) =
+            map_normalized_to_original(norm_pos, norm_end, full_text_result)
+        {
             return full_text_result.original[orig_start..orig_end].to_string();
         }
     }
@@ -259,7 +257,10 @@ pub fn extract_original_phrase(
 
             // Adjust to the end of the last character
             if chars_counted > 0 {
-                if let Some((_idx, ch)) = full_text_result.original[byte_pos..].char_indices().nth(chars_counted - 1) {
+                if let Some((_idx, ch)) = full_text_result.original[byte_pos..]
+                    .char_indices()
+                    .nth(chars_counted - 1)
+                {
                     end_byte_pos = byte_pos + _idx + ch.len_utf8();
                 }
             }
@@ -356,7 +357,10 @@ mod tests {
         // This is the exact text that caused the panic
         let text = "It's like that Robinhood infinite money glitch\u{2026}";
         let result = normalize_for_tts(text);
-        assert_eq!(result.normalized, "It's like that Robinhood infinite money glitch...");
+        assert_eq!(
+            result.normalized,
+            "It's like that Robinhood infinite money glitch..."
+        );
         assert_eq!(result.original, text);
 
         // Test extraction of original phrase
@@ -449,10 +453,14 @@ mod tests {
         // Simulate multiple paragraphs where second starts with ellipsis
         let text = "First paragraph.\n\u{2026}second paragraph starts with ellipsis";
         let result = normalize_for_tts(text);
-        assert_eq!(result.normalized, "First paragraph.\n...second paragraph starts with ellipsis");
+        assert_eq!(
+            result.normalized,
+            "First paragraph.\n...second paragraph starts with ellipsis"
+        );
 
         // Extract just the ellipsis-starting phrase
-        let extracted = extract_original_phrase("...second paragraph starts with ellipsis", &result, None);
+        let extracted =
+            extract_original_phrase("...second paragraph starts with ellipsis", &result, None);
         assert_eq!(extracted, "\u{2026}second paragraph starts with ellipsis");
     }
 }

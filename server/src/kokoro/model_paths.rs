@@ -12,7 +12,9 @@ pub fn find_model_file(filename: &str) -> PathBuf {
         Some(PathBuf::from("/usr/local/share/tts-server/models")),
         Some(PathBuf::from("/opt/tts-server/models")),
         // 4. User home directory
-        env::var("HOME").ok().map(|h| PathBuf::from(h).join(".tts-server/models")),
+        env::var("HOME")
+            .ok()
+            .map(|h| PathBuf::from(h).join(".tts-server/models")),
         // 5. Current directory (for local development)
         Some(PathBuf::from("models")),
         // 6. Relative to executable (for dev builds in target/release/)

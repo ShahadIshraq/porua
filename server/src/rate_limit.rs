@@ -63,7 +63,10 @@ impl PerKeyRateLimiter {
     }
 
     /// Get or create a rate limiter for the given API key
-    fn get_or_create_limiter(&self, api_key: &str) -> Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock>> {
+    fn get_or_create_limiter(
+        &self,
+        api_key: &str,
+    ) -> Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock>> {
         self.limiters
             .entry(api_key.to_string())
             .or_insert_with(|| {
@@ -127,7 +130,11 @@ pub async fn rate_limit_middleware(
 
             tracing::warn!(
                 "Rate limit exceeded for API key: {} (retry after {} seconds)",
-                if api_key == "anonymous" { "unauthenticated" } else { &api_key },
+                if api_key == "anonymous" {
+                    "unauthenticated"
+                } else {
+                    &api_key
+                },
                 retry_after
             );
 
@@ -141,13 +148,12 @@ pub async fn rate_limit_middleware(
                     ),
                 }),
             )
-            .into_response();
+                .into_response();
 
             // Add Retry-After header
-            response.headers_mut().insert(
-                "Retry-After",
-                retry_after.to_string().parse().unwrap(),
-            );
+            response
+                .headers_mut()
+                .insert("Retry-After", retry_after.to_string().parse().unwrap());
 
             response
         }

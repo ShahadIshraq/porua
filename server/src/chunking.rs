@@ -13,8 +13,8 @@ pub struct ChunkingConfig {
 impl Default for ChunkingConfig {
     fn default() -> Self {
         Self {
-            max_chunk_size: 200,  // Lowered for faster streaming - split at ~1-2 sentences
-            min_chunk_size: 50,   // Allow smaller chunks for better streaming
+            max_chunk_size: 200, // Lowered for faster streaming - split at ~1-2 sentences
+            min_chunk_size: 50,  // Allow smaller chunks for better streaming
         }
     }
 }
@@ -82,9 +82,7 @@ fn split_long_sentence(sentence: &str, max_size: usize) -> Vec<String> {
     let mut current = String::new();
 
     // Split by common clause separators: commas, semicolons, em dashes, conjunctions
-    let parts: Vec<&str> = sentence
-        .split(|c: char| matches!(c, ',' | ';'))
-        .collect();
+    let parts: Vec<&str> = sentence.split(|c: char| matches!(c, ',' | ';')).collect();
 
     for (i, part) in parts.iter().enumerate() {
         let part_with_punct = if i < parts.len() - 1 {
@@ -237,7 +235,11 @@ mod tests {
         };
         let text = "First sentence. Second sentence. Third sentence.";
         let chunks = chunk_text(&text, &config);
-        assert!(chunks.len() >= 2, "Expected multiple chunks, got {}", chunks.len());
+        assert!(
+            chunks.len() >= 2,
+            "Expected multiple chunks, got {}",
+            chunks.len()
+        );
     }
 
     #[test]

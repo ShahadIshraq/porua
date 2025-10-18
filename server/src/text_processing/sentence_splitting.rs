@@ -3,10 +3,8 @@
 
 /// Common abbreviations that don't end sentences
 const COMMON_ABBREVIATIONS: &[&str] = &[
-    "Dr", "Mr", "Mrs", "Ms", "Prof", "Sr", "Jr",
-    "Ph.D", "M.D", "B.A", "M.A", "B.S", "M.S",
-    "etc", "i.e", "e.g", "vs", "Inc", "Corp", "Ltd",
-    "Ave", "St", "Rd", "Blvd", "Mt",
+    "Dr", "Mr", "Mrs", "Ms", "Prof", "Sr", "Jr", "Ph.D", "M.D", "B.A", "M.A", "B.S", "M.S", "etc",
+    "i.e", "e.g", "vs", "Inc", "Corp", "Ltd", "Ave", "St", "Rd", "Blvd", "Mt",
 ];
 
 /// Check if a period is likely part of an abbreviation
@@ -62,8 +60,7 @@ pub fn split_sentences(text: &str) -> Vec<String> {
         if ch == '.' || ch == '!' || ch == '?' {
             // Look ahead for space and capital letter
             let next_is_space = i + 1 < chars.len() && chars[i + 1].is_whitespace();
-            let after_space_is_capital = i + 2 < chars.len()
-                && chars[i + 2].is_ascii_uppercase();
+            let after_space_is_capital = i + 2 < chars.len() && chars[i + 2].is_ascii_uppercase();
 
             // Check if it's an abbreviation (only for periods)
             let is_abbrev = ch == '.' && is_abbreviation(&text[..i + 1], i);

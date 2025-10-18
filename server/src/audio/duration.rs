@@ -1,6 +1,6 @@
+use crate::error::Result;
 use hound::WavReader;
 use std::io::Cursor;
-use crate::error::Result;
 
 /// Calculate duration in milliseconds from WAV file bytes
 pub fn calculate(wav_bytes: &[u8]) -> Result<f64> {
@@ -23,9 +23,14 @@ pub fn calculate(wav_bytes: &[u8]) -> Result<f64> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hound::{WavWriter, WavSpec, SampleFormat};
+    use hound::{SampleFormat, WavSpec, WavWriter};
 
-    fn create_test_wav(sample_rate: u32, channels: u16, num_samples: u32, bits_per_sample: u16) -> Vec<u8> {
+    fn create_test_wav(
+        sample_rate: u32,
+        channels: u16,
+        num_samples: u32,
+        bits_per_sample: u16,
+    ) -> Vec<u8> {
         let spec = WavSpec {
             channels,
             sample_rate,
@@ -60,7 +65,11 @@ mod tests {
         let duration = calculate(&wav).unwrap();
 
         // Should be approximately 1000ms
-        assert!((duration - 1000.0).abs() < 1.0, "Expected ~1000ms, got {}ms", duration);
+        assert!(
+            (duration - 1000.0).abs() < 1.0,
+            "Expected ~1000ms, got {}ms",
+            duration
+        );
     }
 
     #[test]
@@ -70,7 +79,11 @@ mod tests {
         let duration = calculate(&wav).unwrap();
 
         // Should be approximately 1000ms
-        assert!((duration - 1000.0).abs() < 1.0, "Expected ~1000ms, got {}ms", duration);
+        assert!(
+            (duration - 1000.0).abs() < 1.0,
+            "Expected ~1000ms, got {}ms",
+            duration
+        );
     }
 
     #[test]
@@ -90,7 +103,8 @@ mod tests {
             assert!(
                 (duration - 1000.0).abs() < 1.0,
                 "Expected ~1000ms for {}Hz, got {}ms",
-                sample_rate, duration
+                sample_rate,
+                duration
             );
         }
     }
@@ -102,7 +116,11 @@ mod tests {
         let duration = calculate(&wav).unwrap();
 
         // Should be approximately 500ms
-        assert!((duration - 500.0).abs() < 1.0, "Expected ~500ms, got {}ms", duration);
+        assert!(
+            (duration - 500.0).abs() < 1.0,
+            "Expected ~500ms, got {}ms",
+            duration
+        );
     }
 
     #[test]
@@ -112,7 +130,11 @@ mod tests {
         let duration = calculate(&wav).unwrap();
 
         // Should be approximately 100ms
-        assert!((duration - 100.0).abs() < 1.0, "Expected ~100ms, got {}ms", duration);
+        assert!(
+            (duration - 100.0).abs() < 1.0,
+            "Expected ~100ms, got {}ms",
+            duration
+        );
     }
 
     #[test]
@@ -140,7 +162,11 @@ mod tests {
         let duration = calculate(&wav).unwrap();
 
         // Should still be 1000ms
-        assert!((duration - 1000.0).abs() < 1.0, "Expected ~1000ms, got {}ms", duration);
+        assert!(
+            (duration - 1000.0).abs() < 1.0,
+            "Expected ~1000ms, got {}ms",
+            duration
+        );
     }
 
     #[test]
@@ -150,6 +176,10 @@ mod tests {
         let duration = calculate(&wav).unwrap();
 
         // Should be approximately 1000ms
-        assert!((duration - 1000.0).abs() < 1.0, "Expected ~1000ms, got {}ms", duration);
+        assert!(
+            (duration - 1000.0).abs() < 1.0,
+            "Expected ~1000ms, got {}ms",
+            duration
+        );
     }
 }

@@ -1,11 +1,13 @@
-use hound::{WavReader, WavWriter, SampleFormat};
-use std::io::Cursor;
 use crate::error::{Result, TtsError};
+use hound::{SampleFormat, WavReader, WavWriter};
+use std::io::Cursor;
 
 /// Concatenate multiple WAV files into a single WAV file
 pub fn concatenate(wav_files: Vec<Vec<u8>>) -> Result<Vec<u8>> {
     if wav_files.is_empty() {
-        return Err(TtsError::WavConcatenation("No audio files to concatenate".to_string()));
+        return Err(TtsError::WavConcatenation(
+            "No audio files to concatenate".to_string(),
+        ));
     }
 
     if wav_files.len() == 1 {
@@ -25,17 +27,17 @@ pub fn concatenate(wav_files: Vec<Vec<u8>>) -> Result<Vec<u8>> {
             match spec.bits_per_sample {
                 16 => concatenate_typed::<i16>(wav_files, spec),
                 32 => concatenate_typed::<i32>(wav_files, spec),
-                _ => Err(TtsError::WavConcatenation(format!("Unsupported bits per sample: {}", spec.bits_per_sample)))
+                _ => Err(TtsError::WavConcatenation(format!(
+                    "Unsupported bits per sample: {}",
+                    spec.bits_per_sample
+                ))),
             }
         }
     }
 }
 
 /// Generic function to concatenate WAV files with a specific sample type
-fn concatenate_typed<T>(
-    wav_files: Vec<Vec<u8>>,
-    spec: hound::WavSpec
-) -> Result<Vec<u8>>
+fn concatenate_typed<T>(wav_files: Vec<Vec<u8>>, spec: hound::WavSpec) -> Result<Vec<u8>>
 where
     T: hound::Sample + Copy,
 {
@@ -48,7 +50,10 @@ where
 
         // Verify all files have the same spec
         if reader.spec() != spec {
-            return Err(TtsError::WavConcatenation(format!("WAV file {} has different spec", i)));
+            return Err(TtsError::WavConcatenation(format!(
+                "WAV file {} has different spec",
+                i
+            )));
         }
 
         // Collect samples

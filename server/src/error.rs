@@ -46,7 +46,9 @@ impl fmt::Display for TtsError {
             TtsError::WavConcatenation(msg) => write!(f, "WAV concatenation error: {}", msg),
             TtsError::InvalidRequest(msg) => write!(f, "Invalid request: {}", msg),
             TtsError::EmptyText => write!(f, "Text cannot be empty"),
-            TtsError::InvalidSpeed(speed) => write!(f, "Invalid speed: {} (must be 0.0-3.0)", speed),
+            TtsError::InvalidSpeed(speed) => {
+                write!(f, "Invalid speed: {} (must be 0.0-3.0)", speed)
+            }
             TtsError::Unauthorized => write!(f, "Unauthorized"),
             TtsError::InvalidApiKey => write!(f, "Invalid API key"),
             TtsError::TaskJoin(msg) => write!(f, "Task execution error: {}", msg),
@@ -98,19 +100,24 @@ impl IntoResponse for TtsError {
             TtsError::Unauthorized | TtsError::InvalidApiKey => {
                 (StatusCode::UNAUTHORIZED, self.to_string())
             }
-            TtsError::FileNotFound(_) => {
-                (StatusCode::NOT_FOUND, self.to_string())
-            }
+            TtsError::FileNotFound(_) => (StatusCode::NOT_FOUND, self.to_string()),
             _ => {
                 tracing::error!("Internal error: {}", self);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error".to_string())
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal server error".to_string(),
+                )
             }
         };
 
-        (status, axum::Json(serde_json::json!({
-            "status": "error",
-            "error": message
-        }))).into_response()
+        (
+            status,
+            axum::Json(serde_json::json!({
+                "status": "error",
+                "error": message
+            })),
+        )
+            .into_response()
     }
 }
 
