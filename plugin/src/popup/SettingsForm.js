@@ -1,6 +1,8 @@
 import { SettingsStore } from '../shared/storage/SettingsStore.js';
 import { ttsService } from '../shared/services/TTSService.js';
 import { VoiceSelector } from './VoiceSelector.js';
+import { SpeedControl } from './SpeedControl.js';
+import { AudioPreview } from './AudioPreview.js';
 
 export class SettingsForm {
   constructor(formElement, statusMessage) {
@@ -15,13 +17,25 @@ export class SettingsForm {
     this.isApiKeyModified = false;
     this.hasStoredKey = false;
 
+    // Initialize shared AudioPreview for both VoiceSelector and SpeedControl
+    this.audioPreview = new AudioPreview();
+
     // Initialize VoiceSelector
     const voiceSelectorContainer = formElement.querySelector('#voice-selector-container');
     this.voiceSelector = new VoiceSelector(voiceSelectorContainer, statusMessage);
+
+    // Initialize SpeedControl with dependencies for test functionality
+    const speedControlContainer = formElement.querySelector('#speed-control-container');
+    this.speedControl = new SpeedControl(speedControlContainer, {
+      audioPreview: this.audioPreview,
+      ttsService: ttsService,
+      settingsStore: SettingsStore,
+      statusMessage: statusMessage
+    });
   }
 
   async init() {
-    this.loadSettings();
+    await this.loadSettings();
     this.setupEventListeners();
     await this.voiceSelector.init();
   }
@@ -52,6 +66,9 @@ export class SettingsForm {
       this.toggleButton.style.display = 'none';
       this.changeButton.style.display = 'none';
     }
+
+    // Initialize speed control with saved speed
+    this.speedControl.init(settings.speed);
   }
 
   async handleSubmit(e) {
@@ -59,9 +76,10 @@ export class SettingsForm {
 
     const apiUrl = this.apiUrlInput.value.trim();
     const apiKey = this.apiKeyInput.value.trim();
+    const speed = this.speedControl.getSpeed();
 
     try {
-      await SettingsStore.set({ apiUrl });
+      await SettingsStore.set({ apiUrl, speed });
 
       if (this.isApiKeyModified || apiKey) {
         await SettingsStore.set({ apiKey });
@@ -150,6 +168,12 @@ export class SettingsForm {
   cleanup() {
     if (this.voiceSelector) {
       this.voiceSelector.cleanup();
+    }
+    if (this.speedControl) {
+      this.speedControl.cleanup();
+    }
+    if (this.audioPreview) {
+      this.audioPreview.cleanup();
     }
   }
 }

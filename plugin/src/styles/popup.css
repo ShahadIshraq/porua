@@ -628,3 +628,258 @@ input[type="password"]:focus {
 .voice-sections::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(135deg, #f9a8d4 0%, #ec4899 50%, #fb923c 100%);
 }
+
+/* Speed Control Styles */
+
+.speed-control {
+  margin-top: 4px;
+}
+
+.speed-label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 12px;
+  color: #4a5568;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+}
+
+.speed-slider-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.speed-min,
+.speed-max {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+  min-width: 32px;
+  text-align: center;
+}
+
+.speed-slider {
+  flex: 1;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(135deg, #fce7f3 0%, #fed7e2 100%);
+  border-radius: 3px;
+  outline: none;
+  transition: background 0.2s ease;
+}
+
+.speed-slider:hover {
+  background: linear-gradient(135deg, #fbcfe8 0%, #fecdd3 100%);
+}
+
+.speed-slider:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(236, 72, 153, 0.1);
+}
+
+/* Slider thumb - WebKit browsers */
+.speed-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ec4899 0%, #fb7185 50%, #fb923c 100%);
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(236, 72, 153, 0.4);
+  transition: all 0.2s ease;
+}
+
+.speed-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 10px rgba(236, 72, 153, 0.5);
+}
+
+.speed-slider::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+  box-shadow: 0 2px 6px rgba(236, 72, 153, 0.6);
+}
+
+/* Slider thumb - Firefox */
+.speed-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ec4899 0%, #fb7185 50%, #fb923c 100%);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 2px 6px rgba(236, 72, 153, 0.4);
+  transition: all 0.2s ease;
+}
+
+.speed-slider::-moz-range-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 3px 10px rgba(236, 72, 153, 0.5);
+}
+
+.speed-slider::-moz-range-thumb:active {
+  transform: scale(1.05);
+  box-shadow: 0 2px 6px rgba(236, 72, 153, 0.6);
+}
+
+/* Slider track - Firefox */
+.speed-slider::-moz-range-track {
+  background: linear-gradient(135deg, #fce7f3 0%, #fed7e2 100%);
+  border-radius: 3px;
+  height: 6px;
+}
+
+.speed-value-display {
+  text-align: center;
+  margin-bottom: 14px;
+}
+
+.speed-value {
+  display: inline-block;
+  font-size: 20px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #ec4899 0%, #fb7185 50%, #fb923c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  min-width: 60px;
+  letter-spacing: -0.3px;
+}
+
+.speed-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.speed-preset-btn {
+  padding: 8px 12px;
+  background: white;
+  color: #ec4899;
+  border: 2px solid #fce7f3;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.speed-preset-btn:hover {
+  background: #fef1f7;
+  border-color: #ec4899;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(236, 72, 153, 0.2);
+}
+
+.speed-preset-btn:active {
+  transform: translateY(0);
+}
+
+.speed-preset-btn.active {
+  background: linear-gradient(135deg, #ec4899 0%, #fb7185 50%, #fb923c 100%);
+  color: white;
+  border-color: #ec4899;
+  box-shadow: 0 2px 6px rgba(236, 72, 153, 0.3);
+}
+
+.speed-preset-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15);
+}
+
+.speed-preset-btn.active:focus {
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15), 0 2px 6px rgba(236, 72, 153, 0.3);
+}
+
+/* Speed Test Button Styles */
+
+.speed-test-container {
+  margin-top: 16px;
+  text-align: center;
+}
+
+.speed-test-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #ec4899 0%, #fb7185 50%, #fb923c 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(236, 72, 153, 0.3);
+  min-width: 140px;
+}
+
+.speed-test-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #db2777 0%, #ec4899 50%, #f97316 100%);
+  box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4);
+  transform: translateY(-2px);
+}
+
+.speed-test-btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(236, 72, 153, 0.3);
+}
+
+.speed-test-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15), 0 2px 6px rgba(236, 72, 153, 0.3);
+}
+
+.speed-test-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.speed-test-btn.loading {
+  background: linear-gradient(135deg, #fce7f3 0%, #fed7e2 100%);
+  color: #ec4899;
+  cursor: wait;
+  box-shadow: 0 2px 6px rgba(236, 72, 153, 0.2);
+}
+
+.speed-test-btn.loading .test-btn-icon {
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.speed-test-btn.playing {
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 50%, #f97316 100%);
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.3);
+}
+
+.speed-test-btn.playing:hover:not(:disabled) {
+  background: linear-gradient(135deg, #b91c1c 0%, #dc2626 50%, #ea580c 100%);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.4);
+}
+
+.test-btn-icon {
+  font-size: 12px;
+  line-height: 1;
+  display: inline-block;
+  min-width: 12px;
+}
+
+.test-btn-text {
+  letter-spacing: 0.2px;
+}

@@ -1,4 +1,5 @@
 import { ttsService } from '../../shared/services/TTSService.js';
+import { parseMultipartStream } from '../../shared/api/MultipartStreamHandler.js';
 
 /**
  * Manages prefetching and caching of audio data for upcoming paragraphs
@@ -36,42 +37,12 @@ export class PrefetchManager {
         signal: abortController.signal
       });
 
-      const contentType = response.headers.get('Content-Type');
-      if (!contentType || !contentType.includes('multipart')) {
-        throw new Error('Expected multipart response, got: ' + contentType);
-      }
-
-      const boundaryMatch = contentType.match(/boundary=([^;]+)/);
-      if (!boundaryMatch) {
-        throw new Error('No boundary found in multipart response');
-      }
-
-      // Import StreamParser dynamically to parse the stream
-      const { StreamParser } = await import('../audio/StreamParser.js');
-      const reader = response.body.getReader();
-      const parts = await StreamParser.parseMultipartStream(reader, boundaryMatch[1]);
-
-      const metadataArray = parts
-        .filter(p => p.type === 'metadata')
-        .map(p => p.metadata);
-
-      const audioBlobs = parts
-        .filter(p => p.type === 'audio')
-        .map(p => new Blob([p.audioData], { type: 'audio/wav' }));
+      // Parse multipart stream using unified handler
+      const { audioBlobs, metadataArray, phraseTimeline } = await parseMultipartStream(response);
 
       if (audioBlobs.length === 0) {
         throw new Error('No audio data received from server');
       }
-
-      // Build timeline from metadata
-      const phraseTimeline = StreamParser.buildPhraseTimeline(metadataArray);
-
-      // Combine all audio blobs into one
-      // For simplicity, we'll keep them as separate blobs or combine them
-      // Since AudioQueue can handle multiple blobs, we'll store all parts
-      const combinedMetadata = {
-        chunks: metadataArray
-      };
 
       // Cache data
       this.cache.set(normalizedText, {

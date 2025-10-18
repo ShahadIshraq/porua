@@ -27,7 +27,8 @@ describe('SettingsStore', () => {
       chrome.storage.sync.get.mockResolvedValue({
         apiUrl: DEFAULT_SETTINGS.apiUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
-        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
+        speed: DEFAULT_SETTINGS.speed
       });
       chrome.storage.local.get.mockResolvedValue({
         encryptedApiKey: ''
@@ -39,6 +40,7 @@ describe('SettingsStore', () => {
       expect(settings.apiKey).toBe('');
       expect(settings.selectedVoiceId).toBe(DEFAULT_SETTINGS.selectedVoiceId);
       expect(settings.selectedVoiceName).toBe(DEFAULT_SETTINGS.selectedVoiceName);
+      expect(settings.speed).toBe(DEFAULT_SETTINGS.speed);
     });
 
     it('should retrieve apiUrl from sync storage', async () => {
@@ -87,7 +89,8 @@ describe('SettingsStore', () => {
       chrome.storage.sync.get.mockResolvedValue({
         apiUrl: DEFAULT_SETTINGS.apiUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
-        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
+        speed: DEFAULT_SETTINGS.speed
       });
       chrome.storage.local.get.mockResolvedValue({ encryptedApiKey: '' });
 
@@ -96,7 +99,8 @@ describe('SettingsStore', () => {
       expect(chrome.storage.sync.get).toHaveBeenCalledWith({
         apiUrl: DEFAULT_SETTINGS.apiUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
-        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
+        speed: DEFAULT_SETTINGS.speed
       });
     });
 
@@ -399,6 +403,67 @@ describe('SettingsStore', () => {
     });
   });
 
+  describe('getSpeed', () => {
+    it('should return speed from sync storage', async () => {
+      const customSpeed = 1.5;
+      chrome.storage.sync.get.mockResolvedValue({ speed: customSpeed });
+
+      const speed = await SettingsStore.getSpeed();
+
+      expect(speed).toBe(customSpeed);
+    });
+
+    it('should return default speed when not set', async () => {
+      chrome.storage.sync.get.mockResolvedValue({
+        speed: DEFAULT_SETTINGS.speed
+      });
+
+      const speed = await SettingsStore.getSpeed();
+
+      expect(speed).toBe(DEFAULT_SETTINGS.speed);
+    });
+
+    it('should request with correct defaults', async () => {
+      chrome.storage.sync.get.mockResolvedValue({
+        speed: DEFAULT_SETTINGS.speed
+      });
+
+      await SettingsStore.getSpeed();
+
+      expect(chrome.storage.sync.get).toHaveBeenCalledWith({
+        speed: DEFAULT_SETTINGS.speed
+      });
+    });
+  });
+
+  describe('setSpeed', () => {
+    it('should store speed in sync storage', async () => {
+      const newSpeed = 1.75;
+      chrome.storage.sync.set.mockResolvedValue(undefined);
+
+      await SettingsStore.setSpeed(newSpeed);
+
+      expect(chrome.storage.sync.set).toHaveBeenCalledWith({
+        speed: newSpeed
+      });
+    });
+
+    it('should handle speed change', async () => {
+      // Set a speed
+      chrome.storage.sync.set.mockResolvedValue(undefined);
+      await SettingsStore.setSpeed(1.25);
+
+      // Get the speed back
+      chrome.storage.sync.get.mockResolvedValue({
+        speed: 1.25
+      });
+
+      const speed = await SettingsStore.getSpeed();
+
+      expect(speed).toBe(1.25);
+    });
+  });
+
   describe('integration scenarios', () => {
     it('should handle complete save and retrieve flow', async () => {
       const testUrl = 'http://test.example.com';
@@ -416,7 +481,8 @@ describe('SettingsStore', () => {
       chrome.storage.sync.get.mockResolvedValue({
         apiUrl: testUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
-        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
+        speed: DEFAULT_SETTINGS.speed
       });
       chrome.storage.local.get.mockResolvedValue({
         encryptedApiKey: encryptedTestKey
@@ -448,7 +514,8 @@ describe('SettingsStore', () => {
       chrome.storage.sync.get.mockResolvedValue({
         apiUrl: DEFAULT_SETTINGS.apiUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
-        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
+        speed: DEFAULT_SETTINGS.speed
       });
       chrome.storage.local.get.mockResolvedValue({ encryptedApiKey: '' });
 
@@ -457,11 +524,12 @@ describe('SettingsStore', () => {
       expect(settings.apiKey).toBe('');
     });
 
-    it('should handle full settings including voice', async () => {
+    it('should handle full settings including voice and speed', async () => {
       const testUrl = 'http://test.com';
       const testKey = 'test-key';
       const voiceId = 'af_alloy';
       const voiceName = 'Alloy';
+      const testSpeed = 1.5;
       const encryptedTestKey = 'encrypted-key';
 
       // Save everything
@@ -473,14 +541,16 @@ describe('SettingsStore', () => {
         apiUrl: testUrl,
         apiKey: testKey,
         selectedVoiceId: voiceId,
-        selectedVoiceName: voiceName
+        selectedVoiceName: voiceName,
+        speed: testSpeed
       });
 
       // Retrieve everything
       chrome.storage.sync.get.mockResolvedValue({
         apiUrl: testUrl,
         selectedVoiceId: voiceId,
-        selectedVoiceName: voiceName
+        selectedVoiceName: voiceName,
+        speed: testSpeed
       });
       chrome.storage.local.get.mockResolvedValue({
         encryptedApiKey: encryptedTestKey
@@ -493,6 +563,7 @@ describe('SettingsStore', () => {
       expect(settings.apiKey).toBe(testKey);
       expect(settings.selectedVoiceId).toBe(voiceId);
       expect(settings.selectedVoiceName).toBe(voiceName);
+      expect(settings.speed).toBe(testSpeed);
     });
   });
 });

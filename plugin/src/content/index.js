@@ -4,9 +4,9 @@ import { PlayButton } from './ui/PlayButton.js';
 import { PlayerControl } from './ui/PlayerControl.js';
 import { HighlightManager } from './ui/HighlightManager.js';
 import { AudioQueue } from './audio/AudioQueue.js';
-import { StreamParser } from './audio/StreamParser.js';
 import { SettingsStore } from '../shared/storage/SettingsStore.js';
 import { ttsService } from '../shared/services/TTSService.js';
+import { parseMultipartStream } from '../shared/api/MultipartStreamHandler.js';
 import { PLAYER_STATES } from '../shared/utils/constants.js';
 import { ParagraphQueue } from './queue/ParagraphQueue.js';
 import { PrefetchManager } from './prefetch/PrefetchManager.js';
@@ -119,32 +119,13 @@ class TTSContentScript {
     // Use TTSService for synthesis
     const response = await ttsService.synthesizeStream(text);
 
-    const contentType = response.headers.get('Content-Type');
-    if (!contentType || !contentType.includes('multipart')) {
-      throw new Error('Expected multipart response, got: ' + contentType);
-    }
-
-    const boundaryMatch = contentType.match(/boundary=([^;]+)/);
-    if (!boundaryMatch) {
-      throw new Error('No boundary found in multipart response');
-    }
-
-    const reader = response.body.getReader();
-    const parts = await StreamParser.parseMultipartStream(reader, boundaryMatch[1]);
-
-    const metadataArray = parts
-      .filter(p => p.type === 'metadata')
-      .map(p => p.metadata);
-
-    const audioBlobs = parts
-      .filter(p => p.type === 'audio')
-      .map(p => new Blob([p.audioData], { type: 'audio/wav' }));
+    // Parse multipart stream using unified handler
+    const { audioBlobs, metadataArray, phraseTimeline } = await parseMultipartStream(response);
 
     if (audioBlobs.length === 0) {
       throw new Error('No audio data received from server');
     }
 
-    const phraseTimeline = StreamParser.buildPhraseTimeline(metadataArray);
     this.state.setPhraseTimeline(phraseTimeline);
 
     if (paragraph && phraseTimeline.length > 0) {
