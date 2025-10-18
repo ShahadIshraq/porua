@@ -8,17 +8,15 @@ export class TTSClient {
   }
 
   async checkHealth() {
-    const response = await this.fetch('/health');
-    return response.json();
+    return await this.fetch('/health');
   }
 
   /**
    * Fetch list of available voices from server
-   * @returns {Promise<{voices: Array<{id: string, name: string, gender: string, language: string, description: string, sample_url: string}>}>}
+   * @returns {Promise<Response>}
    */
   async getVoices() {
-    const response = await this.fetch('/voices');
-    return response.json();
+    return await this.fetch('/voices');
   }
 
   /**
@@ -33,11 +31,10 @@ export class TTSClient {
   /**
    * Fetch a voice sample with authentication
    * @param {string} voiceId - Voice identifier (e.g., 'af_alloy')
-   * @returns {Promise<Blob>} Audio blob
+   * @returns {Promise<Response>}
    */
   async fetchVoiceSample(voiceId) {
-    const response = await this.fetch(`/samples/${voiceId}.wav`);
-    return await response.blob();
+    return await this.fetch(`/samples/${voiceId}.wav`);
   }
 
   async synthesizeStream(text, options = {}) {

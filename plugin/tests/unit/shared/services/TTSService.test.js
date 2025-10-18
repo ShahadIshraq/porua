@@ -130,7 +130,7 @@ describe('TTSService', () => {
   });
 
   describe('fetchVoiceSample', () => {
-    it('should call client fetchVoiceSample with voiceId', async () => {
+    it('should call client fetchVoiceSample with voiceId and handle audio/wav', async () => {
       const mockBlob = new Blob(['audio'], { type: 'audio/wav' });
       const mockResponse = {
         status: 200,
@@ -142,6 +142,21 @@ describe('TTSService', () => {
       const result = await service.fetchVoiceSample('af_nova');
 
       expect(mockClient.fetchVoiceSample).toHaveBeenCalledWith('af_nova');
+      expect(result).toBe(mockBlob);
+    });
+
+    it('should handle application/octet-stream content type', async () => {
+      const mockBlob = new Blob(['audio'], { type: 'application/octet-stream' });
+      const mockResponse = {
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'application/octet-stream' }),
+        blob: vi.fn().mockResolvedValue(mockBlob)
+      };
+      mockClient.fetchVoiceSample.mockResolvedValue(mockResponse);
+
+      const result = await service.fetchVoiceSample('bf_lily');
+
+      expect(mockClient.fetchVoiceSample).toHaveBeenCalledWith('bf_lily');
       expect(result).toBe(mockBlob);
     });
   });

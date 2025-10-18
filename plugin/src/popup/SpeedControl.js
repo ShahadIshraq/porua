@@ -39,7 +39,7 @@ export class SpeedControl {
     ];
 
     // Test sample configuration
-    this.TEST_SAMPLE_TEXT = 'Testing playback speed.';
+    this.TEST_SAMPLE_TEXT = 'The quick brown fox jumps over the lazy dog. This sentence demonstrates various phonetic sounds at different playback speeds.';
     this.TEST_ID = 'speed-test';
 
     this.slider = null;
@@ -164,6 +164,13 @@ export class SpeedControl {
     this.currentSpeed = this.clampSpeed(speed);
     this.updateUI();
 
+    // Stop test audio if it's currently playing
+    if (this.isTestingSpeed) {
+      this.audioPreview.stop();
+      this.isTestingSpeed = false;
+      this.updateTestButtonState('idle');
+    }
+
     if (fireCallback && this.onChangeCallback) {
       this.onChangeCallback(this.currentSpeed);
     }
@@ -283,7 +290,10 @@ export class SpeedControl {
       });
 
       // Convert response to blob using ResponseHandler
-      const audioBlob = await toBlob(response);
+      // Server may return application/octet-stream or audio/wav
+      const contentType = response.headers.get('Content-Type') || '';
+      const expectedType = contentType.includes('audio/') ? 'audio/' : 'application/octet-stream';
+      const audioBlob = await toBlob(response, expectedType);
 
       // Play the audio
       await this.audioPreview.play(this.TEST_ID, audioBlob);
