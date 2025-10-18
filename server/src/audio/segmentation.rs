@@ -176,11 +176,11 @@ fn segment_phrases_simple(text: &str, max_words: usize) -> Vec<String> {
     // Use smart sentence splitting
     let sentences = split_sentences(text);
 
-    for sentence in sentences {
-        let words = segment_words_preserve_punctuation(&sentence);
+    for sentence in sentences.iter() {
+        let words = segment_words_preserve_punctuation(sentence);
 
         if words.len() <= max_words {
-            phrases.push(sentence);
+            phrases.push(sentence.to_string());
         } else {
             // Split into max_words chunks
             for chunk in words.chunks(max_words) {

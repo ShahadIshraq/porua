@@ -1,12 +1,14 @@
 mod audio;
 mod auth;
 mod chunking;
+mod config;
 mod error;
 mod kokoro;
 mod models;
 mod rate_limit;
 mod server;
 mod services;
+mod text_processing;
 mod utils;
 
 use auth::load_api_keys;
