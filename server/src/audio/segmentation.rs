@@ -1,3 +1,5 @@
+use crate::text_processing::sentence_splitting::split_sentences;
+
 /// Configuration for text segmentation behavior
 #[derive(Debug, Clone)]
 pub struct SegmentationConfig {
@@ -185,100 +187,12 @@ pub fn segment_words(text: &str) -> Vec<String> {
     segment_words_with_config(text, &SegmentationConfig::default())
 }
 
-/// Common abbreviations that don't end sentences
-const COMMON_ABBREVIATIONS: &[&str] = &[
-    "Dr", "Mr", "Mrs", "Ms", "Prof", "Sr", "Jr",
-    "Ph.D", "M.D", "B.A", "M.A", "B.S", "M.S",
-    "etc", "i.e", "e.g", "vs", "Inc", "Corp", "Ltd",
-    "Ave", "St", "Rd", "Blvd", "Mt",
-];
-
-/// Check if a period is likely part of an abbreviation
-fn is_abbreviation(text: &str, period_pos: usize) -> bool {
-    // Look backwards for word before period
-    let before = &text[..period_pos];
-
-    // Get the last word before the period
-    let word = if let Some(last_word_start) = before.rfind(|c: char| c.is_whitespace()) {
-        &before[last_word_start + 1..]
-    } else {
-        // No whitespace found, the entire text before period is the word
-        before
-    };
-
-    // Check if it matches common abbreviations
-    for abbrev in COMMON_ABBREVIATIONS {
-        if word.eq_ignore_ascii_case(abbrev) {
-            return true;
-        }
-    }
-
-    // Check for single-letter abbreviations (initials)
-    if word.len() == 1 && !word.is_empty() {
-        if let Some(ch) = word.chars().next() {
-            if ch.is_ascii_uppercase() {
-                return true;
-            }
-        }
-    }
-
-    false
-}
-
-/// Split text into sentences with smart boundary detection
-fn split_sentences_smart(text: &str) -> Vec<String> {
-    let mut sentences = Vec::new();
-    let mut current_sentence = String::new();
-    let chars: Vec<char> = text.chars().collect();
-
-    let mut i = 0;
-    while i < chars.len() {
-        let ch = chars[i];
-        current_sentence.push(ch);
-
-        // Check for sentence-ending punctuation
-        if ch == '.' || ch == '!' || ch == '?' {
-            // Look ahead for space and capital letter
-            let next_is_space = i + 1 < chars.len() && chars[i + 1].is_whitespace();
-            let after_space_is_capital = i + 2 < chars.len()
-                && chars[i + 2].is_ascii_uppercase();
-
-            // Check if it's an abbreviation (only for periods)
-            let is_abbrev = ch == '.' && is_abbreviation(&text[..i + 1], i);
-
-            // Check if it's a decimal number
-            let prev_is_digit = i > 0 && chars[i - 1].is_ascii_digit();
-            let next_is_digit = i + 1 < chars.len() && chars[i + 1].is_ascii_digit();
-            let is_decimal = ch == '.' && prev_is_digit && next_is_digit;
-
-            // End sentence if conditions are met
-            if !is_abbrev && !is_decimal && (next_is_space && after_space_is_capital || ch != '.') {
-                let sentence = current_sentence.trim().to_string();
-                if !sentence.is_empty() {
-                    sentences.push(sentence);
-                }
-                current_sentence.clear();
-            }
-        }
-
-        i += 1;
-    }
-
-    // Add last sentence
-    let sentence = current_sentence.trim().to_string();
-    if !sentence.is_empty() {
-        sentences.push(sentence);
-    }
-
-    sentences
-}
-
 /// Internal: Simple phrase segmentation (improved version of current)
 fn segment_phrases_simple(text: &str, max_words: usize) -> Vec<String> {
     let mut phrases = Vec::new();
 
     // Use smart sentence splitting
-    let sentences = split_sentences_smart(text);
+    let sentences = split_sentences(text);
 
     for sentence in sentences {
         let words = segment_words_preserve_punctuation(&sentence);
@@ -302,7 +216,7 @@ fn segment_phrases_comma_aware(text: &str, max_words: usize) -> Vec<String> {
     let mut phrases = Vec::new();
 
     // Use smart sentence splitting
-    let sentences = split_sentences_smart(text);
+    let sentences = split_sentences(text);
 
     for sentence in sentences {
         // Split by commas and semicolons
@@ -558,7 +472,7 @@ mod tests {
     #[test]
     fn test_split_sentences_abbreviations() {
         let text = "Dr. Smith went to Mt. Everest.";
-        let sentences = split_sentences_smart(text);
+        let sentences = split_sentences(text);
         assert_eq!(sentences.len(), 1);
         assert_eq!(sentences[0], "Dr. Smith went to Mt. Everest.");
     }
@@ -566,7 +480,7 @@ mod tests {
     #[test]
     fn test_split_sentences_decimals() {
         let text = "The value is 3.14. Next sentence.";
-        let sentences = split_sentences_smart(text);
+        let sentences = split_sentences(text);
         assert_eq!(sentences.len(), 2);
         assert_eq!(sentences[0], "The value is 3.14.");
     }
@@ -574,21 +488,21 @@ mod tests {
     #[test]
     fn test_split_sentences_initials() {
         let text = "J. K. Rowling wrote books.";
-        let sentences = split_sentences_smart(text);
+        let sentences = split_sentences(text);
         assert_eq!(sentences.len(), 1);
     }
 
     #[test]
     fn test_split_sentences_multiple() {
         let text = "First sentence. Second sentence! Third question?";
-        let sentences = split_sentences_smart(text);
+        let sentences = split_sentences(text);
         assert_eq!(sentences.len(), 3);
     }
 
     #[test]
     fn test_split_sentences_etc() {
         let text = "We need apples, oranges, etc. for the party.";
-        let sentences = split_sentences_smart(text);
+        let sentences = split_sentences(text);
         assert_eq!(sentences.len(), 1);
     }
 
@@ -619,7 +533,7 @@ mod tests {
     #[test]
     fn test_ellipsis_handling() {
         let text = "Wait\u{2026} for it.";
-        let sentences = split_sentences_smart(text);
+        let sentences = split_sentences(text);
         // Should treat "..." as continuation, not sentence end
         assert_eq!(sentences.len(), 1);
     }
@@ -663,7 +577,7 @@ mod tests {
     #[test]
     fn test_urls_not_split() {
         let text = "Visit www.example.com for info.";
-        let sentences = split_sentences_smart(text);
+        let sentences = split_sentences(text);
         // Should not split at .com
         assert_eq!(sentences.len(), 1);
     }
@@ -698,7 +612,7 @@ mod tests {
     #[test]
     fn test_multiple_sentences_mixed_punctuation() {
         let text = "First. Second! Third? Fourth.";
-        let sentences = split_sentences_smart(text);
+        let sentences = split_sentences(text);
         assert_eq!(sentences.len(), 4);
     }
 
