@@ -19,7 +19,6 @@ use rate_limit::{PerKeyRateLimiter, RateLimitConfig};
 use server::{create_router, AppState};
 use std::env;
 use std::sync::Arc;
-use tracing_subscriber;
 
 #[tokio::main]
 async fn main() -> error::Result<()> {

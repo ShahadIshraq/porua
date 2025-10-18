@@ -203,7 +203,7 @@ fn segment_phrases_comma_aware(text: &str, max_words: usize) -> Vec<String> {
     for sentence in sentences {
         // Split by commas and semicolons
         let clauses: Vec<&str> = sentence
-            .split(|c| c == ',' || c == ';')
+            .split([',', ';'])
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .collect();

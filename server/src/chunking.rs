@@ -82,7 +82,7 @@ fn split_long_sentence(sentence: &str, max_size: usize) -> Vec<String> {
     let mut current = String::new();
 
     // Split by common clause separators: commas, semicolons, em dashes, conjunctions
-    let parts: Vec<&str> = sentence.split(|c: char| matches!(c, ',' | ';')).collect();
+    let parts: Vec<&str> = sentence.split([',', ';']).collect();
 
     for (i, part) in parts.iter().enumerate() {
         let part_with_punct = if i < parts.len() - 1 {

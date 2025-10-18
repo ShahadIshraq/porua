@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::{Mutex, Semaphore};
 
+#[allow(clippy::upper_case_acronyms)]
 pub struct TTS {
     engine: TTSKoko,
 }

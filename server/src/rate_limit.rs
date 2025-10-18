@@ -17,6 +17,9 @@ use std::sync::Arc;
 
 use crate::utils::header_utils::extract_api_key;
 
+/// Type alias for the in-memory rate limiter
+type InMemoryRateLimiter = RateLimiter<NotKeyed, InMemoryState, DefaultClock>;
+
 #[derive(Debug, Serialize)]
 struct ErrorResponse {
     status: String,
@@ -45,7 +48,7 @@ impl Default for RateLimitConfig {
 #[derive(Clone)]
 pub struct PerKeyRateLimiter {
     /// Rate limiters indexed by API key
-    limiters: Arc<DashMap<String, Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>>>,
+    limiters: Arc<DashMap<String, Arc<InMemoryRateLimiter>>>,
     /// Configuration for new rate limiters
     config: RateLimitConfig,
     /// Clock for rate limiting
