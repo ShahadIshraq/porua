@@ -2,6 +2,7 @@
 pub mod audio;
 pub mod auth;
 pub mod chunking;
+pub mod config;
 pub mod error;
 pub mod kokoro;
 pub mod models;
