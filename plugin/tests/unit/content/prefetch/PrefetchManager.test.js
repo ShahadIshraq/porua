@@ -8,18 +8,15 @@ vi.mock('../../../../src/shared/services/TTSService.js', () => ({
   }
 }));
 
-vi.mock('../../../../src/content/audio/StreamParser.js', () => ({
-  StreamParser: {
-    parseMultipartStream: vi.fn(),
-    buildPhraseTimeline: vi.fn()
-  }
+vi.mock('../../../../src/shared/api/MultipartStreamHandler.js', () => ({
+  parseMultipartStream: vi.fn()
 }));
 
 describe('PrefetchManager', () => {
   let prefetchManager;
   let mockSettingsStore;
   let mockTtsService;
-  let mockStreamParser;
+  let mockParseMultipartStream;
 
   beforeEach(async () => {
     // Reset all mocks
@@ -39,8 +36,8 @@ describe('PrefetchManager', () => {
     // Setup TTSService mock
     mockTtsService = (await import('../../../../src/shared/services/TTSService.js')).ttsService;
 
-    // Setup StreamParser mock
-    mockStreamParser = (await import('../../../../src/content/audio/StreamParser.js')).StreamParser;
+    // Setup parseMultipartStream mock
+    mockParseMultipartStream = (await import('../../../../src/shared/api/MultipartStreamHandler.js')).parseMultipartStream;
   });
 
   describe('initial state', () => {
@@ -77,18 +74,11 @@ describe('PrefetchManager', () => {
         }
       });
 
-      mockStreamParser.parseMultipartStream.mockResolvedValue([
-        {
-          type: 'metadata',
-          metadata: { chunk_index: 0, phrases: [] }
-        },
-        {
-          type: 'audio',
-          audioData: new Uint8Array([1, 2, 3])
-        }
-      ]);
-
-      mockStreamParser.buildPhraseTimeline.mockReturnValue([]);
+      mockParseMultipartStream.mockResolvedValue({
+        audioBlobs: [new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' })],
+        metadataArray: [{ chunk_index: 0, phrases: [] }],
+        phraseTimeline: []
+      });
 
       await prefetchManager.prefetch('test text');
 
@@ -106,12 +96,11 @@ describe('PrefetchManager', () => {
         }
       });
 
-      mockStreamParser.parseMultipartStream.mockResolvedValue([
-        { type: 'metadata', metadata: {} },
-        { type: 'audio', audioData: new Uint8Array([1]) }
-      ]);
-
-      mockStreamParser.buildPhraseTimeline.mockReturnValue([]);
+      mockParseMultipartStream.mockResolvedValue({
+        audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
+        metadataArray: [{}],
+        phraseTimeline: []
+      });
 
       await prefetchManager.prefetch('  test text  ');
 
@@ -138,19 +127,19 @@ describe('PrefetchManager', () => {
         }
       });
 
-      mockStreamParser.parseMultipartStream.mockResolvedValue([
-        {
-          type: 'metadata',
-          metadata: { chunk_index: 0, text: 'test', phrases: [] }
-        },
-        {
-          type: 'audio',
-          audioData: mockAudioData
-        }
-      ]);
+      const mockTimeline = [{ text: 'test', startTime: 0, endTime: 1000, chunkIndex: 0 }];
+      const mockMetadata = {
+        chunk_index: 0,
+        text: 'test',
+        duration: 1.0,
+        phrases: [{ text: 'test', start_time: 0, end_time: 1000 }]
+      };
 
-      const mockTimeline = [{ phrase: 'test', startTime: 0, endTime: 1000 }];
-      mockStreamParser.buildPhraseTimeline.mockReturnValue(mockTimeline);
+      mockParseMultipartStream.mockResolvedValue({
+        audioBlobs: [new Blob([mockAudioData], { type: 'audio/wav' })],
+        metadataArray: [mockMetadata],
+        phraseTimeline: mockTimeline
+      });
 
       await prefetchManager.prefetch('test text');
 
@@ -176,12 +165,11 @@ describe('PrefetchManager', () => {
         }
       });
 
-      mockStreamParser.parseMultipartStream.mockResolvedValue([
-        { type: 'metadata', metadata: {} },
-        { type: 'audio', audioData: new Uint8Array([1]) }
-      ]);
-
-      mockStreamParser.buildPhraseTimeline.mockReturnValue([]);
+      mockParseMultipartStream.mockResolvedValue({
+        audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
+        metadataArray: [{}],
+        phraseTimeline: []
+      });
 
       await prefetchManager.prefetch('test');
 
@@ -219,12 +207,11 @@ describe('PrefetchManager', () => {
         }
       });
 
-      mockStreamParser.parseMultipartStream.mockResolvedValue([
-        { type: 'metadata', metadata: {} },
-        { type: 'audio', audioData: new Uint8Array([1]) }
-      ]);
-
-      mockStreamParser.buildPhraseTimeline.mockReturnValue([]);
+      mockParseMultipartStream.mockResolvedValue({
+        audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
+        metadataArray: [{}],
+        phraseTimeline: []
+      });
 
       await Promise.all([firstFetch, secondFetch]);
 
@@ -266,12 +253,11 @@ describe('PrefetchManager', () => {
         }
       });
 
-      mockStreamParser.parseMultipartStream.mockResolvedValue([
-        { type: 'metadata', metadata: {} },
-        { type: 'audio', audioData: new Uint8Array([1]) }
-      ]);
-
-      mockStreamParser.buildPhraseTimeline.mockReturnValue([]);
+      mockParseMultipartStream.mockResolvedValue({
+        audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
+        metadataArray: [{}],
+        phraseTimeline: []
+      });
 
       // Add 4 items (max is 3)
       await prefetchManager.prefetch('text1');
@@ -333,12 +319,11 @@ describe('PrefetchManager', () => {
         }
       });
 
-      mockStreamParser.parseMultipartStream.mockResolvedValue([
-        { type: 'metadata', metadata: {} },
-        { type: 'audio', audioData: new Uint8Array([1]) }
-      ]);
-
-      mockStreamParser.buildPhraseTimeline.mockReturnValue([]);
+      mockParseMultipartStream.mockResolvedValue({
+        audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
+        metadataArray: [{}],
+        phraseTimeline: []
+      });
 
       await prefetchManager.prefetch('text1');
       await prefetchManager.prefetch('text2');

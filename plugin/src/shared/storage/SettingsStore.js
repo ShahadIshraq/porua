@@ -6,7 +6,8 @@ export class SettingsStore {
     const syncData = await chrome.storage.sync.get({
       apiUrl: DEFAULT_SETTINGS.apiUrl,
       selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
-      selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName
+      selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
+      speed: DEFAULT_SETTINGS.speed
     });
 
     const localData = await chrome.storage.local.get({
@@ -22,16 +23,18 @@ export class SettingsStore {
       apiUrl: syncData.apiUrl,
       apiKey,
       selectedVoiceId: syncData.selectedVoiceId,
-      selectedVoiceName: syncData.selectedVoiceName
+      selectedVoiceName: syncData.selectedVoiceName,
+      speed: syncData.speed
     };
   }
 
-  static async set({ apiUrl, apiKey, selectedVoiceId, selectedVoiceName }) {
+  static async set({ apiUrl, apiKey, selectedVoiceId, selectedVoiceName, speed }) {
     // Build sync data object dynamically
     const syncData = {};
     if (apiUrl !== undefined) syncData.apiUrl = apiUrl;
     if (selectedVoiceId !== undefined) syncData.selectedVoiceId = selectedVoiceId;
     if (selectedVoiceName !== undefined) syncData.selectedVoiceName = selectedVoiceName;
+    if (speed !== undefined) syncData.speed = speed;
 
     if (Object.keys(syncData).length > 0) {
       await chrome.storage.sync.set(syncData);
@@ -74,5 +77,16 @@ export class SettingsStore {
       selectedVoiceId: voiceId,
       selectedVoiceName: voiceName
     });
+  }
+
+  static async getSpeed() {
+    const data = await chrome.storage.sync.get({
+      speed: DEFAULT_SETTINGS.speed
+    });
+    return data.speed;
+  }
+
+  static async setSpeed(speed) {
+    await chrome.storage.sync.set({ speed });
   }
 }

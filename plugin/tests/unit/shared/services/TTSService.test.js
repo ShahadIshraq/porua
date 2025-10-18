@@ -84,7 +84,12 @@ describe('TTSService', () => {
   describe('checkHealth', () => {
     it('should call client checkHealth', async () => {
       const mockHealth = { status: 'ok' };
-      mockClient.checkHealth.mockResolvedValue(mockHealth);
+      const mockResponse = {
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        json: vi.fn().mockResolvedValue(mockHealth)
+      };
+      mockClient.checkHealth.mockResolvedValue(mockResponse);
 
       const result = await service.checkHealth();
 
@@ -93,7 +98,12 @@ describe('TTSService', () => {
     });
 
     it('should get client before calling checkHealth', async () => {
-      mockClient.checkHealth.mockResolvedValue({ status: 'ok' });
+      const mockResponse = {
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        json: vi.fn().mockResolvedValue({ status: 'ok' })
+      };
+      mockClient.checkHealth.mockResolvedValue(mockResponse);
 
       await service.checkHealth();
 
@@ -105,7 +115,12 @@ describe('TTSService', () => {
   describe('getVoices', () => {
     it('should call client getVoices', async () => {
       const mockVoices = { voices: [{ id: 'bf_lily', name: 'Lily' }] };
-      mockClient.getVoices.mockResolvedValue(mockVoices);
+      const mockResponse = {
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        json: vi.fn().mockResolvedValue(mockVoices)
+      };
+      mockClient.getVoices.mockResolvedValue(mockResponse);
 
       const result = await service.getVoices();
 
@@ -117,7 +132,12 @@ describe('TTSService', () => {
   describe('fetchVoiceSample', () => {
     it('should call client fetchVoiceSample with voiceId', async () => {
       const mockBlob = new Blob(['audio'], { type: 'audio/wav' });
-      mockClient.fetchVoiceSample.mockResolvedValue(mockBlob);
+      const mockResponse = {
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'audio/wav' }),
+        blob: vi.fn().mockResolvedValue(mockBlob)
+      };
+      mockClient.fetchVoiceSample.mockResolvedValue(mockResponse);
 
       const result = await service.fetchVoiceSample('af_nova');
 

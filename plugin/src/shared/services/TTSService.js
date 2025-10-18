@@ -1,9 +1,10 @@
 import { TTSClient } from '../api/TTSClient.js';
 import { SettingsStore } from '../storage/SettingsStore.js';
+import { toJSON, toBlob } from '../api/ResponseHandler.js';
 
 /**
  * Centralized service for TTS API operations
- * Manages TTSClient instances with proper authentication
+ * Manages TTSClient instances with proper authentication and response handling
  */
 export class TTSService {
   constructor() {
@@ -34,30 +35,33 @@ export class TTSService {
 
   /**
    * Check server health
-   * @returns {Promise<Object>}
+   * @returns {Promise<Object>} Health status object
    */
   async checkHealth() {
     const client = await this.getClient();
-    return await client.checkHealth();
+    const response = await client.checkHealth();
+    return await toJSON(response);
   }
 
   /**
    * Get available voices
-   * @returns {Promise<Object>}
+   * @returns {Promise<Object>} Voices list object
    */
   async getVoices() {
     const client = await this.getClient();
-    return await client.getVoices();
+    const response = await client.getVoices();
+    return await toJSON(response);
   }
 
   /**
    * Fetch a voice sample with authentication
    * @param {string} voiceId - Voice identifier
-   * @returns {Promise<Blob>}
+   * @returns {Promise<Blob>} Audio sample as Blob
    */
   async fetchVoiceSample(voiceId) {
     const client = await this.getClient();
-    return await client.fetchVoiceSample(voiceId);
+    const response = await client.fetchVoiceSample(voiceId);
+    return await toBlob(response, 'audio/wav');
   }
 
   /**
