@@ -15,6 +15,8 @@ use serde::Serialize;
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
+use crate::utils::header_utils::extract_api_key;
+
 #[derive(Debug, Serialize)]
 struct ErrorResponse {
     status: String,
@@ -94,28 +96,6 @@ impl PerKeyRateLimiter {
     pub fn tracked_keys_count(&self) -> usize {
         self.limiters.len()
     }
-}
-
-/// Extract API key from headers
-/// Supports both X-API-Key header and Authorization: Bearer header
-fn extract_api_key(headers: &HeaderMap) -> Option<String> {
-    // Try X-API-Key header first
-    if let Some(key) = headers.get("x-api-key") {
-        if let Ok(key_str) = key.to_str() {
-            return Some(key_str.to_string());
-        }
-    }
-
-    // Try Authorization: Bearer header
-    if let Some(auth) = headers.get("authorization") {
-        if let Ok(auth_str) = auth.to_str() {
-            if let Some(stripped) = auth_str.strip_prefix("Bearer ") {
-                return Some(stripped.to_string());
-            }
-        }
-    }
-
-    None
 }
 
 /// Middleware to enforce per-API key rate limiting
