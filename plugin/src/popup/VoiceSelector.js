@@ -7,10 +7,10 @@ import { AudioPreview } from './AudioPreview.js';
  * Organizes voices by language and gender with collapsible sections
  */
 export class VoiceSelector {
-  constructor(containerElement, statusMessage) {
+  constructor(containerElement, statusMessage, audioPreview = null) {
     this.container = containerElement;
     this.statusMessage = statusMessage;
-    this.audioPreview = new AudioPreview();
+    this.audioPreview = audioPreview || new AudioPreview();
 
     // State
     this.voices = [];
