@@ -20,9 +20,9 @@ export class SettingsForm {
     // Initialize shared AudioPreview for both VoiceSelector and SpeedControl
     this.audioPreview = new AudioPreview();
 
-    // Initialize VoiceSelector
+    // Initialize VoiceSelector with shared AudioPreview
     const voiceSelectorContainer = formElement.querySelector('#voice-selector-container');
-    this.voiceSelector = new VoiceSelector(voiceSelectorContainer, statusMessage);
+    this.voiceSelector = new VoiceSelector(voiceSelectorContainer, statusMessage, this.audioPreview);
 
     // Initialize SpeedControl with dependencies for test functionality
     const speedControlContainer = formElement.querySelector('#speed-control-container');
