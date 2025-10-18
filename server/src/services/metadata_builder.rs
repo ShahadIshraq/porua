@@ -1,10 +1,9 @@
 use crate::audio;
+use crate::error::Result;
 use crate::models::{
-    PhraseMetadata, ChunkMetadata, ValidationResult, ValidationError,
-    ValidationWarning, DebugInfo
+    ChunkMetadata, DebugInfo, PhraseMetadata, ValidationError, ValidationResult, ValidationWarning,
 };
 use crate::text_processing::normalization;
-use crate::error::Result;
 
 /// Build metadata from audio bytes and text with enhanced features
 pub fn build_metadata(
@@ -63,11 +62,8 @@ pub fn build_metadata_with_options(
         };
 
         // Extract original phrase text
-        let original_phrase = normalization::extract_original_phrase(
-            &phrase_text,
-            &norm_result,
-            char_offset_start,
-        );
+        let original_phrase =
+            normalization::extract_original_phrase(&phrase_text, &norm_result, char_offset_start);
 
         phrases.push(PhraseMetadata {
             text: phrase_text.clone(),
@@ -88,7 +84,11 @@ pub fn build_metadata_with_options(
 
     // Validation
     let validation = if include_validation {
-        Some(validate_phrases(&phrases, &norm_result.normalized, &norm_result.original))
+        Some(validate_phrases(
+            &phrases,
+            &norm_result.normalized,
+            &norm_result.original,
+        ))
     } else {
         None
     };
@@ -156,22 +156,29 @@ fn validate_phrases(
                 errors.push(ValidationError {
                     phrase_index: i,
                     error_type: "offset_out_of_bounds".to_string(),
-                    message: format!("Offsets [{}, {}) exceed text length {}", start, end, normalized_text.len()),
+                    message: format!(
+                        "Offsets [{}, {}) exceed text length {}",
+                        start,
+                        end,
+                        normalized_text.len()
+                    ),
                 });
             }
         }
 
         // Check 2: No overlapping phrases
         if i > 0 {
-            if let (Some(prev_end), Some(curr_start)) = (
-                phrases[i - 1].char_offset_end,
-                phrase.char_offset_start,
-            ) {
+            if let (Some(prev_end), Some(curr_start)) =
+                (phrases[i - 1].char_offset_end, phrase.char_offset_start)
+            {
                 if prev_end > curr_start {
                     warnings.push(ValidationWarning {
                         phrase_index: i,
                         warning_type: "overlapping_phrases".to_string(),
-                        message: format!("Overlaps with previous phrase by {} chars", prev_end - curr_start),
+                        message: format!(
+                            "Overlaps with previous phrase by {} chars",
+                            prev_end - curr_start
+                        ),
                     });
                 }
 
@@ -215,7 +222,7 @@ fn validate_phrases(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hound::{WavWriter, WavSpec, SampleFormat};
+    use hound::{SampleFormat, WavSpec, WavWriter};
     use std::io::Cursor;
 
     fn create_test_wav_with_duration(duration_ms: f64) -> Vec<u8> {
@@ -288,14 +295,13 @@ mod tests {
         let metadata = build_metadata(&audio_bytes, text, 0, 0.0).unwrap();
 
         // Total duration of phrases should equal audio duration
-        let total_phrase_duration: f64 = metadata.phrases.iter()
-            .map(|p| p.duration_ms)
-            .sum();
+        let total_phrase_duration: f64 = metadata.phrases.iter().map(|p| p.duration_ms).sum();
 
         assert!(
             (total_phrase_duration - metadata.duration_ms).abs() < 1.0,
             "Expected phrase durations to sum to {}, got {}",
-            metadata.duration_ms, total_phrase_duration
+            metadata.duration_ms,
+            total_phrase_duration
         );
     }
 
@@ -314,7 +320,9 @@ mod tests {
             assert!(
                 (curr_start - prev_end).abs() < 0.1,
                 "Phrase {} starts at {}, but previous phrase ends at {}",
-                i, curr_start, prev_end
+                i,
+                curr_start,
+                prev_end
             );
         }
     }
@@ -340,7 +348,10 @@ mod tests {
         for phrase in &metadata.phrases {
             if let (Some(start), Some(end)) = (phrase.char_offset_start, phrase.char_offset_end) {
                 assert!(start < end, "Start offset should be less than end offset");
-                assert!(end <= text.len(), "End offset should not exceed text length");
+                assert!(
+                    end <= text.len(),
+                    "End offset should not exceed text length"
+                );
             }
         }
     }
@@ -396,7 +407,8 @@ mod tests {
         let text = "Test";
         let audio_bytes = create_test_wav_with_duration(500.0);
 
-        let metadata = build_metadata_with_options(&audio_bytes, text, 0, 0.0, false, true).unwrap();
+        let metadata =
+            build_metadata_with_options(&audio_bytes, text, 0, 0.0, false, true).unwrap();
 
         assert!(metadata.validation.is_none());
         assert!(metadata.debug_info.is_some());
@@ -407,7 +419,8 @@ mod tests {
         let text = "Test";
         let audio_bytes = create_test_wav_with_duration(500.0);
 
-        let metadata = build_metadata_with_options(&audio_bytes, text, 0, 0.0, true, false).unwrap();
+        let metadata =
+            build_metadata_with_options(&audio_bytes, text, 0, 0.0, true, false).unwrap();
 
         assert!(metadata.validation.is_some());
         assert!(metadata.debug_info.is_none());

@@ -1,5 +1,5 @@
-use crate::text_processing::sentence_splitting::split_sentences;
 use crate::text_processing::normalization::normalize_simple;
+use crate::text_processing::sentence_splitting::split_sentences;
 
 /// Configuration for text segmentation behavior
 #[derive(Debug, Clone)]
@@ -393,7 +393,7 @@ mod tests {
         let phrases = segment_phrases_with_config(text, &config);
         // Should split into 3-word chunks
         assert!(phrases.len() >= 2);
-        for phrase in &phrases[..phrases.len()-1] {
+        for phrase in &phrases[..phrases.len() - 1] {
             let words = segment_words(phrase);
             assert!(words.len() <= 3);
         }
@@ -613,7 +613,8 @@ mod tests {
         let text = "This is a test sentence, with multiple clauses, for testing.";
 
         let tts_phrases = segment_phrases_with_config(text, &SegmentationConfig::for_tts());
-        let subtitle_phrases = segment_phrases_with_config(text, &SegmentationConfig::for_subtitles());
+        let subtitle_phrases =
+            segment_phrases_with_config(text, &SegmentationConfig::for_subtitles());
         let reading_phrases = segment_phrases_with_config(text, &SegmentationConfig::for_reading());
 
         // Subtitles should have more (shorter) phrases than reading

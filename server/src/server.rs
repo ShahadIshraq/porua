@@ -9,18 +9,15 @@ use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
 
-use crate::kokoro::{
-    voice_config::Voice,
-    TTSPool,
-};
-use crate::chunking::{chunk_text, ChunkingConfig};
+use crate::audio;
 use crate::auth::ApiKeys;
+use crate::chunking::{chunk_text, ChunkingConfig};
 use crate::config::constants::MAX_TEXT_LENGTH;
 use crate::error::{Result, TtsError};
-use crate::utils::temp_file::TempFile;
-use crate::models::{TTSRequest, VoiceInfo, VoicesResponse, HealthResponse, PoolStatsResponse};
-use crate::audio;
+use crate::kokoro::{voice_config::Voice, TTSPool};
+use crate::models::{HealthResponse, PoolStatsResponse, TTSRequest, VoiceInfo, VoicesResponse};
 use crate::rate_limit::PerKeyRateLimiter;
+use crate::utils::temp_file::TempFile;
 
 // Shared application state
 #[derive(Clone)]
@@ -52,9 +49,11 @@ async fn generate_tts(
 
     // Validate text length to prevent DoS
     if req.text.len() > MAX_TEXT_LENGTH {
-        return Err(TtsError::InvalidRequest(
-            format!("Text too long: {} chars (max {})", req.text.len(), MAX_TEXT_LENGTH)
-        ));
+        return Err(TtsError::InvalidRequest(format!(
+            "Text too long: {} chars (max {})",
+            req.text.len(),
+            MAX_TEXT_LENGTH
+        )));
     }
 
     // Validate speed is reasonable
@@ -74,16 +73,12 @@ async fn generate_tts(
 }
 
 /// Generate TTS for a single chunk of text
-async fn generate_tts_single(
-    state: AppState,
-    req: TTSRequest,
-) -> Result<Vec<u8>> {
+async fn generate_tts_single(state: AppState, req: TTSRequest) -> Result<Vec<u8>> {
     // Acquire a TTS engine from the pool
-    let tts = state.tts_pool.acquire().await
-        .map_err(|e| {
-            tracing::error!("Failed to acquire TTS engine: {}", e);
-            TtsError::TtsEngine(e.to_string())
-        })?;
+    let tts = state.tts_pool.acquire().await.map_err(|e| {
+        tracing::error!("Failed to acquire TTS engine: {}", e);
+        TtsError::TtsEngine(e.to_string())
+    })?;
 
     // Generate unique temporary file
     let temp_file = TempFile::new();
@@ -112,15 +107,15 @@ async fn generate_tts_single(
 }
 
 /// Generate TTS with text chunking and parallel processing
-async fn generate_tts_chunked(
-    state: AppState,
-    req: TTSRequest,
-) -> Result<Vec<u8>> {
+async fn generate_tts_chunked(state: AppState, req: TTSRequest) -> Result<Vec<u8>> {
     // Split text into chunks
     let config = ChunkingConfig::default();
     let chunks = chunk_text(&req.text, &config);
 
-    tracing::debug!("Split text into {} chunks for parallel processing", chunks.len());
+    tracing::debug!(
+        "Split text into {} chunks for parallel processing",
+        chunks.len()
+    );
 
     // Generate audio for each chunk in parallel
     let mut tasks = Vec::new();
@@ -215,8 +210,7 @@ pub fn create_router(state: AppState) -> Router<()> {
 
     // Create static file service for audio samples
     // Samples are served from server/samples/ directory
-    let samples_service = ServeDir::new("samples")
-        .append_index_html_on_directories(false);
+    let samples_service = ServeDir::new("samples").append_index_html_on_directories(false);
 
     let mut router = Router::new()
         .route("/tts", post(generate_tts))
@@ -259,9 +253,11 @@ mod tests {
 
         // Validate text length to prevent DoS
         if req.text.len() > MAX_TEXT_LENGTH {
-            return Err(TtsError::InvalidRequest(
-                format!("Text too long: {} chars (max {})", req.text.len(), MAX_TEXT_LENGTH)
-            ));
+            return Err(TtsError::InvalidRequest(format!(
+                "Text too long: {} chars (max {})",
+                req.text.len(),
+                MAX_TEXT_LENGTH
+            )));
         }
 
         // Validate speed is reasonable
@@ -285,7 +281,7 @@ mod tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            TtsError::EmptyText => {}, // Expected
+            TtsError::EmptyText => {} // Expected
             other => panic!("Expected EmptyText error, got: {:?}", other),
         }
     }
@@ -303,7 +299,7 @@ mod tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            TtsError::EmptyText => {}, // Expected
+            TtsError::EmptyText => {} // Expected
             other => panic!("Expected EmptyText error, got: {:?}", other),
         }
     }
@@ -328,7 +324,7 @@ mod tests {
                 assert!(msg.contains("Text too long"));
                 assert!(msg.contains("10001 chars"));
                 assert!(msg.contains("max 10000"));
-            },
+            }
             other => panic!("Expected InvalidRequest error, got: {:?}", other),
         }
     }
@@ -369,12 +365,12 @@ mod tests {
     fn test_validate_boundary_values() {
         // Test various boundary values
         let test_cases = vec![
-            (1, true),           // Minimum valid
-            (100, true),         // Normal short text
-            (9999, true),        // Just below max
-            (10000, true),       // Exactly at max
-            (10001, false),      // Just over max
-            (20000, false),      // Way over max
+            (1, true),      // Minimum valid
+            (100, true),    // Normal short text
+            (9999, true),   // Just below max
+            (10000, true),  // Exactly at max
+            (10001, false), // Just over max
+            (20000, false), // Way over max
         ];
 
         for (length, should_pass_validation) in test_cases {
@@ -394,10 +390,17 @@ mod tests {
                 assert!(result.is_err(), "Length {} should fail validation", length);
                 match result.unwrap_err() {
                     TtsError::InvalidRequest(msg) => {
-                        assert!(msg.contains("Text too long"),
-                            "Expected 'Text too long' error for length {}, got: {}", length, msg);
-                    },
-                    other => panic!("Expected InvalidRequest for length {}, got: {:?}", length, other),
+                        assert!(
+                            msg.contains("Text too long"),
+                            "Expected 'Text too long' error for length {}, got: {}",
+                            length,
+                            msg
+                        );
+                    }
+                    other => panic!(
+                        "Expected InvalidRequest for length {}, got: {:?}",
+                        length, other
+                    ),
                 }
             }
         }
@@ -412,7 +415,7 @@ mod tests {
             text: long_text,
             voice: "af_heart".to_string(),
             speed: 1.0,
-            enable_chunking: true,  // Chunking enabled
+            enable_chunking: true, // Chunking enabled
         };
 
         let result = validate_tts_request(&req);
@@ -422,7 +425,7 @@ mod tests {
         match result.unwrap_err() {
             TtsError::InvalidRequest(msg) => {
                 assert!(msg.contains("Text too long"));
-            },
+            }
             other => panic!("Expected InvalidRequest error, got: {:?}", other),
         }
     }
@@ -430,14 +433,14 @@ mod tests {
     #[test]
     fn test_validate_rejects_invalid_speed() {
         let test_cases = vec![
-            (0.0, false),     // Zero speed
-            (-1.0, false),    // Negative speed
-            (0.5, true),      // Valid low speed
-            (1.0, true),      // Normal speed
-            (2.0, true),      // Valid high speed
-            (3.0, true),      // Maximum valid speed
-            (3.1, false),     // Just over max
-            (10.0, false),    // Way over max
+            (0.0, false),  // Zero speed
+            (-1.0, false), // Negative speed
+            (0.5, true),   // Valid low speed
+            (1.0, true),   // Normal speed
+            (2.0, true),   // Valid high speed
+            (3.0, true),   // Maximum valid speed
+            (3.1, false),  // Just over max
+            (10.0, false), // Way over max
         ];
 
         for (speed, should_be_valid) in test_cases {
@@ -455,8 +458,11 @@ mod tests {
             } else {
                 assert!(result.is_err(), "Speed {} should be invalid", speed);
                 match result.unwrap_err() {
-                    TtsError::InvalidSpeed(_) => {}, // Expected
-                    other => panic!("Expected InvalidSpeed error for speed {}, got: {:?}", speed, other),
+                    TtsError::InvalidSpeed(_) => {} // Expected
+                    other => panic!(
+                        "Expected InvalidSpeed error for speed {}, got: {:?}",
+                        speed, other
+                    ),
                 }
             }
         }
@@ -488,7 +494,11 @@ mod tests {
 
         for voice in &voices {
             // sample_url should not be empty
-            assert!(!voice.sample_url.is_empty(), "Voice {} missing sample_url", voice.id);
+            assert!(
+                !voice.sample_url.is_empty(),
+                "Voice {} missing sample_url",
+                voice.id
+            );
 
             // sample_url should follow format: /samples/{voice_id}.wav
             let expected_url = format!("/samples/{}.wav", voice.id);
@@ -507,12 +517,34 @@ mod tests {
 
         // Expected voice IDs (all 28 configured voices)
         let expected_ids = vec![
-            "af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica",
-            "af_kore", "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
-            "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam",
-            "am_michael", "am_onyx", "am_puck", "am_santa",
-            "bf_alice", "bf_emma", "bf_isabella", "bf_lily",
-            "bm_daniel", "bm_fable", "bm_george", "bm_lewis",
+            "af_alloy",
+            "af_aoede",
+            "af_bella",
+            "af_heart",
+            "af_jessica",
+            "af_kore",
+            "af_nicole",
+            "af_nova",
+            "af_river",
+            "af_sarah",
+            "af_sky",
+            "am_adam",
+            "am_echo",
+            "am_eric",
+            "am_fenrir",
+            "am_liam",
+            "am_michael",
+            "am_onyx",
+            "am_puck",
+            "am_santa",
+            "bf_alice",
+            "bf_emma",
+            "bf_isabella",
+            "bf_lily",
+            "bm_daniel",
+            "bm_fable",
+            "bm_george",
+            "bm_lewis",
         ];
 
         let voice_ids: Vec<&str> = voices.iter().map(|v| v.id.as_str()).collect();
@@ -526,4 +558,3 @@ mod tests {
         }
     }
 }
-

@@ -1,20 +1,20 @@
-mod kokoro;
-mod server;
-mod chunking;
-mod auth;
-mod error;
-mod utils;
-mod models;
 mod audio;
-mod services;
+mod auth;
+mod chunking;
+mod error;
+mod kokoro;
+mod models;
 mod rate_limit;
+mod server;
+mod services;
+mod utils;
 
+use auth::load_api_keys;
 use kokoro::model_paths::{get_model_path, get_voices_path};
 use kokoro::voice_config::Voice;
-use kokoro::{TTS, TTSPool};
-use server::{create_router, AppState};
-use auth::load_api_keys;
+use kokoro::{TTSPool, TTS};
 use rate_limit::{PerKeyRateLimiter, RateLimitConfig};
+use server::{create_router, AppState};
 use std::env;
 use std::sync::Arc;
 use tracing_subscriber;
@@ -31,11 +31,12 @@ async fn main() -> error::Result<()> {
     // Override with RUST_LOG env var: RUST_LOG=debug for verbose, RUST_LOG=warn for quiet
     tracing_subscriber::fmt()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("tts_server=info,ort=warn,kokoros=warn"))
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                tracing_subscriber::EnvFilter::new("tts_server=info,ort=warn,kokoros=warn")
+            }),
         )
-        .with_target(false)  // Hide module path for cleaner output
-        .compact()           // Use compact formatting
+        .with_target(false) // Hide module path for cleaner output
+        .compact() // Use compact formatting
         .init();
 
     // Parse command line arguments
@@ -154,11 +155,7 @@ async fn main() -> error::Result<()> {
         // CLI mode - use single TTS instance
         println!("Initializing TTS engine for CLI mode...");
 
-        let tts = TTS::new(
-            model_path.to_str().unwrap(),
-            voices_path.to_str().unwrap(),
-        )
-        .await?;
+        let tts = TTS::new(model_path.to_str().unwrap(), voices_path.to_str().unwrap()).await?;
 
         let text = if args.len() > 1 {
             args[1..].join(" ")
@@ -172,7 +169,10 @@ async fn main() -> error::Result<()> {
         let voice = Voice::BritishFemaleLily;
         let voice_config = voice.config();
 
-        println!("Using voice: {} ({})", voice_config.name, voice_config.description);
+        println!(
+            "Using voice: {} ({})",
+            voice_config.name, voice_config.description
+        );
 
         // Generate speech with selected voice and normal speed
         let output_path = "output.wav";
@@ -200,7 +200,8 @@ async fn main() -> error::Result<()> {
         println!("  Number of phrases: {}", metadata.phrases.len());
         println!("\nPhrase breakdown:");
         for (i, phrase) in metadata.phrases.iter().enumerate() {
-            println!("  {}. \"{}\" - {:.2}s @ {:.2}s",
+            println!(
+                "  {}. \"{}\" - {:.2}s @ {:.2}s",
                 i + 1,
                 phrase.text,
                 phrase.duration_ms / 1000.0,

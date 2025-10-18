@@ -2,7 +2,6 @@
 ///
 /// This module handles normalization of Unicode characters (smart quotes, dashes, etc.)
 /// while preserving the original text for client-side matching.
-
 use unicode_normalization::UnicodeNormalization;
 
 #[derive(Debug, Clone)]
@@ -52,17 +51,16 @@ pub fn normalize_for_tts(text: &str) -> NormalizationResult {
                 for _ in 0..(normalized.len() - current_len) {
                     char_mapping.push(orig_idx);
                 }
-            },
+            }
             // Left and right single quotes → ASCII apostrophe
-            '\u{2018}' | '\u{2019}' | '\u{02BC}' | '\u{02BB}' |
-            '\u{02BD}' | '\u{02C8}' | '\u{02CA}' | '\u{02CB}' |
-            '\u{0060}' | '\u{00B4}' => {
+            '\u{2018}' | '\u{2019}' | '\u{02BC}' | '\u{02BB}' | '\u{02BD}' | '\u{02C8}'
+            | '\u{02CA}' | '\u{02CB}' | '\u{0060}' | '\u{00B4}' => {
                 let current_len = normalized.len();
                 normalized.push('\'');
                 for _ in 0..(normalized.len() - current_len) {
                     char_mapping.push(orig_idx);
                 }
-            },
+            }
             // En dash and em dash → ASCII hyphen
             '\u{2013}' | '\u{2014}' => {
                 let current_len = normalized.len();
@@ -70,7 +68,7 @@ pub fn normalize_for_tts(text: &str) -> NormalizationResult {
                 for _ in 0..(normalized.len() - current_len) {
                     char_mapping.push(orig_idx);
                 }
-            },
+            }
             // Non-breaking space → regular space
             '\u{00A0}' => {
                 let current_len = normalized.len();
@@ -78,7 +76,7 @@ pub fn normalize_for_tts(text: &str) -> NormalizationResult {
                 for _ in 0..(normalized.len() - current_len) {
                     char_mapping.push(orig_idx);
                 }
-            },
+            }
             // Ellipsis → three dots (handle in main loop to maintain mapping)
             '\u{2026}' => {
                 let current_len = normalized.len();
@@ -87,7 +85,7 @@ pub fn normalize_for_tts(text: &str) -> NormalizationResult {
                 for _ in 0..(normalized.len() - current_len) {
                     char_mapping.push(orig_idx);
                 }
-            },
+            }
             // Soft hyphen → remove (don't add to normalized or mapping)
             '\u{00AD}' => continue,
             // Other characters → keep as-is
@@ -119,7 +117,10 @@ pub fn normalize_for_tts(text: &str) -> NormalizationResult {
 
 /// Get information about what normalization was performed
 pub fn get_normalization_info(result: &NormalizationResult) -> NormalizationInfo {
-    let changes_count = result.original.chars().zip(result.normalized.chars())
+    let changes_count = result
+        .original
+        .chars()
+        .zip(result.normalized.chars())
         .filter(|(a, b)| a != b)
         .count();
 
@@ -202,7 +203,7 @@ mod tests {
         let result = normalize_for_tts(text);
 
         // char_mapping should track positions
-        assert!(result.char_mapping.len() > 0);
+        assert!(!result.char_mapping.is_empty());
     }
 
     #[test]
@@ -254,9 +255,8 @@ pub fn map_normalized_to_original(
             // Check if this character might have been normalized
             let orig_normalized_str = match orig_ch {
                 '\u{201C}' | '\u{201D}' | '\u{201E}' | '\u{201F}' => "\"",
-                '\u{2018}' | '\u{2019}' | '\u{02BC}' | '\u{02BB}' |
-                '\u{02BD}' | '\u{02C8}' | '\u{02CA}' | '\u{02CB}' |
-                '\u{0060}' | '\u{00B4}' => "'",
+                '\u{2018}' | '\u{2019}' | '\u{02BC}' | '\u{02BB}' | '\u{02BD}' | '\u{02C8}'
+                | '\u{02CA}' | '\u{02CB}' | '\u{0060}' | '\u{00B4}' => "'",
                 '\u{2013}' | '\u{2014}' => "-",
                 '\u{00A0}' => " ",
                 '\u{2026}' => "...",
@@ -318,11 +318,9 @@ pub fn extract_original_phrase(
         let norm_end = norm_pos + normalized_phrase.len();
 
         // Try to map back to original
-        if let Some((orig_start, orig_end)) = map_normalized_to_original(
-            norm_pos,
-            norm_end,
-            full_text_result,
-        ) {
+        if let Some((orig_start, orig_end)) =
+            map_normalized_to_original(norm_pos, norm_end, full_text_result)
+        {
             return full_text_result.original[orig_start..orig_end].to_string();
         }
     }

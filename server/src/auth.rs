@@ -82,14 +82,21 @@ pub fn load_api_keys() -> ApiKeys {
         match ApiKeys::from_file(&key_file_path) {
             Ok(keys) => {
                 if keys.count() > 0 {
-                    println!("✓ Loaded {} API key(s) from: {}", keys.count(), key_file_path);
+                    println!(
+                        "✓ Loaded {} API key(s) from: {}",
+                        keys.count(),
+                        key_file_path
+                    );
                     return keys;
                 } else {
                     println!("⚠ Warning: API key file is empty: {}", key_file_path);
                 }
             }
             Err(e) => {
-                println!("⚠ Warning: Could not read API key file '{}': {}", key_file_path, e);
+                println!(
+                    "⚠ Warning: Could not read API key file '{}': {}",
+                    key_file_path, e
+                );
             }
         }
     }
@@ -110,7 +117,11 @@ pub fn load_api_keys() -> ApiKeys {
             match ApiKeys::from_file(&location) {
                 Ok(keys) => {
                     if keys.count() > 0 {
-                        println!("✓ Loaded {} API key(s) from: {}", keys.count(), location.display());
+                        println!(
+                            "✓ Loaded {} API key(s) from: {}",
+                            keys.count(),
+                            location.display()
+                        );
                         return keys;
                     }
                 }
@@ -163,7 +174,9 @@ pub async fn auth_middleware(
                 StatusCode::UNAUTHORIZED,
                 Json(ErrorResponse {
                     status: "error".to_string(),
-                    error: "API key required. Provide via X-API-Key or Authorization: Bearer header".to_string(),
+                    error:
+                        "API key required. Provide via X-API-Key or Authorization: Bearer header"
+                            .to_string(),
                 }),
             )
                 .into_response()

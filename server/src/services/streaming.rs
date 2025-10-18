@@ -1,16 +1,12 @@
-use axum::{
-    body::Bytes,
-    http::header,
-    response::Response,
-};
-use tokio_stream::{StreamExt, wrappers::ReceiverStream};
+use axum::{body::Bytes, http::header, response::Response};
 use std::time::Instant;
+use tokio_stream::{wrappers::ReceiverStream, StreamExt};
 
-use crate::server::AppState;
-use crate::models::{TTSRequest, ChunkMetadata};
 use crate::chunking::{chunk_text, ChunkingConfig};
 use crate::config::constants::{MAX_TEXT_LENGTH, MULTIPART_BOUNDARY};
 use crate::error::{Result, TtsError};
+use crate::models::{ChunkMetadata, TTSRequest};
+use crate::server::AppState;
 
 fn create_boundary_start() -> String {
     format!("\r\n--{}\r\n", MULTIPART_BOUNDARY)
@@ -58,11 +54,14 @@ async fn generate_chunk_with_metadata(
     chunk_index: usize,
     start_offset_ms: f64,
 ) -> Result<(ChunkMetadata, Vec<u8>)> {
-    use crate::utils::temp_file::TempFile;
     use crate::services::metadata_builder;
+    use crate::utils::temp_file::TempFile;
 
     // Acquire TTS engine
-    let tts = state.tts_pool.acquire().await
+    let tts = state
+        .tts_pool
+        .acquire()
+        .await
         .map_err(|e| TtsError::TtsEngine(e.to_string()))?;
 
     // Generate unique temp file
@@ -87,16 +86,14 @@ async fn generate_chunk_with_metadata(
     // TempFile will automatically clean up when it goes out of scope
 
     // Build metadata using shared function
-    let metadata = metadata_builder::build_metadata(&audio_bytes, text, chunk_index, start_offset_ms)?;
+    let metadata =
+        metadata_builder::build_metadata(&audio_bytes, text, chunk_index, start_offset_ms)?;
 
     Ok((metadata, audio_bytes))
 }
 
 /// Generate TTS audio with multipart streaming response
-pub async fn generate_tts_stream(
-    state: AppState,
-    req: TTSRequest,
-) -> Result<Response> {
+pub async fn generate_tts_stream(state: AppState, req: TTSRequest) -> Result<Response> {
     let start = Instant::now();
 
     tracing::debug!(
@@ -113,9 +110,11 @@ pub async fn generate_tts_stream(
 
     // Validate text length to prevent DoS
     if req.text.len() > MAX_TEXT_LENGTH {
-        return Err(TtsError::InvalidRequest(
-            format!("Text too long: {} chars (max {})", req.text.len(), MAX_TEXT_LENGTH)
-        ));
+        return Err(TtsError::InvalidRequest(format!(
+            "Text too long: {} chars (max {})",
+            req.text.len(),
+            MAX_TEXT_LENGTH
+        )));
     }
 
     // Validate speed
@@ -127,7 +126,10 @@ pub async fn generate_tts_stream(
     let config = ChunkingConfig::default();
     let chunks = chunk_text(&req.text, &config);
 
-    tracing::debug!("Streaming {} text chunks with multipart format", chunks.len());
+    tracing::debug!(
+        "Streaming {} text chunks with multipart format",
+        chunks.len()
+    );
 
     // Create channel for streaming multipart data
     let (tx, rx) = tokio::sync::mpsc::channel::<std::result::Result<Bytes, String>>(10);
@@ -152,7 +154,9 @@ pub async fn generate_tts_stream(
                 speed,
                 0,
                 cumulative_offset_ms,
-            ).await {
+            )
+            .await
+            {
                 Ok((metadata, audio_bytes)) => {
                     cumulative_offset_ms += metadata.duration_ms;
 
@@ -222,7 +226,8 @@ pub async fn generate_tts_stream(
                         speed,
                         chunk_index,
                         start_offset,
-                    ).await
+                    )
+                    .await
                 });
 
                 tasks.push((chunk_index, task));
@@ -284,14 +289,16 @@ pub async fn generate_tts_stream(
     });
 
     // Create streaming response with multipart content type
-    let stream = ReceiverStream::new(rx).map(|result| {
-        result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
-    });
+    let stream = ReceiverStream::new(rx)
+        .map(|result| result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)));
 
     let body = axum::body::Body::from_stream(stream);
 
     Ok(Response::builder()
-        .header(header::CONTENT_TYPE, format!("multipart/mixed; boundary={}", MULTIPART_BOUNDARY))
+        .header(
+            header::CONTENT_TYPE,
+            format!("multipart/mixed; boundary={}", MULTIPART_BOUNDARY),
+        )
         .header(header::TRANSFER_ENCODING, "chunked")
         .body(body)
         .unwrap())
@@ -367,9 +374,11 @@ mod tests {
 
         // Validate text length to prevent DoS
         if req.text.len() > MAX_TEXT_LENGTH {
-            return Err(TtsError::InvalidRequest(
-                format!("Text too long: {} chars (max {})", req.text.len(), MAX_TEXT_LENGTH)
-            ));
+            return Err(TtsError::InvalidRequest(format!(
+                "Text too long: {} chars (max {})",
+                req.text.len(),
+                MAX_TEXT_LENGTH
+            )));
         }
 
         // Validate speed
@@ -393,7 +402,7 @@ mod tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            TtsError::EmptyText => {}, // Expected
+            TtsError::EmptyText => {} // Expected
             other => panic!("Expected EmptyText error, got: {:?}", other),
         }
     }
@@ -411,7 +420,7 @@ mod tests {
         assert!(result.is_err());
 
         match result.unwrap_err() {
-            TtsError::EmptyText => {}, // Expected
+            TtsError::EmptyText => {} // Expected
             other => panic!("Expected EmptyText error, got: {:?}", other),
         }
     }
@@ -436,7 +445,7 @@ mod tests {
                 assert!(msg.contains("Text too long"));
                 assert!(msg.contains("10001 chars"));
                 assert!(msg.contains("max 10000"));
-            },
+            }
             other => panic!("Expected InvalidRequest error, got: {:?}", other),
         }
     }
@@ -477,12 +486,12 @@ mod tests {
     fn test_streaming_boundary_values() {
         // Test various boundary values
         let test_cases = vec![
-            (1, true),           // Minimum valid
-            (100, true),         // Normal short text
-            (9999, true),        // Just below max
-            (10000, true),       // Exactly at max
-            (10001, false),      // Just over max
-            (20000, false),      // Way over max
+            (1, true),      // Minimum valid
+            (100, true),    // Normal short text
+            (9999, true),   // Just below max
+            (10000, true),  // Exactly at max
+            (10001, false), // Just over max
+            (20000, false), // Way over max
         ];
 
         for (length, should_pass_validation) in test_cases {
@@ -502,10 +511,17 @@ mod tests {
                 assert!(result.is_err(), "Length {} should fail validation", length);
                 match result.unwrap_err() {
                     TtsError::InvalidRequest(msg) => {
-                        assert!(msg.contains("Text too long"),
-                            "Expected 'Text too long' error for length {}, got: {}", length, msg);
-                    },
-                    other => panic!("Expected InvalidRequest for length {}, got: {:?}", length, other),
+                        assert!(
+                            msg.contains("Text too long"),
+                            "Expected 'Text too long' error for length {}, got: {}",
+                            length,
+                            msg
+                        );
+                    }
+                    other => panic!(
+                        "Expected InvalidRequest for length {}, got: {:?}",
+                        length, other
+                    ),
                 }
             }
         }
@@ -529,7 +545,7 @@ mod tests {
         match result.unwrap_err() {
             TtsError::InvalidRequest(msg) => {
                 assert!(msg.contains("Text too long"));
-            },
+            }
             other => panic!("Expected InvalidRequest error, got: {:?}", other),
         }
     }

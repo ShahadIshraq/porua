@@ -1,11 +1,11 @@
-pub mod voice_config;
 pub mod model_paths;
+pub mod voice_config;
 
 use kokoros::tts::koko::{TTSKoko, TTSOpts};
 use std::error::Error;
-use std::sync::Arc;
-use tokio::sync::{Semaphore, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+use tokio::sync::{Mutex, Semaphore};
 
 pub struct TTS {
     engine: TTSKoko,
@@ -22,7 +22,13 @@ impl TTS {
         Ok(TTS { engine })
     }
 
-    pub fn speak(&self, text: &str, output_path: &str, style: &str, speed: f32) -> Result<(), Box<dyn Error>> {
+    pub fn speak(
+        &self,
+        text: &str,
+        output_path: &str,
+        style: &str,
+        speed: f32,
+    ) -> Result<(), Box<dyn Error>> {
         self.engine.tts(TTSOpts {
             txt: text,
             lan: "en-us",
@@ -79,7 +85,11 @@ impl TTSPool {
     /// This will wait if all engines are busy
     pub async fn acquire(&self) -> Result<PooledTTS, String> {
         // Acquire a permit from the semaphore
-        let permit = self.semaphore.clone().acquire_owned().await
+        let permit = self
+            .semaphore
+            .clone()
+            .acquire_owned()
+            .await
             .map_err(|e| format!("Failed to acquire semaphore: {}", e))?;
 
         // Find an available engine (round-robin)
