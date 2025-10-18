@@ -9,17 +9,15 @@ use std::time::Instant;
 use crate::server::AppState;
 use crate::models::{TTSRequest, ChunkMetadata};
 use crate::chunking::{chunk_text, ChunkingConfig};
+use crate::config::constants::{MAX_TEXT_LENGTH, MULTIPART_BOUNDARY};
 use crate::error::{Result, TtsError};
 
-const BOUNDARY: &str = "tts_chunk_boundary";
-const MAX_TEXT_LENGTH: usize = 10_000;
-
 fn create_boundary_start() -> String {
-    format!("\r\n--{}\r\n", BOUNDARY)
+    format!("\r\n--{}\r\n", MULTIPART_BOUNDARY)
 }
 
 fn create_boundary_end() -> String {
-    format!("\r\n--{}--\r\n", BOUNDARY)
+    format!("\r\n--{}--\r\n", MULTIPART_BOUNDARY)
 }
 
 fn create_metadata_part(metadata: &ChunkMetadata) -> Result<Bytes> {
@@ -293,7 +291,7 @@ pub async fn generate_tts_stream(
     let body = axum::body::Body::from_stream(stream);
 
     Ok(Response::builder()
-        .header(header::CONTENT_TYPE, format!("multipart/mixed; boundary={}", BOUNDARY))
+        .header(header::CONTENT_TYPE, format!("multipart/mixed; boundary={}", MULTIPART_BOUNDARY))
         .header(header::TRANSFER_ENCODING, "chunked")
         .body(body)
         .unwrap())

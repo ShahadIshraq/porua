@@ -15,14 +15,12 @@ use crate::kokoro::{
 };
 use crate::chunking::{chunk_text, ChunkingConfig};
 use crate::auth::ApiKeys;
+use crate::config::constants::MAX_TEXT_LENGTH;
 use crate::error::{Result, TtsError};
 use crate::utils::temp_file::TempFile;
 use crate::models::{TTSRequest, VoiceInfo, VoicesResponse, HealthResponse, PoolStatsResponse};
 use crate::audio;
 use crate::rate_limit::PerKeyRateLimiter;
-
-// Constants
-const MAX_TEXT_LENGTH: usize = 10_000;
 
 // Shared application state
 #[derive(Clone)]
