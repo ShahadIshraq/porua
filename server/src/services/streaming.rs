@@ -289,8 +289,7 @@ pub async fn generate_tts_stream(state: AppState, req: TTSRequest) -> Result<Res
     });
 
     // Create streaming response with multipart content type
-    let stream = ReceiverStream::new(rx)
-        .map(|result| result.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e)));
+    let stream = ReceiverStream::new(rx).map(|result| result.map_err(std::io::Error::other));
 
     let body = axum::body::Body::from_stream(stream);
 

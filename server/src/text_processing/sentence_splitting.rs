@@ -1,6 +1,5 @@
 /// Sentence splitting with smart boundary detection
 /// Handles abbreviations, decimal numbers, and proper sentence endings
-
 /// Common abbreviations that don't end sentences
 const COMMON_ABBREVIATIONS: &[&str] = &[
     "Dr", "Mr", "Mrs", "Ms", "Prof", "Sr", "Jr", "Ph.D", "M.D", "B.A", "M.A", "B.S", "M.S", "etc",

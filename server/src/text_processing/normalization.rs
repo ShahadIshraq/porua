@@ -329,14 +329,12 @@ pub fn extract_original_phrase(
     if let Some(char_pos) = hint_position {
         // Convert char position to byte position safely
         let mut byte_pos = 0;
-        let mut current_char_idx = 0;
 
-        for (idx, _ch) in full_text_result.original.char_indices() {
+        for (current_char_idx, (idx, _ch)) in full_text_result.original.char_indices().enumerate() {
             if current_char_idx == char_pos {
                 byte_pos = idx;
                 break;
             }
-            current_char_idx += 1;
         }
 
         // If we found the position, try to extract the phrase

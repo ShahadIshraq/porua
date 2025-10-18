@@ -7,6 +7,12 @@ pub struct TempFile {
     path: PathBuf,
 }
 
+impl Default for TempFile {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TempFile {
     /// Create a new temporary file with .wav extension
     pub fn new() -> Self {
