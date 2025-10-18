@@ -22,7 +22,7 @@ async fn test_calculate_wav_duration() {
     }
 
     let wav_bytes = cursor.into_inner();
-    let duration = tts_server::audio::duration::calculate(&wav_bytes).unwrap();
+    let duration = porua_server::audio::duration::calculate(&wav_bytes).unwrap();
 
     // Should be approximately 1000ms (allowing small floating point error)
     assert!((duration - 1000.0).abs() < 1.0);
