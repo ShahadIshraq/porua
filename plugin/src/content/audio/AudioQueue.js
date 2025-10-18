@@ -1,5 +1,5 @@
 import { AudioPlaybackError } from '../../shared/utils/errors.js';
-import { PLAYER_STATES, TIMEOUTS } from '../../shared/utils/constants.js';
+import { PLAYER_STATES, TIMEOUTS, AUDIO_PROGRESS } from '../../shared/utils/constants.js';
 
 export class AudioQueue {
   constructor(state, highlightManager) {
@@ -119,8 +119,8 @@ export class AudioQueue {
           const totalProgress = (this.completedChunks + currentChunkProgress) / this.totalChunks;
 
           // Pass as if it's a single audio: currentTime and duration scaled to represent total
-          const virtualCurrentTime = totalProgress * 100;
-          const virtualDuration = 100;
+          const virtualCurrentTime = totalProgress * AUDIO_PROGRESS.VIRTUAL_DURATION;
+          const virtualDuration = AUDIO_PROGRESS.VIRTUAL_DURATION;
 
           this.onProgressCallback(virtualCurrentTime, virtualDuration);
         }
@@ -137,8 +137,8 @@ export class AudioQueue {
           : 0;
         const totalProgress = (this.completedChunks + currentChunkProgress) / this.totalChunks;
 
-        const virtualCurrentTime = totalProgress * 100;
-        const virtualDuration = 100;
+        const virtualCurrentTime = totalProgress * AUDIO_PROGRESS.VIRTUAL_DURATION;
+        const virtualDuration = AUDIO_PROGRESS.VIRTUAL_DURATION;
 
         this.onProgressCallback(virtualCurrentTime, virtualDuration);
       }
