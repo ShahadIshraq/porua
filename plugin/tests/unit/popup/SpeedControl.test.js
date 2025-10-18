@@ -471,7 +471,7 @@ describe('SpeedControl', () => {
 
         expect(mockDependencies.settingsStore.getSelectedVoice).toHaveBeenCalled();
         expect(mockDependencies.ttsService.synthesize).toHaveBeenCalledWith(
-          'Testing playback speed.',
+          'The quick brown fox jumps over the lazy dog. This sentence demonstrates various phonetic sounds at different playback speeds.',
           {
             voice: 'bf_lily',
             speed: 1.5
@@ -680,6 +680,97 @@ describe('SpeedControl', () => {
 
         expect(speedControl.isTestingSpeed).toBe(false);
       });
+    });
+  });
+
+  describe('Test audio interruption on speed change', () => {
+    it('should stop test audio when slider change event fires', () => {
+      speedControl.init(1.0);
+      speedControl.isTestingSpeed = true;
+      const slider = mockContainer.querySelector('#speed-slider');
+
+      slider.value = '1.5';
+      slider.dispatchEvent(new Event('change'));
+
+      expect(mockDependencies.audioPreview.stop).toHaveBeenCalled();
+      expect(speedControl.isTestingSpeed).toBe(false);
+    });
+
+    it('should reset button to idle state when slider changes during test', () => {
+      speedControl.init(1.0);
+      speedControl.isTestingSpeed = true;
+      speedControl.updateTestButtonState('playing');
+      const slider = mockContainer.querySelector('#speed-slider');
+
+      slider.value = '1.5';
+      slider.dispatchEvent(new Event('change'));
+
+      const icon = mockContainer.querySelector('.test-btn-icon');
+      const text = mockContainer.querySelector('.test-btn-text');
+      expect(icon.textContent).toBe('▶');
+      expect(text.textContent).toBe('Test Speed');
+    });
+
+    it('should stop test audio when preset button clicked during test', () => {
+      speedControl.init(1.0);
+      speedControl.isTestingSpeed = true;
+      const presetButtons = mockContainer.querySelectorAll('.speed-preset-btn');
+
+      presetButtons[2].click(); // 1.25x
+
+      expect(mockDependencies.audioPreview.stop).toHaveBeenCalled();
+      expect(speedControl.isTestingSpeed).toBe(false);
+    });
+
+    it('should reset button to idle state when preset clicked during test', () => {
+      speedControl.init(1.0);
+      speedControl.isTestingSpeed = true;
+      speedControl.updateTestButtonState('playing');
+      const presetButtons = mockContainer.querySelectorAll('.speed-preset-btn');
+
+      presetButtons[2].click(); // 1.25x
+
+      const icon = mockContainer.querySelector('.test-btn-icon');
+      const text = mockContainer.querySelector('.test-btn-text');
+      expect(icon.textContent).toBe('▶');
+      expect(text.textContent).toBe('Test Speed');
+    });
+
+    it('should NOT stop test audio when setSpeed is called programmatically', () => {
+      speedControl.init(1.0);
+      speedControl.isTestingSpeed = true;
+
+      speedControl.setSpeed(1.5);
+
+      expect(mockDependencies.audioPreview.stop).not.toHaveBeenCalled();
+      expect(speedControl.isTestingSpeed).toBe(true);
+    });
+
+    it('should stop test audio when slider input event fires (dragging)', () => {
+      speedControl.init(1.0);
+      speedControl.isTestingSpeed = true;
+      const slider = mockContainer.querySelector('#speed-slider');
+
+      slider.value = '1.5';
+      slider.dispatchEvent(new Event('input'));
+
+      expect(mockDependencies.audioPreview.stop).toHaveBeenCalled();
+      expect(speedControl.isTestingSpeed).toBe(false);
+    });
+
+    it('should reset button to idle when slider dragged during test', () => {
+      speedControl.init(1.0);
+      speedControl.isTestingSpeed = true;
+      speedControl.updateTestButtonState('playing');
+      const slider = mockContainer.querySelector('#speed-slider');
+
+      slider.value = '1.5';
+      slider.dispatchEvent(new Event('input'));
+
+      const icon = mockContainer.querySelector('.test-btn-icon');
+      const text = mockContainer.querySelector('.test-btn-text');
+      expect(icon.textContent).toBe('▶');
+      expect(text.textContent).toBe('Test Speed');
     });
   });
 });

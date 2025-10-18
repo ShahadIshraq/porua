@@ -62,7 +62,10 @@ export class TTSService {
   async fetchVoiceSample(voiceId) {
     const client = await this.getClient();
     const response = await client.fetchVoiceSample(voiceId);
-    return await toBlob(response, 'audio/wav');
+    // Server may return application/octet-stream or audio/wav
+    const contentType = response.headers.get('Content-Type') || '';
+    const expectedType = contentType.includes('audio/') ? 'audio/' : 'application/octet-stream';
+    return await toBlob(response, expectedType);
   }
 
   /**

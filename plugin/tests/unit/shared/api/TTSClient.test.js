@@ -53,17 +53,16 @@ describe('TTSClient', () => {
       );
     });
 
-    it('should return parsed JSON response', async () => {
-      const healthData = { status: 'healthy', version: '1.0.0' };
+    it('should return Response object', async () => {
       const mockResponse = {
         ok: true,
-        json: vi.fn().mockResolvedValue(healthData)
+        json: vi.fn().mockResolvedValue({ status: 'healthy', version: '1.0.0' })
       };
       global.fetch.mockResolvedValue(mockResponse);
 
       const result = await client.checkHealth();
 
-      expect(result).toEqual(healthData);
+      expect(result).toBe(mockResponse);
     });
 
     it('should throw APIError on non-ok response', async () => {
@@ -104,23 +103,21 @@ describe('TTSClient', () => {
       );
     });
 
-    it('should return parsed voice list', async () => {
-      const mockVoices = {
-        voices: [
-          { id: 'af_nova', name: 'Nova', gender: 'Female', language: 'AmericanEnglish' },
-          { id: 'bf_lily', name: 'Lily', gender: 'Female', language: 'BritishEnglish' }
-        ]
-      };
+    it('should return Response object', async () => {
       const mockResponse = {
         ok: true,
-        json: vi.fn().mockResolvedValue(mockVoices)
+        json: vi.fn().mockResolvedValue({
+          voices: [
+            { id: 'af_nova', name: 'Nova', gender: 'Female', language: 'AmericanEnglish' },
+            { id: 'bf_lily', name: 'Lily', gender: 'Female', language: 'BritishEnglish' }
+          ]
+        })
       };
       global.fetch.mockResolvedValue(mockResponse);
 
       const result = await client.getVoices();
 
-      expect(result).toEqual(mockVoices);
-      expect(result.voices).toHaveLength(2);
+      expect(result).toBe(mockResponse);
     });
 
     it('should throw APIError on non-ok response', async () => {
@@ -181,7 +178,7 @@ describe('TTSClient', () => {
       );
     });
 
-    it('should return audio blob', async () => {
+    it('should return Response object', async () => {
       const mockBlob = new Blob(['audio data'], { type: 'audio/wav' });
       const mockResponse = {
         ok: true,
@@ -191,8 +188,7 @@ describe('TTSClient', () => {
 
       const result = await client.fetchVoiceSample('af_nova');
 
-      expect(result).toBe(mockBlob);
-      expect(mockResponse.blob).toHaveBeenCalled();
+      expect(result).toBe(mockResponse);
     });
 
     it('should work with different voice IDs', async () => {
