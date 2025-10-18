@@ -1,6 +1,7 @@
 import { TTSClient } from '../api/TTSClient.js';
 import { SettingsStore } from '../storage/SettingsStore.js';
 import { toJSON, toBlob } from '../api/ResponseHandler.js';
+import { validateTTSText } from '../utils/validation.js';
 
 /**
  * Centralized service for TTS API operations
@@ -71,10 +72,11 @@ export class TTSService {
    * @returns {Promise<Response>}
    */
   async synthesizeStream(text, options = {}) {
+    const validatedText = validateTTSText(text);
     const client = await this.getClient();
     const settings = await SettingsStore.get();
 
-    return await client.synthesizeStream(text, {
+    return await client.synthesizeStream(validatedText, {
       voice: options.voice || settings.selectedVoiceId,
       speed: options.speed || settings.speed || 1.0,
       signal: options.signal
@@ -88,10 +90,11 @@ export class TTSService {
    * @returns {Promise<Response>}
    */
   async synthesize(text, options = {}) {
+    const validatedText = validateTTSText(text);
     const client = await this.getClient();
     const settings = await SettingsStore.get();
 
-    return await client.synthesize(text, {
+    return await client.synthesize(validatedText, {
       voice: options.voice || settings.selectedVoiceId,
       speed: options.speed || settings.speed || 1.0,
       signal: options.signal
