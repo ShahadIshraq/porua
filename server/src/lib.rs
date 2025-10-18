@@ -8,4 +8,5 @@ pub mod models;
 pub mod rate_limit;
 pub mod server;
 pub mod services;
+pub mod text_processing;
 pub mod utils;
