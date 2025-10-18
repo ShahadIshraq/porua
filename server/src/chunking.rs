@@ -1,3 +1,4 @@
+use crate::text_processing::sentence_splitting::split_sentences;
 
 /// Configuration for text chunking
 #[derive(Debug, Clone)]
@@ -29,7 +30,7 @@ pub fn chunk_text(text: &str, config: &ChunkingConfig) -> Vec<String> {
     let mut current_chunk = String::new();
 
     // Split by sentence-ending punctuation
-    let sentences = split_into_sentences(text);
+    let sentences = split_sentences(text);
 
     for sentence in sentences {
         let sentence_len = sentence.len();
@@ -73,57 +74,6 @@ pub fn chunk_text(text: &str, config: &ChunkingConfig) -> Vec<String> {
     }
 
     chunks
-}
-
-/// Splits text into sentences based on punctuation
-fn split_into_sentences(text: &str) -> Vec<String> {
-    let mut sentences = Vec::new();
-    let mut current = String::new();
-    let mut chars = text.chars().peekable();
-
-    while let Some(ch) = chars.next() {
-        current.push(ch);
-
-        // Check for sentence-ending punctuation
-        if matches!(ch, '.' | '!' | '?') {
-            // Look ahead to see if this is truly end of sentence
-            let mut peek_chars = chars.clone();
-            let next_char = peek_chars.next();
-
-            // End of sentence if followed by whitespace and uppercase, or end of text
-            let is_end = match next_char {
-                None => true,
-                Some(next) => {
-                    if next.is_whitespace() {
-                        // Skip whitespace and check next non-whitespace char
-                        let mut found_end = true;
-                        while let Some(c) = peek_chars.peek() {
-                            if !c.is_whitespace() {
-                                found_end = c.is_uppercase() || c.is_ascii_digit();
-                                break;
-                            }
-                            peek_chars.next();
-                        }
-                        found_end
-                    } else {
-                        false
-                    }
-                }
-            };
-
-            if is_end {
-                sentences.push(current.trim().to_string());
-                current.clear();
-            }
-        }
-    }
-
-    // Add any remaining text
-    if !current.trim().is_empty() {
-        sentences.push(current.trim().to_string());
-    }
-
-    sentences
 }
 
 /// Splits a long sentence into smaller chunks at clause boundaries
