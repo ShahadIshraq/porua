@@ -3,7 +3,7 @@ use crate::models::{
     PhraseMetadata, ChunkMetadata, ValidationResult, ValidationError,
     ValidationWarning, DebugInfo
 };
-use crate::utils::text_normalization;
+use crate::text_processing::normalization;
 use crate::error::Result;
 
 /// Build metadata from audio bytes and text with enhanced features
@@ -26,8 +26,8 @@ pub fn build_metadata_with_options(
     include_debug: bool,
 ) -> Result<ChunkMetadata> {
     // Normalize text for TTS while preserving original
-    let norm_result = text_normalization::normalize_for_tts(text);
-    let normalization_info = text_normalization::get_normalization_info(&norm_result);
+    let norm_result = normalization::normalize_for_tts(text);
+    let normalization_info = normalization::get_normalization_info(&norm_result);
 
     // Calculate duration
     let duration_ms = audio::duration::calculate(audio_bytes)?;
@@ -63,7 +63,7 @@ pub fn build_metadata_with_options(
         };
 
         // Extract original phrase text
-        let original_phrase = text_normalization::extract_original_phrase(
+        let original_phrase = normalization::extract_original_phrase(
             &phrase_text,
             &norm_result,
             char_offset_start,
