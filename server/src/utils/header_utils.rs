@@ -1,4 +1,5 @@
-use axum::http::HeaderMap;
+use axum::{extract::ConnectInfo, http::HeaderMap, extract::Request};
+use std::net::{IpAddr, SocketAddr};
 
 /// Extract API key from HTTP headers
 ///
@@ -33,6 +34,55 @@ pub fn extract_api_key(headers: &HeaderMap) -> Option<String> {
     }
 
     None
+}
+
+/// Extract client IP address from HTTP request
+///
+/// Supports X-Forwarded-For, X-Real-IP headers (for proxies/load balancers),
+/// and falls back to connection IP address.
+///
+/// # Priority Order
+/// 1. X-Forwarded-For header (leftmost IP = original client)
+/// 2. X-Real-IP header (nginx proxy)
+/// 3. Connection IP from socket address
+///
+/// # Examples
+///
+/// ```ignore
+/// use axum::extract::Request;
+/// use porua_server::utils::header_utils::extract_client_ip;
+///
+/// let ip = extract_client_ip(&request)?;
+/// println!("Client IP: {}", ip);
+/// ```
+pub fn extract_client_ip<B>(request: &Request<B>) -> Result<IpAddr, String> {
+    // Try X-Forwarded-For first (for proxies/load balancers)
+    if let Some(forwarded_for) = request.headers().get("x-forwarded-for") {
+        if let Ok(forwarded_str) = forwarded_for.to_str() {
+            // Take leftmost IP (original client)
+            if let Some(ip_str) = forwarded_str.split(',').next() {
+                if let Ok(ip) = ip_str.trim().parse::<IpAddr>() {
+                    return Ok(ip);
+                }
+            }
+        }
+    }
+
+    // Try X-Real-IP (nginx)
+    if let Some(real_ip) = request.headers().get("x-real-ip") {
+        if let Ok(ip_str) = real_ip.to_str() {
+            if let Ok(ip) = ip_str.trim().parse::<IpAddr>() {
+                return Ok(ip);
+            }
+        }
+    }
+
+    // Fallback: Extract from connection (axum extensions)
+    if let Some(connect_info) = request.extensions().get::<ConnectInfo<SocketAddr>>() {
+        return Ok(connect_info.0.ip());
+    }
+
+    Err("Unable to extract client IP address".to_string())
 }
 
 #[cfg(test)]
