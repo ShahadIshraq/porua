@@ -45,6 +45,12 @@
           </button>
         </div>
         <small class="help-text">Leave empty if authentication is not required</small>
+        <div class="connection-test-bar">
+          <div id="connection-status" class="connection-status hidden"></div>
+          <button type="button" id="test-connection" class="connection-test-btn" title="Test Connection" aria-label="Test Connection">
+            <img src="icons/connection-test-idle.png" alt="Test Connection" class="connection-icon">
+          </button>
+        </div>
       </div>
 
       <div class="form-group">
@@ -60,8 +66,8 @@
       </div>
 
       <div class="form-actions">
-        <button type="submit" class="btn btn-primary">Save Settings</button>
-        <button type="button" id="test-connection" class="btn btn-secondary">Test Connection</button>
+        <button type="submit" class="btn btn-primary" disabled>Save Settings</button>
+        <button type="button" id="reset-changes" class="btn btn-secondary" hidden>Reset Changes</button>
       </div>
     </form>
 

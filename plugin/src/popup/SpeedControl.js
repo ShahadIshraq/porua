@@ -57,7 +57,7 @@ export class SpeedControl {
     this.currentSpeed = this.clampSpeed(initialSpeed);
     this.render();
     this.setupEventListeners();
-    this.setupAudioPreviewCallback();
+    // Note: Audio preview callback is managed by SettingsForm for shared instance
   }
 
   /**
@@ -246,32 +246,37 @@ export class SpeedControl {
   }
 
   /**
-   * Setup callback for audio preview state changes
+   * Handle audio preview state changes (called by SettingsForm's shared callback)
+   * @param {string} id - The audio ID
+   * @param {string} state - The playback state
+   * @param {string} error - Error message if state is 'error'
    */
-  setupAudioPreviewCallback() {
-    this.audioPreview.onPlayStateChange = (id, state, error) => {
-      if (id !== this.TEST_ID) return;
+  handleAudioPreviewStateChange(id, state, error) {
+    if (id !== this.TEST_ID) return;
 
-      this.updateTestButtonState(state);
+    this.updateTestButtonState(state);
 
-      if (state === 'error') {
-        this.isTestingSpeed = false;
-        this.statusMessage.show(`Preview error: ${error || 'Unknown error'}`, 'error');
-      } else if (state === 'stopped') {
-        this.isTestingSpeed = false;
-      }
-    };
+    if (state === 'error') {
+      this.isTestingSpeed = false;
+      this.statusMessage.show(`Preview error: ${error || 'Unknown error'}`, 'error');
+    } else if (state === 'stopped') {
+      this.isTestingSpeed = false;
+    }
   }
 
   /**
    * Handle test button click
    */
   async handleTestClick() {
-    if (this.isTestingSpeed) {
-      // Stop current test
-      this.audioPreview.stop();
-      this.isTestingSpeed = false;
-      this.updateTestButtonState('idle');
+    // Check if we're currently playing and should pause
+    if (this.isTestingSpeed && !this.audioPreview.isPaused()) {
+      this.audioPreview.pause();
+      return;
+    }
+
+    // Check if we're paused and should resume
+    if (this.isTestingSpeed && this.audioPreview.isPaused()) {
+      await this.audioPreview.resume();
       return;
     }
 
@@ -316,7 +321,7 @@ export class SpeedControl {
 
   /**
    * Update test button visual state
-   * @param {string} state - 'idle', 'loading', 'playing', 'stopped', or 'error'
+   * @param {string} state - 'idle', 'loading', 'playing', 'paused', 'stopped', or 'error'
    */
   updateTestButtonState(state) {
     if (!this.testButton) return;
@@ -330,15 +335,23 @@ export class SpeedControl {
         text.textContent = 'Loading...';
         this.testButton.disabled = false;
         this.testButton.classList.add('loading');
-        this.testButton.classList.remove('playing');
+        this.testButton.classList.remove('playing', 'paused');
         break;
 
       case 'playing':
-        icon.textContent = '■';
-        text.textContent = 'Stop Test';
+        icon.textContent = '❚❚';
+        text.textContent = 'Pause';
         this.testButton.disabled = false;
-        this.testButton.classList.remove('loading');
+        this.testButton.classList.remove('loading', 'paused');
         this.testButton.classList.add('playing');
+        break;
+
+      case 'paused':
+        icon.textContent = '▶';
+        text.textContent = 'Resume';
+        this.testButton.disabled = false;
+        this.testButton.classList.remove('loading', 'playing');
+        this.testButton.classList.add('paused');
         break;
 
       case 'idle':
@@ -348,7 +361,7 @@ export class SpeedControl {
         icon.textContent = '▶';
         text.textContent = 'Test Speed';
         this.testButton.disabled = false;
-        this.testButton.classList.remove('loading', 'playing');
+        this.testButton.classList.remove('loading', 'playing', 'paused');
         break;
     }
   }
@@ -362,8 +375,7 @@ export class SpeedControl {
       this.audioPreview.stop();
     }
 
-    // Clear audio preview callback
-    this.audioPreview.onPlayStateChange = null;
+    // Note: Don't clear audio preview callback - it's shared and managed by SettingsForm
 
     // Event listeners will be removed when the DOM is cleared
     this.slider = null;

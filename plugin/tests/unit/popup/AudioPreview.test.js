@@ -273,6 +273,96 @@ describe('AudioPreview', () => {
     });
   });
 
+  describe('pause and resume', () => {
+    it('should pause current playback', async () => {
+      await audioPreview.play('af_nova', mockBlob);
+      audioPreview.audioElement.paused = false;
+
+      audioPreview.pause();
+
+      expect(audioPreview.audioElement.paused).toBe(true);
+    });
+
+    it('should notify paused state', async () => {
+      await audioPreview.play('af_nova', mockBlob);
+      audioPreview.audioElement.paused = false;
+      mockCallback.mockClear();
+
+      audioPreview.pause();
+
+      expect(mockCallback).toHaveBeenCalledWith('af_nova', 'paused');
+    });
+
+    it('should resume paused playback', async () => {
+      await audioPreview.play('af_nova', mockBlob);
+      audioPreview.audioElement.paused = true;
+      mockCallback.mockClear();
+
+      await audioPreview.resume();
+
+      expect(audioPreview.audioElement.paused).toBe(false);
+      expect(mockCallback).toHaveBeenCalledWith('af_nova', 'playing');
+    });
+  });
+
+  describe('isPaused', () => {
+    it('should return false when no audio is loaded', () => {
+      expect(audioPreview.isPaused()).toBe(false);
+    });
+
+    it('should return false when audio is playing', async () => {
+      await audioPreview.play('af_nova', mockBlob);
+      audioPreview.audioElement.paused = false;
+      audioPreview.audioElement.currentTime = 1;
+
+      expect(audioPreview.isPaused()).toBe(false);
+    });
+
+    it('should return true when audio is paused', async () => {
+      await audioPreview.play('af_nova', mockBlob);
+      audioPreview.audioElement.paused = true;
+      audioPreview.audioElement.currentTime = 1;
+
+      expect(audioPreview.isPaused()).toBe(true);
+    });
+
+    it('should return false when audio is at beginning (not started)', async () => {
+      await audioPreview.play('af_nova', mockBlob);
+      audioPreview.audioElement.paused = true;
+      audioPreview.audioElement.currentTime = 0;
+
+      expect(audioPreview.isPaused()).toBe(false);
+    });
+
+    it('should return true when specific voice is paused', async () => {
+      await audioPreview.play('af_nova', mockBlob);
+      audioPreview.audioElement.paused = true;
+      audioPreview.audioElement.currentTime = 1;
+
+      expect(audioPreview.isPaused('af_nova')).toBe(true);
+    });
+
+    it('should return false when different voice is paused', async () => {
+      await audioPreview.play('af_nova', mockBlob);
+      audioPreview.audioElement.paused = true;
+      audioPreview.audioElement.currentTime = 1;
+
+      expect(audioPreview.isPaused('bf_lily')).toBe(false);
+    });
+
+    it('should return false when querying specific voice but none is paused', async () => {
+      await audioPreview.play('af_nova', mockBlob);
+      audioPreview.audioElement.paused = false;
+      audioPreview.audioElement.currentTime = 1;
+
+      expect(audioPreview.isPaused('af_nova')).toBe(false);
+    });
+
+    it('should return false when querying specific voice but no audio loaded', () => {
+      expect(audioPreview.isPaused('af_nova')).toBe(false);
+    });
+  });
+
   describe('cleanup', () => {
     it('should stop playback', async () => {
       await audioPreview.play('af_nova', mockBlob);

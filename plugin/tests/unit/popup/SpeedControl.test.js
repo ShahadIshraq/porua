@@ -16,6 +16,9 @@ describe('SpeedControl', () => {
       audioPreview: {
         play: vi.fn().mockResolvedValue(undefined),
         stop: vi.fn(),
+        pause: vi.fn(),
+        resume: vi.fn().mockResolvedValue(undefined),
+        isPaused: vi.fn().mockReturnValue(false),
         isPlaying: vi.fn().mockReturnValue(false),
         onPlayStateChange: null,
         cleanup: vi.fn()
@@ -489,14 +492,24 @@ describe('SpeedControl', () => {
         await testPromise;
       });
 
-      it('should stop audio if already testing', async () => {
+      it('should pause audio if already playing', async () => {
         speedControl.init(1.0);
         speedControl.isTestingSpeed = true;
+        mockDependencies.audioPreview.isPaused.mockReturnValue(false);
 
         await speedControl.handleTestClick();
 
-        expect(mockDependencies.audioPreview.stop).toHaveBeenCalled();
-        expect(speedControl.isTestingSpeed).toBe(false);
+        expect(mockDependencies.audioPreview.pause).toHaveBeenCalled();
+      });
+
+      it('should resume audio if paused', async () => {
+        speedControl.init(1.0);
+        speedControl.isTestingSpeed = true;
+        mockDependencies.audioPreview.isPaused.mockReturnValue(true);
+
+        await speedControl.handleTestClick();
+
+        expect(mockDependencies.audioPreview.resume).toHaveBeenCalled();
       });
 
       it('should handle synthesis error', async () => {
@@ -584,9 +597,23 @@ describe('SpeedControl', () => {
         const text = mockContainer.querySelector('.test-btn-text');
         const button = mockContainer.querySelector('#speed-test-btn');
 
-        expect(icon.textContent).toBe('■');
-        expect(text.textContent).toBe('Stop Test');
+        expect(icon.textContent).toBe('❚❚');
+        expect(text.textContent).toBe('Pause');
         expect(button.classList.contains('playing')).toBe(true);
+      });
+
+      it('should update button to paused state', () => {
+        speedControl.init(1.0);
+
+        speedControl.updateTestButtonState('paused');
+
+        const icon = mockContainer.querySelector('.test-btn-icon');
+        const text = mockContainer.querySelector('.test-btn-text');
+        const button = mockContainer.querySelector('#speed-test-btn');
+
+        expect(icon.textContent).toBe('▶');
+        expect(text.textContent).toBe('Resume');
+        expect(button.classList.contains('paused')).toBe(true);
       });
 
       it('should update button to idle state', () => {
@@ -606,19 +633,12 @@ describe('SpeedControl', () => {
       });
     });
 
-    describe('setupAudioPreviewCallback', () => {
-      it('should set callback on audio preview', () => {
-        speedControl.init(1.0);
-
-        expect(mockDependencies.audioPreview.onPlayStateChange).toBeDefined();
-        expect(typeof mockDependencies.audioPreview.onPlayStateChange).toBe('function');
-      });
-
+    describe('handleAudioPreviewStateChange', () => {
       it('should update button state on state change', () => {
         speedControl.init(1.0);
         const updateSpy = vi.spyOn(speedControl, 'updateTestButtonState');
 
-        mockDependencies.audioPreview.onPlayStateChange('speed-test', 'playing');
+        speedControl.handleAudioPreviewStateChange('speed-test', 'playing');
 
         expect(updateSpy).toHaveBeenCalledWith('playing');
       });
@@ -627,7 +647,7 @@ describe('SpeedControl', () => {
         speedControl.init(1.0);
         const updateSpy = vi.spyOn(speedControl, 'updateTestButtonState');
 
-        mockDependencies.audioPreview.onPlayStateChange('other-id', 'playing');
+        speedControl.handleAudioPreviewStateChange('other-id', 'playing');
 
         expect(updateSpy).not.toHaveBeenCalled();
       });
@@ -635,7 +655,7 @@ describe('SpeedControl', () => {
       it('should show error message on error state', () => {
         speedControl.init(1.0);
 
-        mockDependencies.audioPreview.onPlayStateChange('speed-test', 'error', 'Test error');
+        speedControl.handleAudioPreviewStateChange('speed-test', 'error', 'Test error');
 
         expect(mockDependencies.statusMessage.show).toHaveBeenCalledWith(
           'Preview error: Test error',
@@ -647,7 +667,7 @@ describe('SpeedControl', () => {
         speedControl.init(1.0);
         speedControl.isTestingSpeed = true;
 
-        mockDependencies.audioPreview.onPlayStateChange('speed-test', 'stopped');
+        speedControl.handleAudioPreviewStateChange('speed-test', 'stopped');
 
         expect(speedControl.isTestingSpeed).toBe(false);
       });
@@ -663,13 +683,15 @@ describe('SpeedControl', () => {
         expect(mockDependencies.audioPreview.stop).toHaveBeenCalled();
       });
 
-      it('should clear audio preview callback', () => {
+      it('should not clear audio preview callback (managed by SettingsForm)', () => {
         speedControl.init(1.0);
-        mockDependencies.audioPreview.onPlayStateChange = vi.fn();
+        const mockCallback = vi.fn();
+        mockDependencies.audioPreview.onPlayStateChange = mockCallback;
 
         speedControl.cleanup();
 
-        expect(speedControl.audioPreview.onPlayStateChange).toBeNull();
+        // Callback should remain since it's shared and managed externally
+        expect(speedControl.audioPreview.onPlayStateChange).toBe(mockCallback);
       });
 
       it('should reset isTestingSpeed flag', () => {

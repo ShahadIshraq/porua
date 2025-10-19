@@ -24,10 +24,13 @@ export class VoiceSelector {
       'British English': false
     };
 
-    // Bind audio preview callback
-    this.audioPreview.onPlayStateChange = (voiceId, state, error) => {
-      this.handlePlaybackStateChange(voiceId, state, error);
-    };
+    // If we created our own AudioPreview (not shared), bind callback directly
+    if (!audioPreview) {
+      this.audioPreview.onPlayStateChange = (voiceId, state, error) => {
+        this.handlePlaybackStateChange(voiceId, state, error);
+      };
+    }
+    // Otherwise, SettingsForm will manage the shared callback
   }
 
   /**
@@ -276,8 +279,11 @@ export class VoiceSelector {
       playButtonClass += ' loading';
       playButtonDisabled = 'disabled';
     } else if (state === 'playing') {
-      playButtonContent = '■';
+      playButtonContent = '❚❚';
       playButtonClass += ' playing';
+    } else if (state === 'paused') {
+      playButtonContent = '▶';
+      playButtonClass += ' paused';
     }
 
     const selectButtonClass = isSelected ? 'btn-select selected' : 'btn-select';
@@ -356,22 +362,27 @@ export class VoiceSelector {
    * @param {string} voiceId
    */
   async handlePlayClick(voiceId) {
-    const currentState = this.playbackStates[voiceId];
+    // Check if this voice is currently playing and should pause
+    if (this.audioPreview.isPlaying(voiceId)) {
+      this.audioPreview.pause();
+      return;
+    }
 
-    if (currentState === 'playing') {
-      // Stop playback
-      this.audioPreview.stop();
-    } else {
-      // Start playback - fetch audio with authentication via TTSService
-      try {
-        const audioBlob = await ttsService.fetchVoiceSample(voiceId);
-        await this.audioPreview.play(voiceId, audioBlob);
-      } catch (error) {
-        console.error('[VoiceSelector] Failed to fetch voice sample:', error);
-        this.playbackStates[voiceId] = 'error';
-        this.statusMessage.show('Failed to load voice sample', 'error');
-        this.updateVoiceItemUI(voiceId);
-      }
+    // Check if THIS specific voice is paused and should resume
+    if (this.audioPreview.isPaused(voiceId)) {
+      await this.audioPreview.resume();
+      return;
+    }
+
+    // Start new playback - fetch audio with authentication via TTSService
+    try {
+      const audioBlob = await ttsService.fetchVoiceSample(voiceId);
+      await this.audioPreview.play(voiceId, audioBlob);
+    } catch (error) {
+      console.error('[VoiceSelector] Failed to fetch voice sample:', error);
+      this.playbackStates[voiceId] = 'error';
+      this.statusMessage.show('Failed to load voice sample', 'error');
+      this.updateVoiceItemUI(voiceId);
     }
   }
 
@@ -405,7 +416,7 @@ export class VoiceSelector {
   /**
    * Handle playback state changes from AudioPreview
    * @param {string} voiceId
-   * @param {string} state - 'loading'|'playing'|'stopped'|'error'
+   * @param {string} state - 'loading'|'playing'|'paused'|'stopped'|'error'
    * @param {string} error - Error message if state is 'error'
    */
   handlePlaybackStateChange(voiceId, state, error) {
@@ -433,7 +444,7 @@ export class VoiceSelector {
     const state = this.playbackStates[voiceId];
 
     // Reset classes
-    playBtn.classList.remove('loading', 'playing');
+    playBtn.classList.remove('loading', 'playing', 'paused');
     playBtn.disabled = false;
 
     // Update based on state
@@ -444,8 +455,12 @@ export class VoiceSelector {
         playBtn.disabled = true;
         break;
       case 'playing':
-        playBtn.textContent = '■';
+        playBtn.textContent = '❚❚';
         playBtn.classList.add('playing');
+        break;
+      case 'paused':
+        playBtn.textContent = '▶';
+        playBtn.classList.add('paused');
         break;
       case 'stopped':
       case 'idle':
