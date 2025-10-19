@@ -43,6 +43,7 @@ class TTSContentScript {
 
     this.wireupContinuousPlayback();
     this.wireupSkipControls();
+    this.wireupKeyboardShortcuts();
   }
 
   async init() {
@@ -55,6 +56,34 @@ class TTSContentScript {
 
   wireupSkipControls() {
     this.playerControl.setOnSkip((seconds) => this.handleSkip(seconds));
+  }
+
+  wireupKeyboardShortcuts() {
+    this.eventManager.on(document, 'keydown', (e) => {
+      // Only handle shortcuts when playing or paused
+      const state = this.state.getState();
+      if (state !== PLAYER_STATES.PLAYING && state !== PLAYER_STATES.PAUSED) {
+        return;
+      }
+
+      // Ignore if user is typing in input field
+      if (e.target.matches('input, textarea, select, [contenteditable="true"]')) {
+        return;
+      }
+
+      const skipInterval = this.playerControl.skipInterval || 10;
+
+      switch(e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          this.handleSkip(e.shiftKey ? -30 : -skipInterval);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          this.handleSkip(e.shiftKey ? 30 : skipInterval);
+          break;
+      }
+    });
   }
 
   wireupContinuousPlayback() {
