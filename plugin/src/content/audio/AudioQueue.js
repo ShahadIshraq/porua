@@ -153,6 +153,56 @@ export class AudioQueue {
     this.onProgressCallback = callback;
   }
 
+  /**
+   * Seek forward or backward by specified seconds
+   * @param {number} seconds - Positive for forward, negative for backward
+   * @returns {boolean} True if seek was performed, false if not possible
+   */
+  seek(seconds) {
+    if (!this.currentAudio) {
+      return false;
+    }
+
+    const newTime = this.currentAudio.currentTime + seconds;
+
+    if (newTime < 0) {
+      // Clamp to start of current chunk
+      // Caller can check if we're at 0 and handle cross-paragraph navigation
+      this.currentAudio.currentTime = 0;
+    } else if (newTime >= this.currentAudio.duration) {
+      // Skip to near end of chunk to trigger onended handler
+      this.currentAudio.currentTime = this.currentAudio.duration - 0.01;
+    } else {
+      // Normal seek within chunk
+      this.currentAudio.currentTime = newTime;
+    }
+
+    // Immediately update highlight for new position
+    if (this.currentMetadata) {
+      const startOffsetMs = this.currentMetadata.start_offset_ms;
+      const currentTimeMs = startOffsetMs + (this.currentAudio.currentTime * 1000);
+      this.highlightManager.updateHighlight(currentTimeMs);
+    }
+
+    return true;
+  }
+
+  /**
+   * Get current playback time within current chunk
+   * @returns {number} Current time in seconds
+   */
+  getCurrentTime() {
+    return this.currentAudio ? this.currentAudio.currentTime : 0;
+  }
+
+  /**
+   * Get duration of current chunk
+   * @returns {number} Duration in seconds
+   */
+  getCurrentDuration() {
+    return this.currentAudio ? this.currentAudio.duration : 0;
+  }
+
   finish() {
     this.isPlaying = false;
 

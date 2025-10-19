@@ -574,6 +574,156 @@ describe('AudioQueue', () => {
     });
   });
 
+  describe('seek', () => {
+    beforeEach(async () => {
+      audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: 1000 });
+      await audioQueue.play();
+      // Mock duration
+      Object.defineProperty(mockAudio, 'duration', {
+        value: 10,
+        writable: true,
+        configurable: true
+      });
+    });
+
+    it('should seek forward within chunk', () => {
+      mockAudio.currentTime = 2;
+
+      const result = audioQueue.seek(3);
+
+      expect(result).toBe(true);
+      expect(mockAudio.currentTime).toBe(5);
+    });
+
+    it('should seek backward within chunk', () => {
+      mockAudio.currentTime = 5;
+
+      const result = audioQueue.seek(-2);
+
+      expect(result).toBe(true);
+      expect(mockAudio.currentTime).toBe(3);
+    });
+
+    it('should clamp to 0 when seeking backward past start', () => {
+      mockAudio.currentTime = 2;
+
+      const result = audioQueue.seek(-5);
+
+      expect(result).toBe(true);
+      expect(mockAudio.currentTime).toBe(0);
+    });
+
+    it('should clamp to near end when seeking forward past duration', () => {
+      mockAudio.currentTime = 8;
+      mockAudio.duration = 10;
+
+      const result = audioQueue.seek(5);
+
+      expect(result).toBe(true);
+      expect(mockAudio.currentTime).toBe(9.99); // duration - 0.01
+    });
+
+    it('should return false when no current audio', () => {
+      audioQueue.currentAudio = null;
+
+      const result = audioQueue.seek(5);
+
+      expect(result).toBe(false);
+    });
+
+    it('should update highlight after seek', () => {
+      mockAudio.currentTime = 2;
+      mockHighlightManager.updateHighlight.mockClear();
+
+      audioQueue.seek(3);
+
+      const expectedTime = 1000 + (5 * 1000); // start_offset_ms + new time
+      expect(mockHighlightManager.updateHighlight).toHaveBeenCalledWith(expectedTime);
+    });
+
+    it('should not update highlight when no metadata', async () => {
+      audioQueue.clear();
+      audioQueue.enqueue(new Blob(['audio']), null);
+      await audioQueue.play();
+      mockAudio.currentTime = 2;
+      mockHighlightManager.updateHighlight.mockClear();
+
+      audioQueue.seek(3);
+
+      expect(mockHighlightManager.updateHighlight).not.toHaveBeenCalled();
+    });
+
+    it('should handle seek to exactly 0', () => {
+      mockAudio.currentTime = 5;
+
+      const result = audioQueue.seek(-5);
+
+      expect(result).toBe(true);
+      expect(mockAudio.currentTime).toBe(0);
+    });
+
+    it('should handle seek to exact duration', () => {
+      mockAudio.currentTime = 5;
+      mockAudio.duration = 10;
+
+      const result = audioQueue.seek(5);
+
+      expect(result).toBe(true);
+      expect(mockAudio.currentTime).toBe(9.99);
+    });
+  });
+
+  describe('getCurrentTime', () => {
+    it('should return current time when audio exists', async () => {
+      audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: 0 });
+      await audioQueue.play();
+      mockAudio.currentTime = 5.5;
+
+      expect(audioQueue.getCurrentTime()).toBe(5.5);
+    });
+
+    it('should return 0 when no audio', () => {
+      expect(audioQueue.getCurrentTime()).toBe(0);
+    });
+
+    it('should return 0 after clear', async () => {
+      audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: 0 });
+      await audioQueue.play();
+      mockAudio.currentTime = 5;
+
+      audioQueue.clear();
+
+      expect(audioQueue.getCurrentTime()).toBe(0);
+    });
+  });
+
+  describe('getCurrentDuration', () => {
+    it('should return duration when audio exists', async () => {
+      audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: 0 });
+      await audioQueue.play();
+      Object.defineProperty(mockAudio, 'duration', {
+        value: 10.5,
+        writable: true,
+        configurable: true
+      });
+
+      expect(audioQueue.getCurrentDuration()).toBe(10.5);
+    });
+
+    it('should return 0 when no audio', () => {
+      expect(audioQueue.getCurrentDuration()).toBe(0);
+    });
+
+    it('should return 0 after clear', async () => {
+      audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: 0 });
+      await audioQueue.play();
+
+      audioQueue.clear();
+
+      expect(audioQueue.getCurrentDuration()).toBe(0);
+    });
+  });
+
   describe('full playback flow', () => {
     it('should play multiple items in sequence', async () => {
       const blob1 = new Blob(['audio 1']);
@@ -609,6 +759,22 @@ describe('AudioQueue', () => {
 
       await audioQueue.resume();
       expect(audioQueue.isPlaying).toBe(true);
+    });
+
+    it('should handle seek during playback', async () => {
+      audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: 0 });
+      await audioQueue.play();
+      Object.defineProperty(mockAudio, 'duration', {
+        value: 10,
+        writable: true,
+        configurable: true
+      });
+      mockAudio.currentTime = 3;
+
+      const seeked = audioQueue.seek(2);
+
+      expect(seeked).toBe(true);
+      expect(mockAudio.currentTime).toBe(5);
     });
   });
 });
