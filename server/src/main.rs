@@ -309,7 +309,11 @@ mod tests {
         env::remove_var("REQUEST_TIMEOUT_SECONDS");
 
         let timeout = load_request_timeout();
-        assert_eq!(timeout, Duration::from_secs(60), "Default timeout should be 60 seconds");
+        assert_eq!(
+            timeout,
+            Duration::from_secs(60),
+            "Default timeout should be 60 seconds"
+        );
     }
 
     #[test]
@@ -318,7 +322,11 @@ mod tests {
         env::set_var("REQUEST_TIMEOUT_SECONDS", "120");
 
         let timeout = load_request_timeout();
-        assert_eq!(timeout, Duration::from_secs(120), "Custom timeout should be 120 seconds");
+        assert_eq!(
+            timeout,
+            Duration::from_secs(120),
+            "Custom timeout should be 120 seconds"
+        );
 
         // Cleanup
         env::remove_var("REQUEST_TIMEOUT_SECONDS");
@@ -330,7 +338,11 @@ mod tests {
         env::set_var("REQUEST_TIMEOUT_SECONDS", "invalid");
 
         let timeout = load_request_timeout();
-        assert_eq!(timeout, Duration::from_secs(60), "Invalid timeout should fall back to 60 seconds");
+        assert_eq!(
+            timeout,
+            Duration::from_secs(60),
+            "Invalid timeout should fall back to 60 seconds"
+        );
 
         // Cleanup
         env::remove_var("REQUEST_TIMEOUT_SECONDS");
@@ -342,7 +354,11 @@ mod tests {
         env::set_var("REQUEST_TIMEOUT_SECONDS", "-1");
 
         let timeout = load_request_timeout();
-        assert_eq!(timeout, Duration::from_secs(60), "Negative timeout should fall back to 60 seconds");
+        assert_eq!(
+            timeout,
+            Duration::from_secs(60),
+            "Negative timeout should fall back to 60 seconds"
+        );
 
         // Cleanup
         env::remove_var("REQUEST_TIMEOUT_SECONDS");
@@ -354,7 +370,11 @@ mod tests {
         env::set_var("REQUEST_TIMEOUT_SECONDS", "0");
 
         let timeout = load_request_timeout();
-        assert_eq!(timeout, Duration::from_secs(0), "Zero timeout should be accepted");
+        assert_eq!(
+            timeout,
+            Duration::from_secs(0),
+            "Zero timeout should be accepted"
+        );
 
         // Cleanup
         env::remove_var("REQUEST_TIMEOUT_SECONDS");
@@ -366,7 +386,11 @@ mod tests {
         env::set_var("REQUEST_TIMEOUT_SECONDS", "3600");
 
         let timeout = load_request_timeout();
-        assert_eq!(timeout, Duration::from_secs(3600), "Large timeout should be accepted");
+        assert_eq!(
+            timeout,
+            Duration::from_secs(3600),
+            "Large timeout should be accepted"
+        );
 
         // Cleanup
         env::remove_var("REQUEST_TIMEOUT_SECONDS");

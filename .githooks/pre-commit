@@ -1,11 +1,29 @@
 #!/bin/bash
 
-# Pre-commit hook to run Rust tests
-# This hook prevents commits if tests fail
+# Pre-commit hook to run Rust format check and tests
+# This hook prevents commits if format is incorrect or tests fail
 
 set -e
 
-echo "Running server tests before commit..."
+echo "Checking server code formatting..."
+echo ""
+
+# Check cargo format for the server
+if ! cargo fmt --manifest-path server/Cargo.toml --check; then
+    echo ""
+    echo "✗ Code formatting check failed!"
+    echo ""
+    echo "To fix formatting, run:"
+    echo "  cargo fmt --manifest-path server/Cargo.toml"
+    echo ""
+    echo "To skip this hook (not recommended):"
+    echo "  git commit --no-verify"
+    exit 1
+fi
+
+echo "✓ Code formatting is correct!"
+echo ""
+echo "Running server tests..."
 echo ""
 
 # Run cargo test for the server

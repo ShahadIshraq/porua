@@ -819,11 +819,16 @@ mod tests {
         println!("Normalized: {:?}", result.normalized);
 
         // Should normalize the currency with scale
-        assert!(result.normalized.contains("billion dollars") || result.normalized.contains("$1.083"));
+        assert!(
+            result.normalized.contains("billion dollars") || result.normalized.contains("$1.083")
+        );
 
         // Debug: Check what's in the normalized text
         if !result.normalized.contains("billion dollars") {
-            panic!("Expected 'billion dollars' in normalized text, but got: {}", result.normalized);
+            panic!(
+                "Expected 'billion dollars' in normalized text, but got: {}",
+                result.normalized
+            );
         }
     }
 }

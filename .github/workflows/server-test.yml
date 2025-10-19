@@ -26,6 +26,9 @@ jobs:
         with:
           workspaces: server
 
+      - name: Check code formatting
+        run: cargo fmt --manifest-path server/Cargo.toml --check
+
       - name: Run tests
         run: cargo test --manifest-path server/Cargo.toml --verbose
 
