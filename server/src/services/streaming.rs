@@ -701,10 +701,7 @@ mod tests {
 
         // Sentence boundaries should be preserved
         let periods = normalized.matches('.').count();
-        assert_eq!(
-            periods, 3,
-            "Should preserve all sentence-ending periods"
-        );
+        assert_eq!(periods, 3, "Should preserve all sentence-ending periods");
 
         // Chunking should still work correctly
         let config = ChunkingConfig::default();
@@ -723,10 +720,7 @@ mod tests {
         let normalized = normalize_simple(text);
 
         // Should normalize both currency values
-        assert!(
-            !normalized.contains('$'),
-            "Should not contain $ symbols"
-        );
+        assert!(!normalized.contains('$'), "Should not contain $ symbols");
         assert!(
             normalized.contains("billion dollars"),
             "Should contain normalized currency"

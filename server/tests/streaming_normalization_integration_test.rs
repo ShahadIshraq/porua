@@ -3,7 +3,6 @@
 /// These tests verify that the streaming endpoint properly normalizes text
 /// before chunking and passing to the TTS engine, ensuring consistency with
 /// the general endpoint.
-
 use porua_server::chunking::*;
 use porua_server::text_processing::normalization::*;
 
@@ -59,7 +58,11 @@ fn test_streaming_chunk_count_may_change_integration() {
     let normalized_chunks = chunk_text(&normalized, &config);
 
     // Log for debugging
-    println!("Raw text: {} chars, {} chunks", text.len(), raw_chunks.len());
+    println!(
+        "Raw text: {} chars, {} chunks",
+        text.len(),
+        raw_chunks.len()
+    );
     println!(
         "Normalized: {} chars, {} chunks",
         normalized.len(),
@@ -102,14 +105,7 @@ fn test_streaming_preserves_semantic_meaning() {
 
 #[test]
 fn test_streaming_handles_empty_and_edge_cases() {
-    let test_cases = vec![
-        "",
-        " ",
-        "   ",
-        "No special characters here",
-        ".",
-        "!",
-    ];
+    let test_cases = vec!["", " ", "   ", "No special characters here", ".", "!"];
 
     for text in test_cases {
         let normalized = normalize_simple(text);
@@ -156,7 +152,10 @@ fn test_streaming_multiple_patterns_integration() {
         combined.contains("one hundred dollars"),
         "Should normalize currency"
     );
-    assert!(combined.contains("fifty percent"), "Should normalize percentage");
+    assert!(
+        combined.contains("fifty percent"),
+        "Should normalize percentage"
+    );
     assert!(
         !combined.contains('$') && !combined.contains('%'),
         "Should not contain raw symbols"
