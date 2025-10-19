@@ -19,6 +19,7 @@ use rate_limit::{PerIpRateLimiter, PerKeyRateLimiter, RateLimitConfig, RateLimit
 use server::{create_router, AppState};
 use std::env;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[tokio::main]
 async fn main() -> error::Result<()> {
@@ -130,10 +131,17 @@ async fn main() -> error::Result<()> {
             println!("  Set RATE_LIMIT_MODE=auto to enable protection");
         }
 
+        // Get request timeout from environment or default to 60 seconds
+        let request_timeout = load_request_timeout();
+        println!("\nRequest Timeout:");
+        println!("  Timeout: {} seconds", request_timeout.as_secs());
+        println!("  Configure: REQUEST_TIMEOUT_SECONDS (default: 60)");
+
         let state = AppState {
             tts_pool: Arc::new(tts_pool),
             api_keys: api_keys.clone(),
             rate_limiter,
+            request_timeout,
         };
 
         let app = create_router(state);
@@ -271,5 +279,89 @@ fn load_unauthenticated_config() -> RateLimitConfig {
     RateLimitConfig {
         per_second,
         burst_size,
+    }
+}
+
+/// Load request timeout configuration from environment variable
+fn load_request_timeout() -> Duration {
+    let timeout_seconds = env::var("REQUEST_TIMEOUT_SECONDS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .unwrap_or(60); // Default to 60 seconds
+
+    Duration::from_secs(timeout_seconds)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load_request_timeout_default() {
+        // Clear environment variable to test default
+        env::remove_var("REQUEST_TIMEOUT_SECONDS");
+
+        let timeout = load_request_timeout();
+        assert_eq!(timeout, Duration::from_secs(60), "Default timeout should be 60 seconds");
+    }
+
+    #[test]
+    fn test_load_request_timeout_custom() {
+        // Set custom timeout
+        env::set_var("REQUEST_TIMEOUT_SECONDS", "120");
+
+        let timeout = load_request_timeout();
+        assert_eq!(timeout, Duration::from_secs(120), "Custom timeout should be 120 seconds");
+
+        // Cleanup
+        env::remove_var("REQUEST_TIMEOUT_SECONDS");
+    }
+
+    #[test]
+    fn test_load_request_timeout_invalid_falls_back_to_default() {
+        // Set invalid timeout value
+        env::set_var("REQUEST_TIMEOUT_SECONDS", "invalid");
+
+        let timeout = load_request_timeout();
+        assert_eq!(timeout, Duration::from_secs(60), "Invalid timeout should fall back to 60 seconds");
+
+        // Cleanup
+        env::remove_var("REQUEST_TIMEOUT_SECONDS");
+    }
+
+    #[test]
+    fn test_load_request_timeout_negative_falls_back_to_default() {
+        // Set negative timeout value
+        env::set_var("REQUEST_TIMEOUT_SECONDS", "-1");
+
+        let timeout = load_request_timeout();
+        assert_eq!(timeout, Duration::from_secs(60), "Negative timeout should fall back to 60 seconds");
+
+        // Cleanup
+        env::remove_var("REQUEST_TIMEOUT_SECONDS");
+    }
+
+    #[test]
+    fn test_load_request_timeout_zero_is_valid() {
+        // Set zero timeout (edge case - effectively disables timeout)
+        env::set_var("REQUEST_TIMEOUT_SECONDS", "0");
+
+        let timeout = load_request_timeout();
+        assert_eq!(timeout, Duration::from_secs(0), "Zero timeout should be accepted");
+
+        // Cleanup
+        env::remove_var("REQUEST_TIMEOUT_SECONDS");
+    }
+
+    #[test]
+    fn test_load_request_timeout_large_value() {
+        // Test large timeout value (e.g., 1 hour)
+        env::set_var("REQUEST_TIMEOUT_SECONDS", "3600");
+
+        let timeout = load_request_timeout();
+        assert_eq!(timeout, Duration::from_secs(3600), "Large timeout should be accepted");
+
+        // Cleanup
+        env::remove_var("REQUEST_TIMEOUT_SECONDS");
     }
 }
