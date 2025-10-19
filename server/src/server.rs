@@ -16,7 +16,7 @@ use crate::config::constants::MAX_TEXT_LENGTH;
 use crate::error::{Result, TtsError};
 use crate::kokoro::{voice_config::Voice, TTSPool};
 use crate::models::{HealthResponse, PoolStatsResponse, TTSRequest, VoiceInfo, VoicesResponse};
-use crate::rate_limit::PerKeyRateLimiter;
+use crate::rate_limit::RateLimiterMode;
 use crate::utils::temp_file::TempFile;
 
 // Shared application state
@@ -24,7 +24,7 @@ use crate::utils::temp_file::TempFile;
 pub struct AppState {
     pub tts_pool: Arc<TTSPool>,
     pub api_keys: ApiKeys,
-    pub rate_limiter: Option<PerKeyRateLimiter>,
+    pub rate_limiter: Option<RateLimiterMode>,
 }
 
 // HTTP Handlers

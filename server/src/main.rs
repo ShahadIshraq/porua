@@ -15,7 +15,7 @@ use auth::load_api_keys;
 use kokoro::model_paths::{get_model_path, get_voices_path};
 use kokoro::voice_config::Voice;
 use kokoro::{TTSPool, TTS};
-use rate_limit::{PerKeyRateLimiter, RateLimitConfig};
+use rate_limit::{PerIpRateLimiter, PerKeyRateLimiter, RateLimitConfig, RateLimiterMode};
 use server::{create_router, AppState};
 use std::env;
 use std::sync::Arc;
@@ -72,26 +72,8 @@ async fn main() -> error::Result<()> {
         // Load API keys
         let api_keys = load_api_keys();
 
-        // Initialize rate limiter only if API keys are enabled
-        let rate_limiter = if api_keys.is_enabled() {
-            // Get rate limit config from environment or use defaults
-            let per_second = env::var("RATE_LIMIT_PER_SECOND")
-                .ok()
-                .and_then(|s| s.parse::<u32>().ok())
-                .unwrap_or(10);
-            let burst_size = env::var("RATE_LIMIT_BURST_SIZE")
-                .ok()
-                .and_then(|s| s.parse::<u32>().ok())
-                .unwrap_or(20);
-
-            let rate_limit_config = RateLimitConfig {
-                per_second,
-                burst_size,
-            };
-            Some(PerKeyRateLimiter::new(rate_limit_config))
-        } else {
-            None
-        };
+        // Initialize rate limiter with dual-mode support
+        let rate_limiter = load_rate_limit_config(api_keys.is_enabled());
 
         println!("Initializing TTS pool with {} engines...", pool_size);
 
@@ -124,23 +106,28 @@ async fn main() -> error::Result<()> {
             println!("  Set TTS_API_KEY_FILE or create ./api_keys.txt to enable");
         }
         println!("\nRate Limiting:");
-        if rate_limiter.is_some() {
-            let per_second = env::var("RATE_LIMIT_PER_SECOND")
-                .ok()
-                .and_then(|s| s.parse::<u32>().ok())
-                .unwrap_or(10);
-            let burst_size = env::var("RATE_LIMIT_BURST_SIZE")
-                .ok()
-                .and_then(|s| s.parse::<u32>().ok())
-                .unwrap_or(20);
+        if let Some(ref limiter) = rate_limiter {
+            let config = limiter.config();
             println!("  Status: ENABLED");
-            println!("  Rate: {} requests/second", per_second);
-            println!("  Burst size: {} requests", burst_size);
-            println!("  Set RATE_LIMIT_PER_SECOND and RATE_LIMIT_BURST_SIZE to adjust");
-            println!("  Each API key has independent rate limits");
+            println!("  Mode: {}", limiter.mode_description());
+            println!("  Rate: {} requests/second", config.per_second);
+            println!("  Burst size: {} requests", config.burst_size);
+
+            match limiter {
+                RateLimiterMode::PerKey(_) => {
+                    println!("  Each API key has independent rate limits");
+                    println!("  Configure: RATE_LIMIT_AUTHENTICATED_PER_SECOND, RATE_LIMIT_AUTHENTICATED_BURST_SIZE");
+                }
+                RateLimiterMode::PerIp(_) => {
+                    println!("  Each IP address has independent rate limits");
+                    println!("  Configure: RATE_LIMIT_UNAUTHENTICATED_PER_SECOND, RATE_LIMIT_UNAUTHENTICATED_BURST_SIZE");
+                }
+            }
+            println!("  Set RATE_LIMIT_MODE to change mode (auto, per-key, per-ip, disabled)");
         } else {
-            println!("  Status: DISABLED (requires API key authentication)");
-            println!("  Enable authentication to activate rate limiting");
+            println!("  Status: DISABLED");
+            println!("  ⚠️  WARNING: Server is unprotected from abuse");
+            println!("  Set RATE_LIMIT_MODE=auto to enable protection");
         }
 
         let state = AppState {
@@ -215,4 +202,74 @@ async fn main() -> error::Result<()> {
     }
 
     Ok(())
+}
+
+/// Load rate limit configuration based on environment variables and API key status
+fn load_rate_limit_config(api_keys_enabled: bool) -> Option<RateLimiterMode> {
+    // Parse RATE_LIMIT_MODE environment variable
+    let mode = env::var("RATE_LIMIT_MODE")
+        .unwrap_or_else(|_| "auto".to_string())
+        .to_lowercase();
+
+    match mode.as_str() {
+        "disabled" => None,
+        "per-key" => {
+            let config = load_authenticated_config();
+            Some(RateLimiterMode::PerKey(PerKeyRateLimiter::new(config)))
+        }
+        "per-ip" => {
+            let config = load_unauthenticated_config();
+            Some(RateLimiterMode::PerIp(PerIpRateLimiter::new(config)))
+        }
+        "auto" | _ => {
+            // Auto mode: choose based on API key status
+            if api_keys_enabled {
+                let config = load_authenticated_config();
+                Some(RateLimiterMode::PerKey(PerKeyRateLimiter::new(config)))
+            } else {
+                let config = load_unauthenticated_config();
+                Some(RateLimiterMode::PerIp(PerIpRateLimiter::new(config)))
+            }
+        }
+    }
+}
+
+/// Load configuration for authenticated (per-key) rate limiting
+fn load_authenticated_config() -> RateLimitConfig {
+    let per_second = env::var("RATE_LIMIT_AUTHENTICATED_PER_SECOND")
+        .or_else(|_| env::var("RATE_LIMIT_PER_SECOND"))
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10);
+
+    let burst_size = env::var("RATE_LIMIT_AUTHENTICATED_BURST_SIZE")
+        .or_else(|_| env::var("RATE_LIMIT_BURST_SIZE"))
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20);
+
+    RateLimitConfig {
+        per_second,
+        burst_size,
+    }
+}
+
+/// Load configuration for unauthenticated (per-IP) rate limiting
+fn load_unauthenticated_config() -> RateLimitConfig {
+    let per_second = env::var("RATE_LIMIT_UNAUTHENTICATED_PER_SECOND")
+        .or_else(|_| env::var("RATE_LIMIT_PER_SECOND"))
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(5); // More restrictive default for unauthenticated
+
+    let burst_size = env::var("RATE_LIMIT_UNAUTHENTICATED_BURST_SIZE")
+        .or_else(|_| env::var("RATE_LIMIT_BURST_SIZE"))
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10); // More restrictive default for unauthenticated
+
+    RateLimitConfig {
+        per_second,
+        burst_size,
+    }
 }

@@ -419,6 +419,143 @@ RUST_LOG=warn ./target/release/tts_server --server
 RUST_LOG=tts_server=debug,ort=warn,kokoros=warn ./target/release/tts_server --server
 ```
 
+### Authentication & Rate Limiting
+
+The server supports optional API key authentication and intelligent rate limiting to protect against abuse.
+
+#### Authentication
+
+**Setup:**
+1. Create an `api_keys.txt` file with one API key per line
+2. Lines starting with `#` are treated as comments
+3. Empty lines are ignored
+
+**Example `api_keys.txt`:**
+```
+# Production API Keys
+production-key-abc123
+staging-key-xyz789
+
+# Development keys
+dev-key-test456
+```
+
+**API Key File Locations** (checked in order):
+1. `TTS_API_KEY_FILE` environment variable (highest priority)
+2. `./api_keys.txt` (current directory)
+3. `~/.tts-server/api_keys.txt` (user home directory)
+4. `/etc/tts-server/api_keys.txt` (system-wide)
+
+**Using API Keys:**
+
+Clients can authenticate using either header format:
+
+```bash
+# Method 1: X-API-Key header (preferred)
+curl -X POST http://localhost:3003/tts \
+  -H "X-API-Key: your-secret-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello world", "voice": "bf_lily"}' \
+  --output speech.wav
+
+# Method 2: Authorization Bearer token
+curl -X POST http://localhost:3003/tts \
+  -H "Authorization: Bearer your-secret-key-here" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello world", "voice": "bf_lily"}' \
+  --output speech.wav
+```
+
+#### Rate Limiting
+
+The server features **dual-mode rate limiting** that automatically adapts based on authentication status:
+
+**Automatic Mode Selection:**
+- **With API keys enabled**: Per-API-key rate limiting (each key has independent limits)
+- **Without API keys**: Per-IP address rate limiting (each IP has independent limits)
+
+**Default Rate Limits:**
+- **Authenticated** (with API keys): 10 requests/second, burst size 20
+- **Unauthenticated** (without API keys): 5 requests/second, burst size 10 (more restrictive)
+
+**Rate Limiting Modes:**
+
+Set via `RATE_LIMIT_MODE` environment variable:
+- `auto` - Automatic mode selection (recommended)
+- `per-key` - Rate limit by API key only (requires authentication)
+- `per-ip` - Rate limit by IP address only
+- `disabled` - No rate limiting (NOT recommended for production)
+
+**Configuration Examples:**
+
+```bash
+# Default behavior - auto mode
+./target/release/tts_server --server
+
+# Explicitly set auto mode
+RATE_LIMIT_MODE=auto ./target/release/tts_server --server
+
+# Force per-IP mode even with API keys
+RATE_LIMIT_MODE=per-ip ./target/release/tts_server --server
+
+# Disable rate limiting (development only!)
+RATE_LIMIT_MODE=disabled ./target/release/tts_server --server
+
+# Custom authenticated rate limits
+RATE_LIMIT_AUTHENTICATED_PER_SECOND=20 \
+RATE_LIMIT_AUTHENTICATED_BURST_SIZE=40 \
+./target/release/tts_server --server
+
+# Custom unauthenticated rate limits
+RATE_LIMIT_UNAUTHENTICATED_PER_SECOND=3 \
+RATE_LIMIT_UNAUTHENTICATED_BURST_SIZE=5 \
+./target/release/tts_server --server
+```
+
+**Environment Variables:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RATE_LIMIT_MODE` | `auto` | Rate limiting mode: `auto`, `per-key`, `per-ip`, `disabled` |
+| `RATE_LIMIT_AUTHENTICATED_PER_SECOND` | `10` | Requests/second for authenticated users |
+| `RATE_LIMIT_AUTHENTICATED_BURST_SIZE` | `20` | Burst size for authenticated users |
+| `RATE_LIMIT_UNAUTHENTICATED_PER_SECOND` | `5` | Requests/second for unauthenticated users |
+| `RATE_LIMIT_UNAUTHENTICATED_BURST_SIZE` | `10` | Burst size for unauthenticated users |
+| `TTS_API_KEY_FILE` | (none) | Path to API keys file |
+
+**Legacy Variables** (for backward compatibility):
+- `RATE_LIMIT_PER_SECOND` - Sets both authenticated and unauthenticated limits
+- `RATE_LIMIT_BURST_SIZE` - Sets both authenticated and unauthenticated burst sizes
+
+**Rate Limit Responses:**
+
+When rate limited, the server returns HTTP 429 with a `Retry-After` header:
+
+```bash
+HTTP/1.1 429 Too Many Requests
+Retry-After: 2
+Content-Type: application/json
+
+{
+  "status": "error",
+  "error": "Rate limit exceeded. Please retry after 2 seconds."
+}
+```
+
+**Behind Reverse Proxy:**
+
+The server automatically detects client IP addresses from:
+1. `X-Forwarded-For` header (load balancers)
+2. `X-Real-IP` header (nginx)
+3. Direct connection IP (fallback)
+
+**Production Recommendations:**
+- ✅ Enable API key authentication for production deployments
+- ✅ Use `auto` mode for intelligent rate limiting
+- ✅ Set appropriate limits based on your infrastructure capacity
+- ✅ Monitor rate limit violations in logs
+- ⚠️ Never disable rate limiting in production environments
+
 ## Packaging & Distribution
 
 ### Creating Distribution Packages
