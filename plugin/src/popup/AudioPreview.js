@@ -51,7 +51,56 @@ export class AudioPreview {
   }
 
   /**
-   * Stop current playback
+   * Pause current playback (keeps position)
+   */
+  pause() {
+    if (!this.audioElement.paused) {
+      this.audioElement.pause();
+
+      if (this.currentVoiceId && this.onPlayStateChange) {
+        this.onPlayStateChange(this.currentVoiceId, 'paused');
+      }
+    }
+  }
+
+  /**
+   * Resume paused playback
+   */
+  async resume() {
+    if (this.audioElement.paused && this.currentVoiceId) {
+      try {
+        await this.audioElement.play();
+        if (this.onPlayStateChange) {
+          this.onPlayStateChange(this.currentVoiceId, 'playing');
+        }
+      } catch (error) {
+        console.error('[AudioPreview] Resume error:', error);
+        if (this.onPlayStateChange) {
+          this.onPlayStateChange(this.currentVoiceId, 'error', error.message);
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if currently paused
+   * @param {string|null} voiceId - Optional voice ID to check if specific voice is paused
+   * @returns {boolean} True if paused (and matches voiceId if provided)
+   */
+  isPaused(voiceId = null) {
+    const isCurrentlyPaused = this.currentVoiceId !== null &&
+                             this.audioElement.paused &&
+                             this.audioElement.currentTime > 0;
+
+    if (voiceId === null) {
+      return isCurrentlyPaused;
+    }
+
+    return isCurrentlyPaused && this.currentVoiceId === voiceId;
+  }
+
+  /**
+   * Stop current playback (resets to beginning)
    */
   stop() {
     if (!this.audioElement.paused) {

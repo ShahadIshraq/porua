@@ -17,6 +17,7 @@ const mockSpeedControlInstance = {
   init: vi.fn(),
   getSpeed: vi.fn(() => 1.0),
   setSpeed: vi.fn(),
+  onChange: vi.fn(),
   cleanup: vi.fn()
 };
 
@@ -39,6 +40,10 @@ describe('SettingsForm', () => {
   let mockTestButton;
   let mockToggleButton;
   let mockChangeButton;
+  let mockSaveButton;
+  let mockResetButton;
+  let mockConnectionStatus;
+  let mockConnectionIcon;
 
   beforeEach(() => {
     // Create mock form elements
@@ -52,7 +57,15 @@ describe('SettingsForm', () => {
 
     mockTestButton = document.createElement('button');
     mockTestButton.id = 'test-connection';
-    mockTestButton.textContent = 'Test Connection';
+
+    mockConnectionIcon = document.createElement('img');
+    mockConnectionIcon.className = 'connection-icon';
+    mockConnectionIcon.src = 'icons/connection-test-idle.png';
+    mockTestButton.appendChild(mockConnectionIcon);
+
+    mockConnectionStatus = document.createElement('div');
+    mockConnectionStatus.id = 'connection-status';
+    mockConnectionStatus.className = 'connection-status hidden';
 
     mockToggleButton = document.createElement('button');
     mockToggleButton.id = 'toggle-visibility';
@@ -61,12 +74,23 @@ describe('SettingsForm', () => {
     mockChangeButton = document.createElement('button');
     mockChangeButton.id = 'change-key';
 
+    mockSaveButton = document.createElement('button');
+    mockSaveButton.type = 'submit';
+    mockSaveButton.textContent = 'Save Settings';
+
+    mockResetButton = document.createElement('button');
+    mockResetButton.id = 'reset-changes';
+    mockResetButton.hidden = true;
+
     mockFormElement = document.createElement('form');
     mockFormElement.appendChild(mockApiUrlInput);
     mockFormElement.appendChild(mockApiKeyInput);
     mockFormElement.appendChild(mockTestButton);
+    mockFormElement.appendChild(mockConnectionStatus);
     mockFormElement.appendChild(mockToggleButton);
     mockFormElement.appendChild(mockChangeButton);
+    mockFormElement.appendChild(mockSaveButton);
+    mockFormElement.appendChild(mockResetButton);
 
     // Create voice selector container
     const mockVoiceSelectorContainer = document.createElement('div');
@@ -86,10 +110,18 @@ describe('SettingsForm', () => {
           return mockApiKeyInput;
         case '#test-connection':
           return mockTestButton;
+        case '.connection-icon':
+          return mockConnectionIcon;
+        case '#connection-status':
+          return mockConnectionStatus;
         case '#toggle-visibility':
           return mockToggleButton;
         case '#change-key':
           return mockChangeButton;
+        case 'button[type="submit"]':
+          return mockSaveButton;
+        case '#reset-changes':
+          return mockResetButton;
         case '#voice-selector-container':
           return mockVoiceSelectorContainer;
         case '#speed-control-container':
@@ -119,6 +151,7 @@ describe('SettingsForm', () => {
     mockSpeedControlInstance.init.mockClear();
     mockSpeedControlInstance.getSpeed.mockClear().mockReturnValue(1.0);
     mockSpeedControlInstance.setSpeed.mockClear();
+    mockSpeedControlInstance.onChange.mockClear();
     mockSpeedControlInstance.cleanup.mockClear();
 
     // Create the SettingsForm instance
@@ -403,10 +436,8 @@ describe('SettingsForm', () => {
 
       await settingsForm.testConnection();
 
-      expect(mockStatusMessage.show).toHaveBeenCalledWith(
-        'Please enter an API URL',
-        'error'
-      );
+      expect(mockConnectionStatus.textContent).toBe('Please enter an API URL');
+      expect(mockConnectionStatus.className).toContain('error');
     });
 
     it('should disable test button during test', async () => {
@@ -416,7 +447,8 @@ describe('SettingsForm', () => {
       const testPromise = settingsForm.testConnection();
 
       expect(mockTestButton.disabled).toBe(true);
-      expect(mockTestButton.textContent).toBe('Testing...');
+      expect(mockConnectionStatus.textContent).toBe('Testing connection...');
+      expect(mockConnectionStatus.className).toContain('testing');
 
       await testPromise;
     });
@@ -428,7 +460,6 @@ describe('SettingsForm', () => {
       await settingsForm.testConnection();
 
       expect(mockTestButton.disabled).toBe(false);
-      expect(mockTestButton.textContent).toBe('Test Connection');
     });
 
     it('should reset ttsService before testing', async () => {
@@ -455,10 +486,9 @@ describe('SettingsForm', () => {
 
       await settingsForm.testConnection();
 
-      expect(mockStatusMessage.show).toHaveBeenCalledWith(
-        'Connection successful!',
-        'success'
-      );
+      expect(mockConnectionStatus.textContent).toBe('Connection successful');
+      expect(mockConnectionStatus.className).toContain('success');
+      expect(mockConnectionIcon.src).toContain('connection-test-success.png');
     });
 
     it('should show error for unexpected response', async () => {
@@ -467,10 +497,9 @@ describe('SettingsForm', () => {
 
       await settingsForm.testConnection();
 
-      expect(mockStatusMessage.show).toHaveBeenCalledWith(
-        'Unexpected response from server',
-        'error'
-      );
+      expect(mockConnectionStatus.textContent).toBe('Unexpected response from server');
+      expect(mockConnectionStatus.className).toContain('error');
+      expect(mockConnectionIcon.src).toContain('connection-test-fail.png');
     });
 
     it('should show auth error for 401', async () => {
@@ -481,10 +510,9 @@ describe('SettingsForm', () => {
 
       await settingsForm.testConnection();
 
-      expect(mockStatusMessage.show).toHaveBeenCalledWith(
-        'Authentication failed. Check your API key.',
-        'error'
-      );
+      expect(mockConnectionStatus.textContent).toBe('Authentication failed');
+      expect(mockConnectionStatus.className).toContain('error');
+      expect(mockConnectionIcon.src).toContain('connection-test-fail.png');
     });
 
     it('should show auth error for 403', async () => {
@@ -495,10 +523,9 @@ describe('SettingsForm', () => {
 
       await settingsForm.testConnection();
 
-      expect(mockStatusMessage.show).toHaveBeenCalledWith(
-        'Authentication failed. Check your API key.',
-        'error'
-      );
+      expect(mockConnectionStatus.textContent).toBe('Authentication failed');
+      expect(mockConnectionStatus.className).toContain('error');
+      expect(mockConnectionIcon.src).toContain('connection-test-fail.png');
     });
 
     it('should show connection error for other errors', async () => {
@@ -507,10 +534,9 @@ describe('SettingsForm', () => {
 
       await settingsForm.testConnection();
 
-      expect(mockStatusMessage.show).toHaveBeenCalledWith(
-        'Connection failed: Network error',
-        'error'
-      );
+      expect(mockConnectionStatus.textContent).toBe('Connection failed: Network error');
+      expect(mockConnectionStatus.className).toContain('error');
+      expect(mockConnectionIcon.src).toContain('connection-test-fail.png');
     });
   });
 
