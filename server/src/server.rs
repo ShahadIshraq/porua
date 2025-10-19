@@ -84,13 +84,15 @@ async fn generate_tts_single(state: AppState, req: TTSRequest) -> Result<Vec<u8>
     let temp_file = TempFile::new();
     let temp_path = temp_file.as_str().to_string();
 
-    let text = req.text.clone();
+    // Normalize text for TTS (semantic + unicode normalization)
+    let normalized_text = crate::text_processing::normalization::normalize_simple(&req.text);
+
     let voice = req.voice.clone();
     let speed = req.speed;
 
     // Move TTS generation to blocking thread pool
     let generation_result = tokio::task::spawn_blocking(move || {
-        futures::executor::block_on(tts.speak(&text, &temp_path, &voice, speed))
+        futures::executor::block_on(tts.speak(&normalized_text, &temp_path, &voice, speed))
             .map_err(|e| TtsError::TtsEngine(e.to_string()))
     })
     .await?;

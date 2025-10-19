@@ -29,6 +29,9 @@ unicode-normalization = "0.1"
 governor = "0.6"
 dashmap = "6.0"
 dotenvy = "0.15"
+num2words = "0.3"
+regex = "1.10"
+lazy_static = "1.4"
 
 [dev-dependencies]
 tempfile = "3.8"
