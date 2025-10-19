@@ -5,7 +5,7 @@ pub mod chunking;
 pub mod config;
 pub mod error;
 pub mod kokoro;
-pub mod models;
+mod models; // Internal module, not exported
 pub mod rate_limit;
 pub mod server;
 pub mod services;
