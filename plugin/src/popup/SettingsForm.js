@@ -2,6 +2,7 @@ import { SettingsStore } from '../shared/storage/SettingsStore.js';
 import { ttsService } from '../shared/services/TTSService.js';
 import { VoiceSelector } from './VoiceSelector.js';
 import { SpeedControl } from './SpeedControl.js';
+import { SkipControl } from './SkipControl.js';
 import { AudioPreview } from './AudioPreview.js';
 
 export class SettingsForm {
@@ -24,7 +25,8 @@ export class SettingsForm {
     // Dirty state tracking
     this.originalValues = {
       apiUrl: '',
-      speed: 1.0
+      speed: 1.0,
+      skipInterval: 10
     };
     this.isDirty = false;
     this.dirtyFields = new Set();
@@ -44,6 +46,10 @@ export class SettingsForm {
       settingsStore: SettingsStore,
       statusMessage: statusMessage
     });
+
+    // Initialize SkipControl
+    const skipControlContainer = formElement.querySelector('#skip-control-container');
+    this.skipControl = new SkipControl(skipControlContainer);
 
     // Setup combined callback for shared AudioPreview
     this.setupSharedAudioPreviewCallback();
@@ -91,6 +97,9 @@ export class SettingsForm {
     // Track speed changes
     this.speedControl.onChange(() => this.checkDirty());
 
+    // Track skip interval changes
+    this.skipControl.onChange(() => this.checkDirty());
+
     // Warn on window close with unsaved changes
     window.addEventListener('beforeunload', (e) => {
       if (this.isDirty) {
@@ -108,7 +117,8 @@ export class SettingsForm {
     // Store original values for dirty checking
     this.originalValues = {
       apiUrl: settings.apiUrl,
-      speed: settings.speed
+      speed: settings.speed,
+      skipInterval: settings.skipInterval
     };
 
     if (settings.apiKey) {
@@ -128,6 +138,9 @@ export class SettingsForm {
 
     // Initialize speed control with saved speed
     this.speedControl.init(settings.speed);
+
+    // Initialize skip control with saved skip interval
+    this.skipControl.init(settings.skipInterval);
   }
 
   async handleSubmit(e) {
@@ -136,9 +149,10 @@ export class SettingsForm {
     const apiUrl = this.apiUrlInput.value.trim();
     const apiKey = this.apiKeyInput.value.trim();
     const speed = this.speedControl.getSpeed();
+    const skipInterval = this.skipControl.getSkipInterval();
 
     try {
-      await SettingsStore.set({ apiUrl, speed });
+      await SettingsStore.set({ apiUrl, speed, skipInterval });
 
       if (this.isApiKeyModified || apiKey) {
         await SettingsStore.set({ apiKey });
@@ -155,7 +169,8 @@ export class SettingsForm {
       // Update original values after successful save
       this.originalValues = {
         apiUrl: apiUrl,
-        speed: speed
+        speed: speed,
+        skipInterval: skipInterval
       };
 
       // Reset dirty state
@@ -304,6 +319,12 @@ export class SettingsForm {
       this.dirtyFields.add('speed');
     }
 
+    // Check Skip Interval
+    const currentSkipInterval = this.skipControl.getSkipInterval();
+    if (currentSkipInterval !== this.originalValues.skipInterval) {
+      this.dirtyFields.add('skipInterval');
+    }
+
     // Update dirty state
     const wasDirty = this.isDirty;
     this.isDirty = this.dirtyFields.size > 0;
@@ -352,6 +373,7 @@ export class SettingsForm {
     // Restore original values
     this.apiUrlInput.value = this.originalValues.apiUrl;
     this.speedControl.setSpeed(this.originalValues.speed);
+    this.skipControl.setSkipInterval(this.originalValues.skipInterval);
 
     // Reset API Key state
     if (this.isApiKeyModified) {
@@ -385,6 +407,9 @@ export class SettingsForm {
     }
     if (this.speedControl) {
       this.speedControl.cleanup();
+    }
+    if (this.skipControl) {
+      this.skipControl.cleanup();
     }
     if (this.audioPreview) {
       this.audioPreview.cleanup();

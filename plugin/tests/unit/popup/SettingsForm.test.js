@@ -21,8 +21,20 @@ const mockSpeedControlInstance = {
   cleanup: vi.fn()
 };
 
+// Create a mock SkipControl class
+const mockSkipControlInstance = {
+  init: vi.fn(),
+  getSkipInterval: vi.fn(() => 10),
+  setSkipInterval: vi.fn(),
+  onChange: vi.fn(),
+  cleanup: vi.fn()
+};
+
 vi.mock('../../../src/popup/SpeedControl.js', () => ({
   SpeedControl: vi.fn(() => mockSpeedControlInstance)
+}));
+vi.mock('../../../src/popup/SkipControl.js', () => ({
+  SkipControl: vi.fn(() => mockSkipControlInstance)
 }));
 vi.mock('../../../src/popup/AudioPreview.js', () => ({
   AudioPreview: vi.fn(() => ({
@@ -102,6 +114,11 @@ describe('SettingsForm', () => {
     mockSpeedControlContainer.id = 'speed-control-container';
     mockFormElement.appendChild(mockSpeedControlContainer);
 
+    // Create skip control container
+    const mockSkipControlContainer = document.createElement('div');
+    mockSkipControlContainer.id = 'skip-control-container';
+    mockFormElement.appendChild(mockSkipControlContainer);
+
     mockFormElement.querySelector = vi.fn((selector) => {
       switch (selector) {
         case '#api-url':
@@ -126,6 +143,8 @@ describe('SettingsForm', () => {
           return mockVoiceSelectorContainer;
         case '#speed-control-container':
           return mockSpeedControlContainer;
+        case '#skip-control-container':
+          return mockSkipControlContainer;
         default:
           return null;
       }
@@ -153,6 +172,12 @@ describe('SettingsForm', () => {
     mockSpeedControlInstance.setSpeed.mockClear();
     mockSpeedControlInstance.onChange.mockClear();
     mockSpeedControlInstance.cleanup.mockClear();
+
+    mockSkipControlInstance.init.mockClear();
+    mockSkipControlInstance.getSkipInterval.mockClear().mockReturnValue(10);
+    mockSkipControlInstance.setSkipInterval.mockClear();
+    mockSkipControlInstance.onChange.mockClear();
+    mockSkipControlInstance.cleanup.mockClear();
 
     // Create the SettingsForm instance
     settingsForm = new SettingsForm(mockFormElement, mockStatusMessage);
@@ -184,7 +209,7 @@ describe('SettingsForm', () => {
 
   describe('init', () => {
     it('should call loadSettings', async () => {
-      SettingsStore.get.mockResolvedValue({ apiUrl: 'http://test.com', apiKey: '' });
+      SettingsStore.get.mockResolvedValue({ apiUrl: 'http://test.com', apiKey: '', speed: 1.0, skipInterval: 10 });
       const loadSpy = vi.spyOn(settingsForm, 'loadSettings');
 
       settingsForm.init();
@@ -193,7 +218,7 @@ describe('SettingsForm', () => {
     });
 
     it('should call setupEventListeners', async () => {
-      SettingsStore.get.mockResolvedValue({ apiUrl: 'http://test.com', apiKey: '', speed: 1.0 });
+      SettingsStore.get.mockResolvedValue({ apiUrl: 'http://test.com', apiKey: '', speed: 1.0, skipInterval: 10 });
       const setupSpy = vi.spyOn(settingsForm, 'setupEventListeners');
 
       await settingsForm.init();
@@ -262,7 +287,8 @@ describe('SettingsForm', () => {
       SettingsStore.get.mockResolvedValue({
         apiUrl: 'http://example.com',
         apiKey: '',
-        speed: 1.0
+        speed: 1.0,
+        skipInterval: 10
       });
 
       await settingsForm.loadSettings();
@@ -274,7 +300,8 @@ describe('SettingsForm', () => {
       SettingsStore.get.mockResolvedValue({
         apiUrl: 'http://example.com',
         apiKey: 'stored-key-123',
-        speed: 1.0
+        speed: 1.0,
+        skipInterval: 10
       });
 
       await settingsForm.loadSettings();
@@ -291,7 +318,8 @@ describe('SettingsForm', () => {
       SettingsStore.get.mockResolvedValue({
         apiUrl: 'http://example.com',
         apiKey: '',
-        speed: 1.0
+        speed: 1.0,
+        skipInterval: 10
       });
 
       await settingsForm.loadSettings();
@@ -307,7 +335,8 @@ describe('SettingsForm', () => {
       SettingsStore.get.mockResolvedValue({
         apiUrl: 'http://example.com',
         apiKey: '',
-        speed: 1.5
+        speed: 1.5,
+        skipInterval: 10
       });
 
       await settingsForm.loadSettings();
@@ -331,26 +360,30 @@ describe('SettingsForm', () => {
     it('should save API URL and speed', async () => {
       mockApiUrlInput.value = 'http://test.com';
       settingsForm.speedControl.getSpeed.mockReturnValue(1.25);
+      settingsForm.skipControl.getSkipInterval.mockReturnValue(10);
       SettingsStore.set.mockResolvedValue(undefined);
 
       await settingsForm.handleSubmit({ preventDefault: vi.fn() });
 
       expect(SettingsStore.set).toHaveBeenCalledWith({
         apiUrl: 'http://test.com',
-        speed: 1.25
+        speed: 1.25,
+        skipInterval: 10
       });
     });
 
     it('should trim API URL', async () => {
       mockApiUrlInput.value = '  http://test.com  ';
       settingsForm.speedControl.getSpeed.mockReturnValue(1.0);
+      settingsForm.skipControl.getSkipInterval.mockReturnValue(10);
       SettingsStore.set.mockResolvedValue(undefined);
 
       await settingsForm.handleSubmit({ preventDefault: vi.fn() });
 
       expect(SettingsStore.set).toHaveBeenCalledWith({
         apiUrl: 'http://test.com',
-        speed: 1.0
+        speed: 1.0,
+        skipInterval: 10
       });
     });
 
@@ -380,6 +413,7 @@ describe('SettingsForm', () => {
       mockApiKeyInput.value = '';
       settingsForm.isApiKeyModified = false;
       settingsForm.speedControl.getSpeed.mockReturnValue(1.0);
+      settingsForm.skipControl.getSkipInterval.mockReturnValue(10);
       SettingsStore.set.mockResolvedValue(undefined);
 
       await settingsForm.handleSubmit({ preventDefault: vi.fn() });
@@ -387,7 +421,8 @@ describe('SettingsForm', () => {
       expect(SettingsStore.set).toHaveBeenCalledTimes(1);
       expect(SettingsStore.set).toHaveBeenCalledWith({
         apiUrl: 'http://test.com',
-        speed: 1.0
+        speed: 1.0,
+        skipInterval: 10
       });
     });
 

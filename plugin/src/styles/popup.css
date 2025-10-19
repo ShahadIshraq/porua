@@ -1122,6 +1122,67 @@ input[type="password"]:focus {
   letter-spacing: 0.2px;
 }
 
+/* Skip Control Styles */
+.skip-control {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.skip-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.skip-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.skip-preset-btn {
+  padding: 8px 12px;
+  background: white;
+  color: #ec4899;
+  border: 2px solid #fce7f3;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.skip-preset-btn:hover {
+  background: #fef1f7;
+  border-color: #ec4899;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(236, 72, 153, 0.2);
+}
+
+.skip-preset-btn:active {
+  transform: translateY(0);
+}
+
+.skip-preset-btn.active {
+  background: linear-gradient(135deg, #ec4899 0%, #fb7185 50%, #fb923c 100%);
+  color: white;
+  border-color: #ec4899;
+  box-shadow: 0 2px 6px rgba(236, 72, 153, 0.3);
+}
+
+.skip-preset-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15);
+}
+
+.skip-preset-btn.active:focus {
+  box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.15), 0 2px 6px rgba(236, 72, 153, 0.3);
+}
+
 /* Cache Statistics Section */
 .cache-section {
   margin-top: 24px;
