@@ -13,11 +13,20 @@ export const PLAYER_STATES = {
   PAUSED: 'paused'
 };
 
+export const SKIP_INTERVALS = {
+  FIVE_SECONDS: 5,
+  TEN_SECONDS: 10,
+  FIFTEEN_SECONDS: 15,
+  THIRTY_SECONDS: 30
+};
+
 export const DEFAULT_SETTINGS = {
   apiUrl: 'http://localhost:3000',
   selectedVoiceId: 'bf_lily',
   selectedVoiceName: 'Lily',
-  speed: 1.0
+  speed: 1.0,
+  skipInterval: 10,
+  enableSkipControls: true
 };
 
 export const Z_INDEX = {
