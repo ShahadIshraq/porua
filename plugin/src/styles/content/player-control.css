@@ -3,114 +3,113 @@
 .tts-player-control {
   position: fixed;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
 
-  /* Size - pill shape to fit 3 buttons */
+  /* Size - compact to fit circles */
   width: auto;
-  height: 50px;
-  padding: 0 6px;
+  padding: 0;
+  gap: 8px;
 
-  /* Appearance - IDLE/PAUSED: Pink-coral gradient matching icon theme */
-  background: linear-gradient(135deg, #ec4899 0%, #fb7185 50%, #fb923c 100%);
-  border-radius: 25px; /* Pill shape */
-  box-shadow: var(--tts-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.3));
+  /* No background - buttons are independent circles */
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
   cursor: move;
 
   /* Ensure it's on top */
   z-index: var(--tts-player-control-z, 1000000);
 
   /* Smooth transitions */
-  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition: transform 0.2s ease;
 }
 
 .tts-player-control:hover {
-  background: linear-gradient(135deg, #db2777 0%, #ec4899 50%, #f97316 100%);
-  box-shadow: var(--tts-shadow-lg, 0 6px 16px rgba(0, 0, 0, 0.4));
-  transform: scale(1.05);
+  transform: none;
 }
 
-/* SVG Progress Ring Container */
-.tts-progress-ring {
-  position: absolute;
-  width: 60px;
-  height: 60px;
-  top: -5px;
-  left: -5px;
-  pointer-events: none;
-  transform: rotate(-90deg); /* Start progress from top (12 o'clock) */
+/* Progress Bar Container */
+.tts-progress-container {
+  width: 56px;
+  padding: 0;
 }
 
-/* Background track (subtle gray circle) */
+/* Background track */
 .tts-progress-track {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.15);
-  stroke-width: 3;
+  width: 100%;
+  height: 4px;
+  background: rgba(236, 72, 153, 0.3);
+  border-radius: 2px;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
 
-/* Progress arc */
-.tts-progress-arc {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.95);
-  stroke-width: 3;
-  stroke-linecap: round;
-  /* Longer transition for ultra-smooth progress updates */
-  transition: stroke-dashoffset 0.25s linear, opacity 0.15s ease, stroke 0.2s ease;
-  will-change: stroke-dashoffset;
+/* Progress fill */
+.tts-progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #ec4899, #fb7185);
+  border-radius: 2px;
+  transition: width 0.25s linear;
+  will-change: width;
+  box-shadow: 0 0 8px rgba(236, 72, 153, 0.6);
 }
 
-/* Hide progress arc in IDLE state only */
-.tts-player-control:has(.tts-player-button:not(.loading):not(.playing):not(.paused)) .tts-progress-arc {
+/* Hide progress bar in IDLE state only */
+.tts-player-control:has(.tts-player-button:not(.loading):not(.playing):not(.paused)) .tts-progress-container {
   opacity: 0;
 }
 
 /* Button container */
 .tts-control-buttons {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   position: relative;
   z-index: 1;
 }
 
-/* Loading state: indeterminate spinner */
-.tts-player-control:has(.tts-player-button.loading) .tts-progress-arc {
-  stroke: rgba(255, 255, 255, 0.9);
-  stroke-dasharray: 42.41; /* 90° arc = 25% of circumference (169.65 * 0.25) */
-  stroke-dashoffset: 0;
-  animation: progress-spin 1.2s linear infinite;
+/* Loading state: show progress bar with animation */
+.tts-player-control:has(.tts-player-button.loading) .tts-progress-fill {
+  background: rgba(255, 255, 255, 0.9);
+  width: 100%;
+  animation: loading-pulse 1.2s ease-in-out infinite;
   opacity: 1;
 }
 
 /* Playing state: show progress with full brightness */
-.tts-player-control:has(.tts-player-button.playing) .tts-progress-arc {
-  stroke: rgba(255, 255, 255, 0.95);
+.tts-player-control:has(.tts-player-button.playing) .tts-progress-fill {
+  background: rgba(255, 255, 255, 0.95);
   opacity: 1;
 }
 
 /* Paused state: show progress with dimmed opacity to indicate paused */
-.tts-player-control:has(.tts-player-button.paused) .tts-progress-arc {
-  stroke: rgba(255, 255, 255, 0.7);
+.tts-player-control:has(.tts-player-button.paused) .tts-progress-fill {
+  background: rgba(255, 255, 255, 0.7);
   opacity: 1;
 }
 
 .tts-player-button {
   /* Reset button styles */
-  background: none;
+  background: linear-gradient(135deg, #ec4899 0%, #fb7185 50%, #fb923c 100%);
   border: none;
   padding: 0;
   margin: 0;
 
-  /* Size - main play button */
-  width: 50px;
-  height: 50px;
+  /* Size - main play button (larger circle) */
+  width: 56px;
+  height: 56px;
 
   /* Appearance */
   color: white;
-  font-size: 20px;
+  font-size: 22px;
   cursor: pointer;
   border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 
   /* Layout */
   display: flex;
@@ -118,7 +117,7 @@
   justify-content: center;
 
   /* Interaction */
-  transition: background-color 0.2s ease, transform 0.15s ease;
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
 
   /* Prevent text selection */
   user-select: none;
@@ -128,12 +127,12 @@
 }
 
 .tts-player-button:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(135deg, #db2777 0%, #ec4899 50%, #f97316 100%);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   transform: scale(1.1);
 }
 
 .tts-player-button:active {
-  background-color: rgba(255, 255, 255, 0.2);
   transform: scale(1.05);
 }
 
@@ -149,20 +148,21 @@
 /* Skip buttons */
 .tts-skip-button {
   /* Reset */
-  background: none;
+  background: linear-gradient(135deg, #ec4899 0%, #fb7185 50%, #fb923c 100%);
   border: none;
   padding: 0;
   margin: 0;
 
-  /* Size */
-  width: 38px;
-  height: 38px;
+  /* Size - perfect circle */
+  width: 50px;
+  height: 50px;
 
   /* Appearance */
   color: white;
   font-size: 11px;
   cursor: pointer;
   border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 
   /* Layout */
   display: flex;
@@ -172,7 +172,7 @@
   gap: 2px;
 
   /* Interaction */
-  transition: background-color 0.2s ease, transform 0.15s ease;
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
 
   /* Prevent text selection */
   user-select: none;
@@ -180,12 +180,12 @@
 }
 
 .tts-skip-button:hover {
-  background-color: rgba(255, 255, 255, 0.15);
+  background: linear-gradient(135deg, #db2777 0%, #ec4899 50%, #f97316 100%);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   transform: scale(1.1);
 }
 
 .tts-skip-button:active {
-  background-color: rgba(255, 255, 255, 0.25);
   transform: scale(1.05);
 }
 
@@ -198,12 +198,12 @@
   outline: none;
 }
 
-/* Skip button icon */
+/* Skip button icon (SVG) */
 .tts-skip-icon {
-  font-size: 16px;
-  line-height: 1;
   display: flex;
   align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 /* Skip button time indicator */
@@ -237,32 +237,30 @@
 }
 
 /* LOADING state: Solid orange gradient (NO animation) */
-.tts-player-control:has(.tts-player-button.loading) {
+.tts-player-button.loading {
   background: linear-gradient(135deg, #fb923c, #f97316);
 }
 
-.tts-player-control:has(.tts-player-button.loading):hover {
+.tts-player-button.loading:hover {
   background: linear-gradient(135deg, #f97316, #ea580c);
-  transform: scale(1.05);
 }
 
 /* PLAYING state: Solid emerald gradient (NO animation) */
-.tts-player-control:has(.tts-player-button.playing) {
+.tts-player-button.playing {
   background: linear-gradient(135deg, #34d399, #10b981);
 }
 
-.tts-player-control:has(.tts-player-button.playing):hover {
+.tts-player-button.playing:hover {
   background: linear-gradient(135deg, #10b981, #059669);
-  transform: scale(1.05);
 }
 
-/* Progress ring spinning animation for loading state */
-@keyframes progress-spin {
-  from {
-    transform: rotate(0deg);
+/* Loading pulse animation for progress bar */
+@keyframes loading-pulse {
+  0%, 100% {
+    opacity: 0.5;
   }
-  to {
-    transform: rotate(360deg);
+  50% {
+    opacity: 1;
   }
 }
 

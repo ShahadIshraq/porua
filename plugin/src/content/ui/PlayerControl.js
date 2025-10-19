@@ -11,9 +11,8 @@ export class PlayerControl {
     this.button = null;
     this.skipBackwardButton = null;
     this.skipForwardButton = null;
-    this.progressRing = null;
-    this.progressArc = null;
-    this.circumference = 2 * Math.PI * 27; // 2πr where r=27
+    this.progressContainer = null;
+    this.progressFill = null;
     this.isDragging = false;
     this.dragOffset = { x: 0, y: 0 };
 
@@ -28,59 +27,54 @@ export class PlayerControl {
     this.state.subscribe((newState) => this.updateUI(newState));
   }
 
-  createProgressRing() {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('class', 'tts-progress-ring');
-    svg.setAttribute('viewBox', '0 0 60 60');
-    svg.setAttribute('width', '60');
-    svg.setAttribute('height', '60');
+  createProgressBar() {
+    const container = createElement('div', 'tts-progress-container');
 
-    // Background track (subtle gray circle)
-    const track = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    track.setAttribute('class', 'tts-progress-track');
-    track.setAttribute('cx', '30');
-    track.setAttribute('cy', '30');
-    track.setAttribute('r', '27');
-    track.setAttribute('fill', 'none');
-    track.setAttribute('stroke', 'rgba(255, 255, 255, 0.15)');
-    track.setAttribute('stroke-width', '3');
+    // Background track
+    const track = createElement('div', 'tts-progress-track');
 
-    // Progress arc (white circle that fills)
-    const progress = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    progress.setAttribute('class', 'tts-progress-arc');
-    progress.setAttribute('cx', '30');
-    progress.setAttribute('cy', '30');
-    progress.setAttribute('r', '27');
-    progress.setAttribute('fill', 'none');
-    progress.setAttribute('stroke', 'rgba(255, 255, 255, 0.95)');
-    progress.setAttribute('stroke-width', '3');
-    progress.setAttribute('stroke-linecap', 'round');
-    progress.setAttribute('stroke-dasharray', this.circumference.toString());
-    progress.setAttribute('stroke-dashoffset', this.circumference.toString());
+    // Progress fill
+    const fill = createElement('div', 'tts-progress-fill');
 
-    svg.appendChild(track);
-    svg.appendChild(progress);
+    track.appendChild(fill);
+    container.appendChild(track);
 
-    this.progressArc = progress;
+    this.progressFill = fill;
 
-    return svg;
+    return container;
   }
 
   createSkipButton(direction) {
     const button = createElement('button', `tts-skip-button tts-skip-${direction}`);
 
-    const icon = createElement('span', 'tts-skip-icon');
-    icon.textContent = direction === 'forward' ? '⏩' : '⏪';
+    // Create SVG icon for cleaner look
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'tts-skip-icon');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('width', '16');
+    svg.setAttribute('height', '16');
+    svg.setAttribute('fill', 'currentColor');
+
+    // Create double arrow path based on direction
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    if (direction === 'forward') {
+      // Forward double arrow: >>
+      path.setAttribute('d', 'M5.5 4l8 8-8 8V4zm9 0l8 8-8 8V4z');
+    } else {
+      // Backward double arrow: <<
+      path.setAttribute('d', 'M18.5 20l-8-8 8-8v16zm-9 0l-8-8 8-8v16z');
+    }
+    svg.appendChild(path);
 
     const time = createElement('span', 'tts-skip-time');
     time.textContent = this.skipInterval.toString();
 
-    // Layout: backward shows icon-time (⏪10), forward shows time-icon (10⏩)
+    // Layout: backward shows icon-time, forward shows time-icon
     if (direction === 'forward') {
       button.appendChild(time);
-      button.appendChild(icon);
+      button.appendChild(svg);
     } else {
-      button.appendChild(icon);
+      button.appendChild(svg);
       button.appendChild(time);
     }
 
@@ -111,10 +105,6 @@ export class PlayerControl {
   create() {
     const control = createElement('div', 'tts-player-control');
 
-    // Add progress ring first (behind buttons)
-    this.progressRing = this.createProgressRing();
-    control.appendChild(this.progressRing);
-
     // Create button container for horizontal layout
     const buttonContainer = createElement('div', 'tts-control-buttons');
 
@@ -138,6 +128,10 @@ export class PlayerControl {
     buttonContainer.appendChild(this.skipForwardButton);
 
     control.appendChild(buttonContainer);
+
+    // Add progress bar at the bottom
+    this.progressContainer = this.createProgressBar();
+    control.appendChild(this.progressContainer);
 
     // Setup drag handler
     this.eventManager.on(control, 'mousedown', (e) => this.startDrag(e));
@@ -194,7 +188,7 @@ export class PlayerControl {
   }
 
   updateProgress(currentTime, duration) {
-    if (!this.progressArc || !duration || isNaN(duration) || duration === 0) {
+    if (!this.progressFill || !duration || isNaN(duration) || duration === 0) {
       return;
     }
 
@@ -214,16 +208,15 @@ export class PlayerControl {
   applyProgressUpdate() {
     this.progressRafId = null;
 
-    if (!this.pendingProgress || !this.progressArc) {
+    if (!this.pendingProgress || !this.progressFill) {
       return;
     }
 
     const { currentTime, duration } = this.pendingProgress;
     const percentage = Math.min(100, Math.max(0, (currentTime / duration) * 100));
-    const offset = this.circumference - (percentage / 100) * this.circumference;
 
-    // Use CSS for smooth animation instead of direct attribute updates
-    this.progressArc.style.strokeDashoffset = offset.toString();
+    // Update width of progress fill
+    this.progressFill.style.width = `${percentage}%`;
 
     this.pendingProgress = null;
   }
@@ -236,8 +229,8 @@ export class PlayerControl {
     }
     this.pendingProgress = null;
 
-    if (this.progressArc) {
-      this.progressArc.style.strokeDashoffset = this.circumference.toString();
+    if (this.progressFill) {
+      this.progressFill.style.width = '0%';
     }
   }
 
@@ -299,8 +292,8 @@ export class PlayerControl {
     this.button = null;
     this.skipBackwardButton = null;
     this.skipForwardButton = null;
-    this.progressRing = null;
-    this.progressArc = null;
+    this.progressContainer = null;
+    this.progressFill = null;
     this.pendingProgress = null;
   }
 }

@@ -510,7 +510,9 @@ describe('PlayerControl', () => {
         const button = playerControl.createSkipButton('backward');
         const children = Array.from(button.children);
 
-        expect(children[0].className).toContain('tts-skip-icon');
+        // SVG element uses getAttribute instead of className
+        expect(children[0].tagName.toLowerCase()).toBe('svg');
+        expect(children[0].getAttribute('class')).toContain('tts-skip-icon');
         expect(children[1].className).toContain('tts-skip-time');
       });
 
@@ -519,7 +521,9 @@ describe('PlayerControl', () => {
         const children = Array.from(button.children);
 
         expect(children[0].className).toContain('tts-skip-time');
-        expect(children[1].className).toContain('tts-skip-icon');
+        // SVG element uses getAttribute instead of className
+        expect(children[1].tagName.toLowerCase()).toBe('svg');
+        expect(children[1].getAttribute('class')).toContain('tts-skip-icon');
       });
     });
 
