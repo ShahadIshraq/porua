@@ -10,7 +10,8 @@ Cargo.lock
 
 # Model files (usually large and shouldn't be in git)
 *.onnx
-models/
+*.bin
+server/models/
 
 # IDE
 .vscode/
