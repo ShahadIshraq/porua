@@ -2,9 +2,7 @@
 ///
 /// These tests verify that semantic normalization is properly applied
 /// throughout the entire TTS pipeline (CLI, server, streaming modes)
-
 use porua_server::text_processing::normalization::normalize_simple;
-use porua_server::text_processing::semantic_normalization::normalize_semantic;
 
 #[test]
 fn test_normalize_simple_includes_semantic() {
@@ -62,7 +60,10 @@ fn test_currency_with_cents_full_pipeline() {
     let input = "The total cost is $23.45";
     let result = normalize_simple(input);
 
-    assert_eq!(result, "The total cost is twenty-three dollars and forty-five cents");
+    assert_eq!(
+        result,
+        "The total cost is twenty-three dollars and forty-five cents"
+    );
 }
 
 #[test]
@@ -231,9 +232,9 @@ fn test_mixed_unicode_and_semantic() {
 
 #[test]
 fn test_direct_semantic_normalization_api() {
-    // Test the direct semantic normalization API
+    // Test the semantic normalization through normalize_simple
     let input = "$10.3 billion";
-    let result = normalize_semantic(input);
+    let result = normalize_simple(input);
 
     assert_eq!(result, "ten point three billion dollars");
 }
@@ -242,7 +243,7 @@ fn test_direct_semantic_normalization_api() {
 fn test_semantic_preserves_other_text() {
     // Ensure semantic normalization doesn't affect non-pattern text
     let input = "The company, founded in 2020, raised $10M";
-    let result = normalize_semantic(input);
+    let result = normalize_simple(input);
 
     assert!(result.contains("The company, founded in 2020, raised"));
     assert!(result.contains("ten million dollars"));
@@ -279,7 +280,7 @@ fn test_currency_with_commas() {
     // Test that large numbers with commas are handled correctly
     // Note: Current implementation may not handle commas in numbers
     let input = "Revenue was $1,000,000";
-    let result = normalize_semantic(input);
+    let result = normalize_simple(input);
 
     // This test documents current behavior
     // If commas are not supported, this should be a known limitation
