@@ -32,7 +32,8 @@ class TTSContentScript {
     this.playerControl = new PlayerControl(
       this.state,
       this.eventManager,
-      () => this.handlePlayerControlClick()
+      () => this.handlePlayerControlClick(),
+      10 // Default skip interval, will be updated from settings in init()
     );
     this.playButton = new PlayButton(
       this.state,
@@ -41,10 +42,19 @@ class TTSContentScript {
     );
 
     this.wireupContinuousPlayback();
+    this.wireupSkipControls();
   }
 
-  init() {
+  async init() {
     this.playButton.init();
+
+    // Load skip interval from settings
+    const settings = await SettingsStore.get();
+    this.playerControl.skipInterval = settings.skipInterval || 10;
+  }
+
+  wireupSkipControls() {
+    this.playerControl.setOnSkip((seconds) => this.handleSkip(seconds));
   }
 
   wireupContinuousPlayback() {
@@ -106,6 +116,21 @@ class TTSContentScript {
       if (paragraph) {
         this.handlePlayClick();
       }
+    }
+  }
+
+  handleSkip(seconds) {
+    const currentState = this.state.getState();
+
+    // Only allow seeking when playing or paused
+    if (currentState !== PLAYER_STATES.PLAYING && currentState !== PLAYER_STATES.PAUSED) {
+      return;
+    }
+
+    const success = this.audioQueue.seek(seconds);
+
+    if (!success) {
+      console.warn('[TTS] Skip failed: No audio currently playing');
     }
   }
 
