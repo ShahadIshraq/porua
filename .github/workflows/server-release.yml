@@ -1,0 +1,188 @@
+name: Server Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+
+jobs:
+  build:
+    name: Build Server (${{ matrix.target.name }})
+    runs-on: ${{ matrix.target.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { os: macos-latest, target: aarch64-apple-darwin, name: macos-arm64, ext: tar.gz }
+          - { os: windows-latest, target: x86_64-pc-windows-msvc, name: windows-x64, ext: zip }
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-gnu, name: linux-x64, ext: tar.gz }
+          - { os: ubuntu-latest, target: aarch64-unknown-linux-gnu, name: linux-arm64, ext: tar.gz }
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target.target }}
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+
+      - name: Install cross-compilation tools (Linux ARM64)
+        if: matrix.target.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Validate version matches Cargo.toml
+        shell: bash
+        run: |
+          CARGO_VERSION=$(cargo metadata --manifest-path server/Cargo.toml --no-deps --format-version 1 | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4)
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          echo "Cargo.toml version: $CARGO_VERSION"
+          echo "Tag version: $TAG_VERSION"
+          if [ "$CARGO_VERSION" != "$TAG_VERSION" ]; then
+            echo "Error: Version mismatch! Cargo.toml has $CARGO_VERSION but tag is $TAG_VERSION"
+            exit 1
+          fi
+
+      - name: Build release binary
+        shell: bash
+        run: |
+          if [ "${{ matrix.target.target }}" = "aarch64-unknown-linux-gnu" ]; then
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+          fi
+          cargo build --release --manifest-path server/Cargo.toml --target ${{ matrix.target.target }}
+
+      - name: Prepare binary
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TARGET="${{ matrix.target.target }}"
+          NAME="${{ matrix.target.name }}"
+
+          # Create staging directory
+          mkdir -p staging
+
+          # Copy binary
+          if [[ "${{ matrix.target.os }}" == "windows-latest" ]]; then
+            cp "server/target/$TARGET/release/porua_server.exe" staging/
+          else
+            cp "server/target/$TARGET/release/porua_server" staging/
+          fi
+
+          # Copy models directory
+          cp -r server/models staging/
+
+          # Create archive
+          cd staging
+          if [[ "${{ matrix.target.ext }}" == "zip" ]]; then
+            7z a "../porua_server-v$VERSION-$NAME.zip" *
+          else
+            tar -czf "../porua_server-v$VERSION-$NAME.tar.gz" *
+          fi
+          cd ..
+
+      - name: Generate checksum
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          NAME="${{ matrix.target.name }}"
+          EXT="${{ matrix.target.ext }}"
+          FILENAME="porua_server-v$VERSION-$NAME.$EXT"
+
+          if [[ "${{ matrix.target.os }}" == "windows-latest" ]]; then
+            certutil -hashfile "$FILENAME" SHA256 | findstr /v ":" | findstr /v "CertUtil" > "$FILENAME.sha256"
+          else
+            shasum -a 256 "$FILENAME" > "$FILENAME.sha256"
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: porua_server-v${{ steps.version.outputs.version }}-${{ matrix.target.name }}
+          path: |
+            porua_server-v${{ steps.version.outputs.version }}-${{ matrix.target.name }}.${{ matrix.target.ext }}
+            porua_server-v${{ steps.version.outputs.version }}-${{ matrix.target.name }}.${{ matrix.target.ext }}.sha256
+
+  release:
+    name: Create Server Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f -exec mv {} release-assets/ \;
+
+          # Create combined checksum file
+          cd release-assets
+          cat *.sha256 > SHA256SUMS
+          cd ..
+
+      - name: Check if pre-release
+        id: prerelease
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ "$VERSION" =~ -alpha|- beta|-rc ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Porua Server v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
+          generate_release_notes: true
+          files: |
+            release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
