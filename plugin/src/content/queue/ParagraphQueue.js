@@ -79,6 +79,38 @@ export class ParagraphQueue {
   }
 
   /**
+   * Get the previous paragraph without advancing
+   * @returns {HTMLElement|null}
+   */
+  getPreviousParagraph() {
+    const previousIndex = this.currentIndex - 1;
+    if (previousIndex >= 0 && previousIndex < this.paragraphs.length) {
+      return this.paragraphs[previousIndex];
+    }
+    return null;
+  }
+
+  /**
+   * Move back to the previous paragraph and return it
+   * @returns {HTMLElement|null}
+   */
+  rewind() {
+    if (this.currentIndex > 0) {
+      this.currentIndex--;
+      return this.getCurrentParagraph();
+    }
+    return null;
+  }
+
+  /**
+   * Check if there are paragraphs before the current one
+   * @returns {boolean}
+   */
+  hasPrevious() {
+    return this.currentIndex > 0;
+  }
+
+  /**
    * Clear all paragraphs and reset index
    */
   clear() {

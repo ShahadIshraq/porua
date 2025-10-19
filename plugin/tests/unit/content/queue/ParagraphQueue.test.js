@@ -358,6 +358,153 @@ describe('ParagraphQueue', () => {
     });
   });
 
+  describe('getPreviousParagraph', () => {
+    it('should return null when no previous paragraph exists', () => {
+      queue.enqueueMultiple([p1, p2, p3]);
+      queue.advance(); // at p1 (index 0)
+
+      expect(queue.getPreviousParagraph()).toBeNull();
+    });
+
+    it('should return previous paragraph without moving index', () => {
+      queue.enqueueMultiple([p1, p2, p3]);
+      queue.advance(); // at p1 (index 0)
+      queue.advance(); // at p2 (index 1)
+
+      expect(queue.getPreviousParagraph()).toBe(p1);
+      expect(queue.getCurrentParagraph()).toBe(p2); // Still at p2
+      expect(queue.getCurrentIndex()).toBe(1); // Index unchanged
+    });
+
+    it('should return correct previous paragraph after multiple advances', () => {
+      queue.enqueueMultiple([p1, p2, p3, p4]);
+      queue.advance(); // index 0
+      queue.advance(); // index 1
+      queue.advance(); // index 2
+
+      expect(queue.getPreviousParagraph()).toBe(p2);
+    });
+
+    it('should return null before any advance', () => {
+      queue.enqueueMultiple([p1, p2, p3]);
+
+      expect(queue.getPreviousParagraph()).toBeNull();
+    });
+
+    it('should return null when queue is empty', () => {
+      expect(queue.getPreviousParagraph()).toBeNull();
+    });
+  });
+
+  describe('rewind', () => {
+    it('should move back to previous paragraph', () => {
+      queue.enqueueMultiple([p1, p2, p3]);
+      queue.advance(); // index 0
+      queue.advance(); // index 1
+
+      const result = queue.rewind();
+
+      expect(result).toBe(p1);
+      expect(queue.getCurrentIndex()).toBe(0);
+      expect(queue.getCurrentParagraph()).toBe(p1);
+    });
+
+    it('should return null when already at first paragraph', () => {
+      queue.enqueueMultiple([p1, p2, p3]);
+      queue.advance(); // index 0
+
+      const result = queue.rewind();
+
+      expect(result).toBeNull();
+      expect(queue.getCurrentIndex()).toBe(0); // Still at 0
+    });
+
+    it('should return null before any advance', () => {
+      queue.enqueueMultiple([p1, p2, p3]);
+
+      const result = queue.rewind();
+
+      expect(result).toBeNull();
+      expect(queue.getCurrentIndex()).toBe(-1); // Still at -1
+    });
+
+    it('should move backward through queue sequentially', () => {
+      queue.enqueueMultiple([p1, p2, p3, p4]);
+      queue.advance(); // index 0
+      queue.advance(); // index 1
+      queue.advance(); // index 2
+      queue.advance(); // index 3
+
+      expect(queue.rewind()).toBe(p3);
+      expect(queue.getCurrentIndex()).toBe(2);
+
+      expect(queue.rewind()).toBe(p2);
+      expect(queue.getCurrentIndex()).toBe(1);
+
+      expect(queue.rewind()).toBe(p1);
+      expect(queue.getCurrentIndex()).toBe(0);
+
+      expect(queue.rewind()).toBeNull();
+      expect(queue.getCurrentIndex()).toBe(0);
+    });
+
+    it('should work correctly with advance after rewind', () => {
+      queue.enqueueMultiple([p1, p2, p3]);
+      queue.advance(); // index 0
+      queue.advance(); // index 1
+
+      queue.rewind(); // back to index 0
+
+      expect(queue.advance()).toBe(p2);
+      expect(queue.getCurrentIndex()).toBe(1);
+    });
+  });
+
+  describe('hasPrevious', () => {
+    it('should return false when at first paragraph', () => {
+      queue.enqueueMultiple([p1, p2, p3]);
+      queue.advance(); // index 0
+
+      expect(queue.hasPrevious()).toBe(false);
+    });
+
+    it('should return true when previous paragraphs exist', () => {
+      queue.enqueueMultiple([p1, p2, p3]);
+      queue.advance(); // index 0
+      queue.advance(); // index 1
+
+      expect(queue.hasPrevious()).toBe(true);
+    });
+
+    it('should return false before any advance', () => {
+      queue.enqueueMultiple([p1, p2, p3]);
+
+      expect(queue.hasPrevious()).toBe(false);
+    });
+
+    it('should return false when queue is empty', () => {
+      expect(queue.hasPrevious()).toBe(false);
+    });
+
+    it('should return true at last paragraph if previous exist', () => {
+      queue.enqueueMultiple([p1, p2, p3]);
+      queue.advance(); // index 0
+      queue.advance(); // index 1
+      queue.advance(); // index 2
+
+      expect(queue.hasPrevious()).toBe(true);
+    });
+
+    it('should return false after rewind to first', () => {
+      queue.enqueueMultiple([p1, p2, p3]);
+      queue.advance(); // index 0
+      queue.advance(); // index 1
+      queue.rewind(); // back to index 0
+
+      expect(queue.hasPrevious()).toBe(false);
+    });
+  });
+
   describe('integration scenarios', () => {
     it('should handle complete playback cycle', () => {
       // Setup
