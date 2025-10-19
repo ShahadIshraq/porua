@@ -7,6 +7,7 @@ use porua_server::kokoro::TTSPool;
 use porua_server::rate_limit::{PerKeyRateLimiter, RateLimitConfig, RateLimiterMode};
 use porua_server::server::{create_router, AppState};
 use std::sync::Arc;
+use std::time::Duration;
 use tower::ServiceExt;
 
 async fn create_test_app(rate_config: RateLimitConfig, with_auth: bool) -> axum::Router {
@@ -52,6 +53,7 @@ async fn create_test_app(rate_config: RateLimitConfig, with_auth: bool) -> axum:
         tts_pool,
         api_keys,
         rate_limiter,
+        request_timeout: Duration::from_secs(60), // Default timeout for tests
     };
 
     create_router(state)

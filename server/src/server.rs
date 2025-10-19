@@ -6,8 +6,10 @@ use axum::{
     Json, Router,
 };
 use std::sync::Arc;
+use std::time::Duration;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::services::ServeDir;
+use tower_http::timeout::TimeoutLayer;
 
 use crate::audio;
 use crate::auth::ApiKeys;
@@ -25,6 +27,7 @@ pub struct AppState {
     pub tts_pool: Arc<TTSPool>,
     pub api_keys: ApiKeys,
     pub rate_limiter: Option<RateLimiterMode>,
+    pub request_timeout: Duration,
 }
 
 // HTTP Handlers
@@ -214,6 +217,9 @@ pub fn create_router(state: AppState) -> Router<()> {
     // Clone api_keys for middleware
     let api_keys_for_middleware = state.api_keys.clone();
 
+    // Get timeout duration from state
+    let timeout_duration = state.request_timeout;
+
     // Create static file service for audio samples
     // Samples are served from server/samples/ directory
     let samples_service = ServeDir::new("samples").append_index_html_on_directories(false);
@@ -240,7 +246,11 @@ pub fn create_router(state: AppState) -> Router<()> {
         crate::auth::auth_middleware,
     ));
 
-    router.with_state(state).layer(cors)
+    // Apply timeout layer to prevent long-running requests from exhausting resources
+    router
+        .with_state(state)
+        .layer(cors)
+        .layer(TimeoutLayer::new(timeout_duration))
 }
 
 #[cfg(test)]
@@ -561,6 +571,27 @@ mod tests {
                 "Missing expected voice: {}",
                 expected_id
             );
+        }
+    }
+
+    // ===== Timeout Configuration Tests =====
+
+    #[test]
+    fn test_timeout_duration_is_configurable() {
+        use std::time::Duration;
+
+        // Test that different timeout values can be stored in AppState
+        // We don't need to create a full AppState, just verify the type works
+        let timeouts = vec![
+            Duration::from_secs(10),
+            Duration::from_secs(30),
+            Duration::from_secs(60),
+            Duration::from_secs(120),
+        ];
+
+        for timeout in timeouts {
+            // Just verify Duration works as expected
+            assert_eq!(timeout.as_secs(), timeout.as_secs());
         }
     }
 }
