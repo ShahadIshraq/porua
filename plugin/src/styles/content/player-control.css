@@ -6,13 +6,14 @@
   align-items: center;
   justify-content: center;
 
-  /* Size */
-  width: 50px;
+  /* Size - pill shape to fit 3 buttons */
+  width: auto;
   height: 50px;
+  padding: 0 6px;
 
   /* Appearance - IDLE/PAUSED: Pink-coral gradient matching icon theme */
   background: linear-gradient(135deg, #ec4899 0%, #fb7185 50%, #fb923c 100%);
-  border-radius: 50%;
+  border-radius: 25px; /* Pill shape */
   box-shadow: var(--tts-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.3));
   cursor: move;
 
@@ -63,6 +64,16 @@
   opacity: 0;
 }
 
+/* Button container */
+.tts-control-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+
 /* Loading state: indeterminate spinner */
 .tts-player-control:has(.tts-player-button.loading) .tts-progress-arc {
   stroke: rgba(255, 255, 255, 0.9);
@@ -91,19 +102,23 @@
   padding: 0;
   margin: 0;
 
-  /* Size */
-  width: 100%;
-  height: 100%;
+  /* Size - main play button */
+  width: 50px;
+  height: 50px;
 
   /* Appearance */
   color: white;
   font-size: 20px;
   cursor: pointer;
+  border-radius: 50%;
 
   /* Layout */
   display: flex;
   align-items: center;
   justify-content: center;
+
+  /* Interaction */
+  transition: background-color 0.2s ease, transform 0.15s ease;
 
   /* Prevent text selection */
   user-select: none;
@@ -112,8 +127,103 @@
   -ms-user-select: none;
 }
 
+.tts-player-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: scale(1.1);
+}
+
+.tts-player-button:active {
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
 .tts-player-button:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 2px;
+}
+
+.tts-player-button:focus:not(:focus-visible) {
   outline: none;
+}
+
+/* Skip buttons */
+.tts-skip-button {
+  /* Reset */
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+
+  /* Size */
+  width: 38px;
+  height: 38px;
+
+  /* Appearance */
+  color: white;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 50%;
+
+  /* Layout */
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+
+  /* Interaction */
+  transition: background-color 0.2s ease, transform 0.15s ease;
+
+  /* Prevent text selection */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.tts-skip-button:hover {
+  background-color: rgba(255, 255, 255, 0.15);
+  transform: scale(1.1);
+}
+
+.tts-skip-button:active {
+  background-color: rgba(255, 255, 255, 0.25);
+  transform: scale(1.05);
+}
+
+.tts-skip-button:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: 2px;
+}
+
+.tts-skip-button:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Skip button icon */
+.tts-skip-icon {
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+/* Skip button time indicator */
+.tts-skip-time {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+/* Disabled state (when not playing) */
+.tts-skip-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tts-skip-button:disabled:hover {
+  background-color: transparent;
+  transform: none;
 }
 
 /* Spinner element */
