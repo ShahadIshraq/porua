@@ -4,7 +4,7 @@ use axum::{
 };
 use porua_server::auth::ApiKeys;
 use porua_server::kokoro::TTSPool;
-use porua_server::rate_limit::{PerKeyRateLimiter, RateLimitConfig};
+use porua_server::rate_limit::{PerKeyRateLimiter, RateLimitConfig, RateLimiterMode};
 use porua_server::server::{create_router, AppState};
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -28,7 +28,7 @@ async fn create_test_app(rate_config: RateLimitConfig, with_auth: bool) -> axum:
 
     // Rate limiter is only enabled when API keys are enabled
     let rate_limiter = if with_auth {
-        Some(PerKeyRateLimiter::new(rate_config))
+        Some(RateLimiterMode::PerKey(PerKeyRateLimiter::new(rate_config)))
     } else {
         None
     };

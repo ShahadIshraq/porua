@@ -1,4 +1,4 @@
-use axum::{extract::ConnectInfo, http::HeaderMap, extract::Request};
+use axum::{extract::ConnectInfo, extract::Request, http::HeaderMap};
 use std::net::{IpAddr, SocketAddr};
 
 /// Extract API key from HTTP headers

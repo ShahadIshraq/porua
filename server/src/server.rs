@@ -87,6 +87,10 @@ async fn generate_tts_single(state: AppState, req: TTSRequest) -> Result<Vec<u8>
     // Normalize text for TTS (semantic + unicode normalization)
     let normalized_text = crate::text_processing::normalization::normalize_simple(&req.text);
 
+    // Debug logging to verify normalization
+    tracing::info!("Original text: {:?}", &req.text);
+    tracing::info!("Normalized text: {:?}", &normalized_text);
+
     let voice = req.voice.clone();
     let speed = req.speed;
 
