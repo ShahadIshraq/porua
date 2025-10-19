@@ -122,9 +122,14 @@ pub async fn generate_tts_stream(state: AppState, req: TTSRequest) -> Result<Res
         return Err(TtsError::InvalidSpeed(req.speed));
     }
 
-    // Split text into chunks
+    // Normalize text for TTS (semantic + unicode normalization)
+    // This ensures currency, percentages, and special characters are properly converted
+    // BEFORE chunking, so the TTS engine receives clean, speakable text
+    let normalized_text = crate::text_processing::normalization::normalize_simple(&req.text);
+
+    // Split normalized text into chunks
     let config = ChunkingConfig::default();
-    let chunks = chunk_text(&req.text, &config);
+    let chunks = chunk_text(&normalized_text, &config);
 
     tracing::debug!(
         "Streaming {} text chunks with multipart format",
@@ -546,6 +551,210 @@ mod tests {
                 assert!(msg.contains("Text too long"));
             }
             other => panic!("Expected InvalidRequest error, got: {:?}", other),
+        }
+    }
+
+    // ===== Normalization Tests for Streaming Endpoint =====
+
+    #[test]
+    fn test_streaming_normalizes_currency() {
+        use crate::text_processing::normalization::normalize_simple;
+
+        let text = "The price is $1.083 billion today.";
+        let normalized = normalize_simple(text);
+
+        // Verify normalization happens
+        assert!(
+            normalized.contains("billion dollars"),
+            "Expected 'billion dollars' in normalized text"
+        );
+        assert!(
+            !normalized.contains("$1.083"),
+            "Should not contain raw currency"
+        );
+
+        // Verify chunking works on normalized text
+        let config = ChunkingConfig::default();
+        let chunks = chunk_text(&normalized, &config);
+
+        // All chunks should have normalized content
+        for chunk in chunks {
+            assert!(
+                !chunk.contains('$'),
+                "Chunk should not contain $ symbol: {}",
+                chunk
+            );
+        }
+    }
+
+    #[test]
+    fn test_streaming_normalizes_percentage() {
+        use crate::text_processing::normalization::normalize_simple;
+
+        let text = "Growth was 50% this year.";
+        let normalized = normalize_simple(text);
+
+        assert!(
+            normalized.contains("fifty percent"),
+            "Expected 'fifty percent' in normalized text"
+        );
+        assert!(!normalized.contains("50%"), "Should not contain raw %");
+    }
+
+    #[test]
+    fn test_streaming_normalizes_unicode() {
+        use crate::text_processing::normalization::normalize_simple;
+
+        let text = "\u{201C}Hello\u{201D} \u{2014} test";
+        let normalized = normalize_simple(text);
+
+        // Smart quotes → ASCII quotes
+        assert!(normalized.contains('"'), "Should contain ASCII quotes");
+        assert!(
+            !normalized.contains('\u{201C}'),
+            "Should not contain smart quotes"
+        );
+
+        // Em dash → hyphen
+        assert!(normalized.contains('-'), "Should contain hyphen");
+        assert!(
+            !normalized.contains('\u{2014}'),
+            "Should not contain em dash"
+        );
+    }
+
+    #[test]
+    fn test_streaming_normalizes_multiple_currencies() {
+        use crate::text_processing::normalization::normalize_simple;
+
+        let text = "Microsoft reported $13 billion, so around $1.083 billion a month.";
+        let normalized = normalize_simple(text);
+
+        // Should normalize both currency values
+        assert!(
+            normalized.contains("thirteen billion dollars")
+                || normalized.contains("13 billion dollars"),
+            "Should normalize first currency"
+        );
+        assert!(
+            normalized.contains("one point zero eight three billion dollars"),
+            "Should normalize second currency"
+        );
+        assert!(!normalized.contains('$'), "Should not contain $ symbols");
+    }
+
+    #[test]
+    fn test_streaming_chunking_on_normalized_text() {
+        use crate::text_processing::normalization::normalize_simple;
+
+        // Text with currency that becomes much longer when normalized
+        let text = "Price: $1M, $2M, $3M.";
+        let normalized = normalize_simple(text);
+
+        // Normalized text is much longer
+        assert!(
+            normalized.len() > text.len() * 2,
+            "Normalized text should be significantly longer"
+        );
+
+        // Chunking should be based on normalized length
+        let config = ChunkingConfig {
+            max_chunk_size: 50,
+            min_chunk_size: 10,
+        };
+        let chunks = chunk_text(&normalized, &config);
+
+        // Should chunk based on normalized text length
+        // (may create more chunks than if chunking raw text)
+        for chunk in &chunks {
+            assert!(
+                !chunk.contains('$'),
+                "Chunk should not contain raw currency"
+            );
+            assert!(
+                chunk.contains("million dollars"),
+                "Chunk should contain normalized text"
+            );
+        }
+    }
+
+    #[test]
+    fn test_streaming_empty_text_normalization() {
+        use crate::text_processing::normalization::normalize_simple;
+
+        let text = "";
+        let normalized = normalize_simple(text);
+        assert_eq!(normalized, "");
+
+        let config = ChunkingConfig::default();
+        let chunks = chunk_text(&normalized, &config);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0], "");
+    }
+
+    #[test]
+    fn test_streaming_normalization_preserves_sentence_boundaries() {
+        use crate::text_processing::normalization::normalize_simple;
+
+        let text = "First sentence with $100. Second sentence with 50%. Third sentence.";
+        let normalized = normalize_simple(text);
+
+        // Sentence boundaries should be preserved
+        let periods = normalized.matches('.').count();
+        assert_eq!(
+            periods, 3,
+            "Should preserve all sentence-ending periods"
+        );
+
+        // Chunking should still work correctly
+        let config = ChunkingConfig::default();
+        let chunks = chunk_text(&normalized, &config);
+
+        // Should have multiple chunks due to sentence boundaries
+        assert!(chunks.len() >= 1);
+    }
+
+    #[test]
+    fn test_streaming_complex_text_with_all_patterns() {
+        use crate::text_processing::normalization::normalize_simple;
+
+        let text = "Only one member of the Magnificent Seven (outside of NVIDIA) has ever disclosed its AI revenue — Microsoft, which stopped reporting in January 2025, when it reported \"$13 billion in annualized revenue,\" so around $1.083 billion a month.";
+
+        let normalized = normalize_simple(text);
+
+        // Should normalize both currency values
+        assert!(
+            !normalized.contains('$'),
+            "Should not contain $ symbols"
+        );
+        assert!(
+            normalized.contains("billion dollars"),
+            "Should contain normalized currency"
+        );
+
+        // Should normalize em dash
+        assert!(
+            !normalized.contains('\u{2014}'),
+            "Should not contain em dash"
+        );
+
+        // Should normalize smart quotes
+        assert!(
+            !normalized.contains('\u{201C}') && !normalized.contains('\u{201D}'),
+            "Should not contain smart quotes"
+        );
+
+        // Chunking should work correctly
+        let config = ChunkingConfig::default();
+        let chunks = chunk_text(&normalized, &config);
+
+        // Verify all chunks are normalized
+        for chunk in chunks {
+            assert!(!chunk.contains('$'), "No chunk should contain $");
+            assert!(
+                !chunk.contains('\u{201C}') && !chunk.contains('\u{201D}'),
+                "No chunk should contain smart quotes"
+            );
         }
     }
 }
