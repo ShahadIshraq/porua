@@ -28,7 +28,9 @@ describe('SettingsStore', () => {
         apiUrl: DEFAULT_SETTINGS.apiUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
         selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
-        speed: DEFAULT_SETTINGS.speed
+        speed: DEFAULT_SETTINGS.speed,
+        skipInterval: DEFAULT_SETTINGS.skipInterval,
+        enableSkipControls: DEFAULT_SETTINGS.enableSkipControls
       });
       chrome.storage.local.get.mockResolvedValue({
         encryptedApiKey: ''
@@ -41,6 +43,8 @@ describe('SettingsStore', () => {
       expect(settings.selectedVoiceId).toBe(DEFAULT_SETTINGS.selectedVoiceId);
       expect(settings.selectedVoiceName).toBe(DEFAULT_SETTINGS.selectedVoiceName);
       expect(settings.speed).toBe(DEFAULT_SETTINGS.speed);
+      expect(settings.skipInterval).toBe(DEFAULT_SETTINGS.skipInterval);
+      expect(settings.enableSkipControls).toBe(DEFAULT_SETTINGS.enableSkipControls);
     });
 
     it('should retrieve apiUrl from sync storage', async () => {
@@ -90,7 +94,9 @@ describe('SettingsStore', () => {
         apiUrl: DEFAULT_SETTINGS.apiUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
         selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
-        speed: DEFAULT_SETTINGS.speed
+        speed: DEFAULT_SETTINGS.speed,
+        skipInterval: DEFAULT_SETTINGS.skipInterval,
+        enableSkipControls: DEFAULT_SETTINGS.enableSkipControls
       });
       chrome.storage.local.get.mockResolvedValue({ encryptedApiKey: '' });
 
@@ -100,7 +106,9 @@ describe('SettingsStore', () => {
         apiUrl: DEFAULT_SETTINGS.apiUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
         selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
-        speed: DEFAULT_SETTINGS.speed
+        speed: DEFAULT_SETTINGS.speed,
+        skipInterval: DEFAULT_SETTINGS.skipInterval,
+        enableSkipControls: DEFAULT_SETTINGS.enableSkipControls
       });
     });
 
@@ -482,7 +490,9 @@ describe('SettingsStore', () => {
         apiUrl: testUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
         selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
-        speed: DEFAULT_SETTINGS.speed
+        speed: DEFAULT_SETTINGS.speed,
+        skipInterval: DEFAULT_SETTINGS.skipInterval,
+        enableSkipControls: DEFAULT_SETTINGS.enableSkipControls
       });
       chrome.storage.local.get.mockResolvedValue({
         encryptedApiKey: encryptedTestKey
@@ -515,7 +525,9 @@ describe('SettingsStore', () => {
         apiUrl: DEFAULT_SETTINGS.apiUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
         selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
-        speed: DEFAULT_SETTINGS.speed
+        speed: DEFAULT_SETTINGS.speed,
+        skipInterval: DEFAULT_SETTINGS.skipInterval,
+        enableSkipControls: DEFAULT_SETTINGS.enableSkipControls
       });
       chrome.storage.local.get.mockResolvedValue({ encryptedApiKey: '' });
 
@@ -550,7 +562,9 @@ describe('SettingsStore', () => {
         apiUrl: testUrl,
         selectedVoiceId: voiceId,
         selectedVoiceName: voiceName,
-        speed: testSpeed
+        speed: testSpeed,
+        skipInterval: DEFAULT_SETTINGS.skipInterval,
+        enableSkipControls: DEFAULT_SETTINGS.enableSkipControls
       });
       chrome.storage.local.get.mockResolvedValue({
         encryptedApiKey: encryptedTestKey
@@ -564,6 +578,8 @@ describe('SettingsStore', () => {
       expect(settings.selectedVoiceId).toBe(voiceId);
       expect(settings.selectedVoiceName).toBe(voiceName);
       expect(settings.speed).toBe(testSpeed);
+      expect(settings.skipInterval).toBe(DEFAULT_SETTINGS.skipInterval);
+      expect(settings.enableSkipControls).toBe(DEFAULT_SETTINGS.enableSkipControls);
     });
   });
 });
