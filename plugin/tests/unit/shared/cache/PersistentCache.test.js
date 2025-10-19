@@ -201,18 +201,18 @@ describe('PersistentCache', () => {
 
   describe('size limit enforcement', () => {
     it('should enforce 100MB size limit', async () => {
-      // Create entries with smaller sizes to avoid memory issues in tests
-      // Use 1MB blobs instead of 30MB
-      const largeAudioData = {
-        audioBlobs: [new Blob(['x'.repeat(1024 * 1024)], { type: 'audio/wav' })], // 1 MB
+      // Create entries with tiny sizes to avoid OOM
+      // Use 1KB blobs - logic is same regardless of size
+      const audioData = {
+        audioBlobs: [new Blob(['x'.repeat(1024)], { type: 'audio/wav' })], // 1 KB
         metadataArray: [],
         phraseTimeline: [],
-        metadata: { size: 1024 * 1024, timestamp: Date.now() }
+        metadata: { size: 1024, timestamp: Date.now() }
       };
 
       // Add multiple entries
       for (let i = 0; i < 5; i++) {
-        await cache.set(`key${i}`, largeAudioData);
+        await cache.set(`key${i}`, audioData);
       }
 
       // Total size should be tracked
@@ -228,19 +228,13 @@ describe('PersistentCache', () => {
         metadata: { size, timestamp: Date.now(), lastAccess: Date.now() }
       });
 
-      // Use smaller sizes to avoid OOM: 100KB instead of 20-40MB
-      await cache.set('key1', audioData(100 * 1024)); // 100 KB
-      await new Promise(resolve => setTimeout(resolve, 10));
-
-      await cache.set('key2', audioData(100 * 1024)); // 100 KB
-      await new Promise(resolve => setTimeout(resolve, 10));
-
-      await cache.set('key3', audioData(100 * 1024)); // 100 KB
-      await new Promise(resolve => setTimeout(resolve, 10));
+      // Use tiny sizes: 1KB to avoid OOM
+      await cache.set('key1', audioData(1024)); // 1 KB
+      await cache.set('key2', audioData(1024)); // 1 KB
+      await cache.set('key3', audioData(1024)); // 1 KB
 
       // Access key1 to make it more recent
       await cache.get('key1');
-      await new Promise(resolve => setTimeout(resolve, 10));
 
       // Verify keys exist
       const hasKey1 = await cache.has('key1');

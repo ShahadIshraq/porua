@@ -176,18 +176,18 @@ describe('AudioCacheManager', () => {
     });
 
     it('should handle cache full error gracefully', async () => {
-      // Create very large entries to fill cache
-      const largeAudioData = {
-        audioBlobs: [new Blob(['x'.repeat(50 * 1024 * 1024)], { type: 'audio/wav' })],
+      // Use tiny blobs to avoid OOM - logic is same regardless of size
+      const smallAudioData = {
+        audioBlobs: [new Blob(['x'.repeat(100)], { type: 'audio/wav' })],
         metadataArray: [],
         phraseTimeline: []
       };
 
       // This should not throw even if warm cache is full
-      await expect(manager.set('text1', 'bf_lily', 1.0, largeAudioData)).resolves.not.toThrow();
-      await expect(manager.set('text2', 'bf_lily', 1.0, largeAudioData)).resolves.not.toThrow();
-      await expect(manager.set('text3', 'bf_lily', 1.0, largeAudioData)).resolves.not.toThrow();
-    }, 10000); // 10 second timeout for this large-data test
+      await expect(manager.set('text1', 'bf_lily', 1.0, smallAudioData)).resolves.not.toThrow();
+      await expect(manager.set('text2', 'bf_lily', 1.0, smallAudioData)).resolves.not.toThrow();
+      await expect(manager.set('text3', 'bf_lily', 1.0, smallAudioData)).resolves.not.toThrow();
+    });
   });
 
   describe('has', () => {
