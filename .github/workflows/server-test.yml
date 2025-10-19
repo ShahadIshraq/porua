@@ -1,0 +1,36 @@
+name: Server Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  server-test:
+    name: Run Server Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+
+      - name: Run tests
+        run: cargo test --manifest-path server/Cargo.toml --verbose
+
+      - name: Check test results
+        if: failure()
+        run: |
+          echo "Tests failed! Please fix the failing tests before merging."
+          exit 1

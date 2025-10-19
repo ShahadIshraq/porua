@@ -44,6 +44,12 @@ async fn main() -> error::Result<()> {
     // Parse command line arguments
     let args: Vec<String> = env::args().collect();
 
+    // Check for --version flag
+    if args.contains(&"--version".to_string()) || args.contains(&"-v".to_string()) {
+        println!("Porua Server v{}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+
     // Check if we should run in server mode
     let server_mode = args.contains(&"--server".to_string());
     let port = args
@@ -68,6 +74,7 @@ async fn main() -> error::Result<()> {
 
     if server_mode {
         // Server mode - initialize pool
+        println!("Porua Server v{}", env!("CARGO_PKG_VERSION"));
         println!("Starting TTS HTTP server on port {}...", port);
 
         // Load API keys
