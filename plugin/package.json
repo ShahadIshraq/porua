@@ -19,9 +19,13 @@
     "@vitest/ui": "^3.2.4",
     "archiver": "^7.0.1",
     "esbuild": "^0.19.0",
+    "fake-indexeddb": "^6.2.4",
     "fs-extra": "^11.3.2",
     "happy-dom": "^20.0.0",
     "jsdom": "^27.0.0",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "idb": "^8.0.3"
   }
 }

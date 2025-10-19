@@ -6,7 +6,6 @@ import { HighlightManager } from './ui/HighlightManager.js';
 import { AudioQueue } from './audio/AudioQueue.js';
 import { SettingsStore } from '../shared/storage/SettingsStore.js';
 import { ttsService } from '../shared/services/TTSService.js';
-import { parseMultipartStream } from '../shared/api/MultipartStreamHandler.js';
 import { PLAYER_STATES } from '../shared/utils/constants.js';
 import { ParagraphQueue } from './queue/ParagraphQueue.js';
 import { PrefetchManager } from './prefetch/PrefetchManager.js';
@@ -116,11 +115,8 @@ class TTSContentScript {
       paragraph = this.state.getPlayingParagraph();
     }
 
-    // Use TTSService for synthesis
-    const response = await ttsService.synthesizeStream(text);
-
-    // Parse multipart stream using unified handler
-    const { audioBlobs, metadataArray, phraseTimeline } = await parseMultipartStream(response);
+    // TTSService now returns parsed data directly (with transparent caching)
+    const { audioBlobs, metadataArray, phraseTimeline } = await ttsService.synthesizeStream(text);
 
     if (audioBlobs.length === 0) {
       throw new Error('No audio data received from server');

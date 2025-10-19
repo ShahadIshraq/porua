@@ -526,24 +526,6 @@ describe('SpeedControl', () => {
         );
       });
 
-      it('should handle blob conversion error', async () => {
-        speedControl.init(1.0);
-        const mockResponse = {
-          status: 200,
-          headers: new Headers({ 'Content-Type': 'audio/wav' }),
-          blob: vi.fn().mockRejectedValue(new Error('Blob conversion failed'))
-        };
-        mockDependencies.ttsService.synthesize.mockResolvedValue(mockResponse);
-
-        await speedControl.handleTestClick();
-
-        expect(speedControl.isTestingSpeed).toBe(false);
-        expect(mockDependencies.statusMessage.show).toHaveBeenCalledWith(
-          'Test failed: API Error 200: Failed to convert response to Blob: Blob conversion failed',
-          'error'
-        );
-      });
-
       it('should handle auth error (401)', async () => {
         speedControl.init(1.0);
         const error = new Error('Unauthorized');

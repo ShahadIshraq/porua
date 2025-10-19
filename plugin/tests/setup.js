@@ -1,4 +1,5 @@
 import { vi, beforeEach, afterEach } from 'vitest';
+import 'fake-indexeddb/auto';
 
 // Mock console methods globally to keep test output clean
 beforeEach(() => {

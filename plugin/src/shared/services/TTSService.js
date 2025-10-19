@@ -2,15 +2,21 @@ import { TTSClient } from '../api/TTSClient.js';
 import { SettingsStore } from '../storage/SettingsStore.js';
 import { toJSON, toBlob } from '../api/ResponseHandler.js';
 import { validateTTSText } from '../utils/validation.js';
+import { AudioCacheManager } from '../cache/AudioCacheManager.js';
+import { parseMultipartStream } from '../api/MultipartStreamHandler.js';
 
 /**
  * Centralized service for TTS API operations
  * Manages TTSClient instances with proper authentication and response handling
+ * Now includes transparent caching for both streaming and non-streaming synthesis
  */
 export class TTSService {
   constructor() {
     this._client = null;
     this._currentSettings = null;
+
+    // Initialize cache manager (transparent caching)
+    this.cacheManager = new AudioCacheManager();
   }
 
   /**
@@ -69,39 +75,107 @@ export class TTSService {
   }
 
   /**
-   * Synthesize text to speech (streaming)
+   * Synthesize text to speech (streaming) - WITH TRANSPARENT CACHING
    * @param {string} text - Text to synthesize
    * @param {Object} options - Synthesis options
-   * @returns {Promise<Response>}
+   * @returns {Promise<Object>} { audioBlobs, metadataArray, phraseTimeline }
    */
   async synthesizeStream(text, options = {}) {
     const validatedText = validateTTSText(text);
-    const client = await this.getClient();
     const settings = await SettingsStore.get();
 
-    return await client.synthesizeStream(validatedText, {
-      voice: options.voice || settings.selectedVoiceId,
-      speed: options.speed || settings.speed || 1.0,
+    const voiceId = options.voice || settings.selectedVoiceId;
+    const speed = options.speed || settings.speed || 1.0;
+
+    // Check cache first
+    const cached = await this.cacheManager.get(validatedText, voiceId, speed);
+    if (cached) {
+      return cached; // Return parsed data directly
+    }
+
+    // Cache miss - fetch from server
+    const client = await this.getClient();
+    const response = await client.synthesizeStream(validatedText, {
+      voice: voiceId,
+      speed: speed,
       signal: options.signal
     });
+
+    // Parse multipart response
+    const { audioBlobs, metadataArray, phraseTimeline } =
+      await parseMultipartStream(response);
+
+    // Store in cache for next time
+    await this.cacheManager.set(validatedText, voiceId, speed, {
+      audioBlobs,
+      metadataArray,
+      phraseTimeline
+    });
+
+    return { audioBlobs, metadataArray, phraseTimeline };
   }
 
   /**
-   * Synthesize text to speech (non-streaming)
+   * Synthesize text to speech (non-streaming) - WITH TRANSPARENT CACHING
    * @param {string} text - Text to synthesize
    * @param {Object} options - Synthesis options
-   * @returns {Promise<Response>}
+   * @returns {Promise<Blob>} Audio blob
    */
   async synthesize(text, options = {}) {
     const validatedText = validateTTSText(text);
-    const client = await this.getClient();
     const settings = await SettingsStore.get();
 
-    return await client.synthesize(validatedText, {
-      voice: options.voice || settings.selectedVoiceId,
-      speed: options.speed || settings.speed || 1.0,
+    const voiceId = options.voice || settings.selectedVoiceId;
+    const speed = options.speed || settings.speed || 1.0;
+
+    // Check cache first
+    const cached = await this.cacheManager.get(validatedText, voiceId, speed);
+    if (cached) {
+      // Merge all audio blobs into one for non-streaming API compatibility
+      if (cached.audioBlobs.length === 1) {
+        return cached.audioBlobs[0];
+      } else {
+        // Combine multiple blobs into single blob
+        return new Blob(cached.audioBlobs, { type: 'audio/wav' });
+      }
+    }
+
+    // Cache miss - fetch from server
+    const client = await this.getClient();
+    const response = await client.synthesize(validatedText, {
+      voice: voiceId,
+      speed: speed,
       signal: options.signal
     });
+
+    // Convert to blob
+    const contentType = response.headers.get('Content-Type') || '';
+    const expectedType = contentType.includes('audio/') ? 'audio/' : 'application/octet-stream';
+    const audioBlob = await toBlob(response, expectedType);
+
+    // Store in cache (as single-item array for consistency)
+    await this.cacheManager.set(validatedText, voiceId, speed, {
+      audioBlobs: [audioBlob],
+      metadataArray: [],
+      phraseTimeline: []
+    });
+
+    return audioBlob;
+  }
+
+  /**
+   * Get cache statistics
+   * @returns {Promise<Object>} Cache stats
+   */
+  async getCacheStats() {
+    return await this.cacheManager.getStats();
+  }
+
+  /**
+   * Clear all cached audio
+   */
+  async clearCache() {
+    await this.cacheManager.clearAll();
   }
 
   /**
@@ -110,6 +184,13 @@ export class TTSService {
   reset() {
     this._client = null;
     this._currentSettings = null;
+  }
+
+  /**
+   * Cleanup on shutdown
+   */
+  async shutdown() {
+    await this.cacheManager.shutdown();
   }
 }
 

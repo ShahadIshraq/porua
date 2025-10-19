@@ -63,18 +63,8 @@ describe('PrefetchManager', () => {
     });
 
     it('should return true for cached text', async () => {
-      // Setup mocks for successful prefetch
-      const mockReader = { read: vi.fn() };
+      // Setup mock - synthesizeStream now returns parsed data directly
       mockTtsService.synthesizeStream.mockResolvedValue({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => mockReader
-        }
-      });
-
-      mockParseMultipartStream.mockResolvedValue({
         audioBlobs: [new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' })],
         metadataArray: [{ chunk_index: 0, phrases: [] }],
         phraseTimeline: []
@@ -86,17 +76,8 @@ describe('PrefetchManager', () => {
     });
 
     it('should trim text before checking', async () => {
-      // Setup successful prefetch
+      // Setup mock - synthesizeStream now returns parsed data directly
       mockTtsService.synthesizeStream.mockResolvedValue({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => ({ read: vi.fn() })
-        }
-      });
-
-      mockParseMultipartStream.mockResolvedValue({
         audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
         metadataArray: [{}],
         phraseTimeline: []
@@ -116,17 +97,8 @@ describe('PrefetchManager', () => {
     });
 
     it('should return cached data', async () => {
-      // Setup successful prefetch
+      // Setup mock - synthesizeStream now returns parsed data directly
       const mockAudioData = new Uint8Array([1, 2, 3]);
-      mockTtsService.synthesizeStream.mockResolvedValue({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => ({ read: vi.fn() })
-        }
-      });
-
       const mockTimeline = [{ text: 'test', startTime: 0, endTime: 1000, chunkIndex: 0 }];
       const mockMetadata = {
         chunk_index: 0,
@@ -135,7 +107,7 @@ describe('PrefetchManager', () => {
         phrases: [{ text: 'test', start_time: 0, end_time: 1000 }]
       };
 
-      mockParseMultipartStream.mockResolvedValue({
+      mockTtsService.synthesizeStream.mockResolvedValue({
         audioBlobs: [new Blob([mockAudioData], { type: 'audio/wav' })],
         metadataArray: [mockMetadata],
         phraseTimeline: mockTimeline
@@ -155,17 +127,8 @@ describe('PrefetchManager', () => {
 
   describe('prefetch', () => {
     it('should not prefetch if already cached', async () => {
-      // First prefetch
+      // Setup mock - synthesizeStream now returns parsed data directly
       mockTtsService.synthesizeStream.mockResolvedValue({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => ({ read: vi.fn() })
-        }
-      });
-
-      mockParseMultipartStream.mockResolvedValue({
         audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
         metadataArray: [{}],
         phraseTimeline: []
@@ -183,7 +146,7 @@ describe('PrefetchManager', () => {
     });
 
     it('should not start duplicate prefetch for same text', async () => {
-      // Setup a slow response
+      // Setup a slow response - synthesizeStream now returns parsed data directly
       let resolveFirst;
       const firstPromise = new Promise(resolve => {
         resolveFirst = resolve;
@@ -197,17 +160,8 @@ describe('PrefetchManager', () => {
       // Start second prefetch while first is pending
       const secondFetch = prefetchManager.prefetch('test');
 
-      // Resolve first
+      // Resolve first with parsed data
       resolveFirst({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => ({ read: vi.fn() })
-        }
-      });
-
-      mockParseMultipartStream.mockResolvedValue({
         audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
         metadataArray: [{}],
         phraseTimeline: []
@@ -243,17 +197,8 @@ describe('PrefetchManager', () => {
 
   describe('cache management', () => {
     it('should evict oldest entry when cache exceeds limit', async () => {
-      // Setup mock for successful prefetches
+      // Setup mock - synthesizeStream now returns parsed data directly
       mockTtsService.synthesizeStream.mockResolvedValue({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => ({ read: vi.fn() })
-        }
-      });
-
-      mockParseMultipartStream.mockResolvedValue({
         audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
         metadataArray: [{}],
         phraseTimeline: []
@@ -309,17 +254,8 @@ describe('PrefetchManager', () => {
 
   describe('clearCache', () => {
     it('should clear all cached entries', async () => {
-      // Setup mock
+      // Setup mock - synthesizeStream now returns parsed data directly
       mockTtsService.synthesizeStream.mockResolvedValue({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => ({ read: vi.fn() })
-        }
-      });
-
-      mockParseMultipartStream.mockResolvedValue({
         audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
         metadataArray: [{}],
         phraseTimeline: []

@@ -2,19 +2,24 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TTSService, ttsService } from '../../../../src/shared/services/TTSService.js';
 import { TTSClient } from '../../../../src/shared/api/TTSClient.js';
 import { SettingsStore } from '../../../../src/shared/storage/SettingsStore.js';
+import { parseMultipartStream } from '../../../../src/shared/api/MultipartStreamHandler.js';
+import { AudioCacheManager } from '../../../../src/shared/cache/AudioCacheManager.js';
 
 // Mock dependencies
 vi.mock('../../../../src/shared/api/TTSClient.js');
 vi.mock('../../../../src/shared/storage/SettingsStore.js');
+vi.mock('../../../../src/shared/api/MultipartStreamHandler.js');
+vi.mock('../../../../src/shared/cache/AudioCacheManager.js');
 
 describe('TTSService', () => {
   let service;
   let mockSettings;
   let mockClient;
+  let mockCacheManager;
+  let mockParsedData;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new TTSService();
 
     mockSettings = {
       apiUrl: 'http://localhost:3000',
@@ -32,8 +37,36 @@ describe('TTSService', () => {
       synthesize: vi.fn()
     };
 
+    // Mock parsed multipart data
+    mockParsedData = {
+      audioBlobs: [new Blob(['audio data'], { type: 'audio/wav' })],
+      metadataArray: [{ duration: 1.5 }],
+      phraseTimeline: [{ text: 'Hello', start: 0, end: 0.5 }]
+    };
+
+    // Mock AudioCacheManager
+    mockCacheManager = {
+      get: vi.fn().mockResolvedValue(null), // Cache miss by default
+      set: vi.fn().mockResolvedValue(undefined),
+      has: vi.fn().mockResolvedValue(false),
+      clearAll: vi.fn().mockResolvedValue(undefined),
+      getStats: vi.fn().mockReturnValue({
+        hitRate: '0%',
+        totalSize: '0 B',
+        bytesSaved: '0 B'
+      }),
+      shutdown: vi.fn().mockResolvedValue(undefined)
+    };
+
+    AudioCacheManager.mockImplementation(() => mockCacheManager);
+
+    // Mock parseMultipartStream
+    parseMultipartStream.mockResolvedValue(mockParsedData);
+
     SettingsStore.get = vi.fn().mockResolvedValue(mockSettings);
     TTSClient.mockImplementation(() => mockClient);
+
+    service = new TTSService();
   });
 
   describe('getClient', () => {
@@ -173,7 +206,8 @@ describe('TTSService', () => {
         speed: 1.0,
         signal: undefined
       });
-      expect(result).toBe(mockResponse);
+      expect(result).toEqual(mockParsedData);
+      expect(parseMultipartStream).toHaveBeenCalledWith(mockResponse);
     });
 
     it('should use default voice and speed from settings', async () => {
@@ -234,7 +268,12 @@ describe('TTSService', () => {
 
   describe('synthesize', () => {
     it('should call client synthesize with text', async () => {
-      const mockResponse = { ok: true };
+      const mockBlob = new Blob(['audio'], { type: 'audio/wav' });
+      const mockResponse = {
+        ok: true,
+        headers: new Map([['Content-Type', 'audio/wav']]),
+        blob: vi.fn().mockResolvedValue(mockBlob)
+      };
       mockClient.synthesize.mockResolvedValue(mockResponse);
 
       const result = await service.synthesize('Hello world');
@@ -244,11 +283,17 @@ describe('TTSService', () => {
         speed: 1.0,
         signal: undefined
       });
-      expect(result).toBe(mockResponse);
+      expect(result).toBe(mockBlob);
     });
 
     it('should override voice and speed with options', async () => {
-      mockClient.synthesize.mockResolvedValue({ ok: true });
+      const mockBlob = new Blob(['audio'], { type: 'audio/wav' });
+      const mockResponse = {
+        ok: true,
+        headers: new Map([['Content-Type', 'audio/wav']]),
+        blob: vi.fn().mockResolvedValue(mockBlob)
+      };
+      mockClient.synthesize.mockResolvedValue(mockResponse);
 
       await service.synthesize('Test', {
         voice: 'am_eric',

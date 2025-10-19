@@ -26,8 +26,28 @@ export const Z_INDEX = {
 };
 
 export const CACHE_CONFIG = {
+  // Legacy prefetch config (deprecated)
   MAX_PREFETCH_CACHE_SIZE: 3,
-  PREFETCH_LOOKAHEAD: 2
+  PREFETCH_LOOKAHEAD: 2,
+
+  // NEW: Persistent cache config
+  HOT_CACHE_SIZE: 5,              // In-memory entries
+  WARM_CACHE_DB_NAME: 'tts-audio-db',
+  WARM_CACHE_VERSION: 1,
+
+  // Hard limits
+  MAX_CACHE_SIZE_BYTES: 100 * 1024 * 1024,  // 100MB hard limit
+  MAX_ENTRY_AGE_MS: 7 * 24 * 60 * 60 * 1000, // 7 days in milliseconds
+
+  // Cache key
+  CACHE_KEY_VERSION: 1,           // Bump to invalidate all caches
+
+  // Eviction
+  EVICTION_BATCH_SIZE: 5,         // Evict 5 entries at a time when limit hit
+  CLEANUP_INTERVAL_MS: 3600000,   // Run cleanup every hour to remove stale entries
+
+  // Stats
+  STATS_LOG_INTERVAL_MS: 300000   // Log stats every 5 minutes
 };
 
 export const AUDIO_PROGRESS = {

@@ -1,5 +1,4 @@
 import { ttsService } from '../../shared/services/TTSService.js';
-import { parseMultipartStream } from '../../shared/api/MultipartStreamHandler.js';
 import { CACHE_CONFIG } from '../../shared/utils/constants.js';
 import { Logger } from '../../shared/utils/logger.js';
 
@@ -34,13 +33,10 @@ export class PrefetchManager {
     this.pendingFetches.set(normalizedText, abortController);
 
     try {
-      // Use TTSService for synthesis with abort signal
-      const response = await ttsService.synthesizeStream(normalizedText, {
+      // TTSService now returns parsed data directly (with transparent caching)
+      const { audioBlobs, metadataArray, phraseTimeline } = await ttsService.synthesizeStream(normalizedText, {
         signal: abortController.signal
       });
-
-      // Parse multipart stream using unified handler
-      const { audioBlobs, metadataArray, phraseTimeline } = await parseMultipartStream(response);
 
       if (audioBlobs.length === 0) {
         throw new Error('No audio data received from server');

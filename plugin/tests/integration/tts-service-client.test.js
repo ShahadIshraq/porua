@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TTSService } from '../../src/shared/services/TTSService.js';
 import { SettingsStore } from '../../src/shared/storage/SettingsStore.js';
+import { AudioCacheManager } from '../../src/shared/cache/AudioCacheManager.js';
 
 /**
  * Integration tests for TTSService + TTSClient
@@ -10,6 +11,7 @@ import { SettingsStore } from '../../src/shared/storage/SettingsStore.js';
 
 // Mock dependencies
 vi.mock('../../src/shared/storage/SettingsStore.js');
+vi.mock('../../src/shared/cache/AudioCacheManager.js');
 
 // Mock global fetch
 global.fetch = vi.fn();
@@ -17,10 +19,10 @@ global.fetch = vi.fn();
 describe('TTSService + TTSClient Integration', () => {
   let service;
   let mockSettings;
+  let mockCacheManager;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new TTSService();
 
     mockSettings = {
       apiUrl: 'http://localhost:3000',
@@ -30,11 +32,29 @@ describe('TTSService + TTSClient Integration', () => {
       speed: 1.0
     };
 
+    // Mock AudioCacheManager
+    mockCacheManager = {
+      get: vi.fn().mockResolvedValue(null), // Cache miss by default
+      set: vi.fn().mockResolvedValue(undefined),
+      has: vi.fn().mockResolvedValue(false),
+      clearAll: vi.fn().mockResolvedValue(undefined),
+      getStats: vi.fn().mockReturnValue({
+        hitRate: '0%',
+        totalSize: '0 B',
+        bytesSaved: '0 B'
+      }),
+      shutdown: vi.fn().mockResolvedValue(undefined)
+    };
+
+    AudioCacheManager.mockImplementation(() => mockCacheManager);
+
     SettingsStore.get = vi.fn().mockResolvedValue(mockSettings);
     SettingsStore.getSelectedVoice = vi.fn().mockResolvedValue({
       id: 'bf_lily',
       name: 'Lily'
     });
+
+    service = new TTSService();
   });
 
   describe('checkHealth integration', () => {
@@ -177,17 +197,41 @@ describe('TTSService + TTSClient Integration', () => {
 
   describe('synthesizeStream integration', () => {
     it('should successfully call client and return Response', async () => {
+      const boundary = 'test-boundary-123';
+      const mockBlob = new Blob(['audio data'], { type: 'audio/wav' });
+
+      // Create multipart response body
+      const encoder = new TextEncoder();
+      const parts = [
+        `--${boundary}\r\n`,
+        `Content-Type: audio/wav\r\n\r\n`,
+        'audio data',
+        `\r\n--${boundary}\r\n`,
+        `Content-Type: application/json\r\n\r\n`,
+        JSON.stringify({ duration: 1.5 }),
+        `\r\n--${boundary}--\r\n`
+      ];
+      const bodyData = parts.join('');
+
       const mockResponse = {
         ok: true,
         status: 200,
-        headers: new Headers({ 'Content-Type': 'multipart/form-data' }),
-        body: 'stream-data'
+        headers: new Map([['Content-Type', `multipart/form-data; boundary=${boundary}`]]),
+        body: {
+          getReader: () => ({
+            read: vi.fn()
+              .mockResolvedValueOnce({ done: false, value: encoder.encode(bodyData) })
+              .mockResolvedValueOnce({ done: true })
+          })
+        }
       };
       global.fetch.mockResolvedValue(mockResponse);
 
       const result = await service.synthesizeStream('Hello world');
 
-      expect(result).toBe(mockResponse);
+      expect(result).toHaveProperty('audioBlobs');
+      expect(result).toHaveProperty('metadataArray');
+      expect(result).toHaveProperty('phraseTimeline');
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:3000/tts/stream',
         expect.objectContaining({
@@ -198,7 +242,22 @@ describe('TTSService + TTSClient Integration', () => {
     });
 
     it('should use settings for voice and speed', async () => {
-      const mockResponse = { ok: true };
+      const boundary = 'test-boundary';
+      const encoder = new TextEncoder();
+      const bodyData = `--${boundary}\r\nContent-Type: audio/wav\r\n\r\naudio\r\n--${boundary}--\r\n`;
+
+      const mockResponse = {
+        ok: true,
+        status: 200,
+        headers: new Map([['Content-Type', `multipart/form-data; boundary=${boundary}`]]),
+        body: {
+          getReader: () => ({
+            read: vi.fn()
+              .mockResolvedValueOnce({ done: false, value: encoder.encode(bodyData) })
+              .mockResolvedValueOnce({ done: true })
+          })
+        }
+      };
       global.fetch.mockResolvedValue(mockResponse);
 
       await service.synthesizeStream('Test');
@@ -213,17 +272,18 @@ describe('TTSService + TTSClient Integration', () => {
 
   describe('synthesize integration', () => {
     it('should successfully call client and return Response', async () => {
+      const mockBlob = new Blob(['audio-data'], { type: 'audio/wav' });
       const mockResponse = {
         ok: true,
         status: 200,
-        headers: new Headers({ 'Content-Type': 'audio/wav' }),
-        body: 'audio-data'
+        headers: new Map([['Content-Type', 'audio/wav']]),
+        blob: vi.fn().mockResolvedValue(mockBlob)
       };
       global.fetch.mockResolvedValue(mockResponse);
 
       const result = await service.synthesize('Hello world');
 
-      expect(result).toBe(mockResponse);
+      expect(result).toBe(mockBlob);
       expect(global.fetch).toHaveBeenCalledWith(
         'http://localhost:3000/tts',
         expect.objectContaining({

@@ -1,5 +1,3 @@
-import { toBlob } from '../shared/api/ResponseHandler.js';
-
 /**
  * SpeedControl component for adjusting TTS playback speed
  * Provides a slider control with preset buttons for common speed values
@@ -289,16 +287,11 @@ export class SpeedControl {
       const voice = await this.settingsStore.getSelectedVoice();
 
       // Synthesize test audio with current speed
-      const response = await this.ttsService.synthesize(this.TEST_SAMPLE_TEXT, {
+      // ttsService.synthesize() now returns a Blob directly (with caching)
+      const audioBlob = await this.ttsService.synthesize(this.TEST_SAMPLE_TEXT, {
         voice: voice.id,
         speed: this.currentSpeed
       });
-
-      // Convert response to blob using ResponseHandler
-      // Server may return application/octet-stream or audio/wav
-      const contentType = response.headers.get('Content-Type') || '';
-      const expectedType = contentType.includes('audio/') ? 'audio/' : 'application/octet-stream';
-      const audioBlob = await toBlob(response, expectedType);
 
       // Play the audio
       await this.audioPreview.play(this.TEST_ID, audioBlob);
