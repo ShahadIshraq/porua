@@ -175,9 +175,12 @@ async fn main() -> error::Result<()> {
             voice_config.name, voice_config.description
         );
 
+        // Normalize text for TTS (semantic + unicode normalization)
+        let normalized_text = text_processing::normalization::normalize_simple(&text);
+
         // Generate speech with selected voice and normal speed
         let output_path = "output.wav";
-        tts.speak(&text, output_path, voice.id(), 1.0)?;
+        tts.speak(&normalized_text, output_path, voice.id(), 1.0)?;
 
         println!("Speech saved to {}", output_path);
 

@@ -2,6 +2,7 @@
 ///
 /// This module handles normalization of Unicode characters (smart quotes, dashes, etc.)
 /// while preserving the original text for client-side matching.
+use crate::text_processing::semantic_normalization;
 use unicode_normalization::UnicodeNormalization;
 
 #[derive(Debug, Clone)]
@@ -31,6 +32,7 @@ pub struct NormalizationInfo {
 /// Normalize text for TTS while tracking the original
 ///
 /// This function handles:
+/// - Semantic normalization (currency, percentages, etc.) - APPLIED FIRST
 /// - Smart quotes → ASCII quotes
 /// - En/em dashes → ASCII hyphen
 /// - Ellipsis → three dots
@@ -39,10 +41,16 @@ pub struct NormalizationInfo {
 /// - Unicode normalization (NFC form)
 pub fn normalize_for_tts(text: &str) -> NormalizationResult {
     let original = text.to_string();
-    let mut normalized = String::with_capacity(text.len());
+
+    // STEP 1: Apply semantic normalization (currency, numbers, percentages, etc.)
+    // This must happen BEFORE Unicode normalization to ensure TTS receives proper spoken forms
+    let semantically_normalized = semantic_normalization::normalize_semantic(text);
+
+    // STEP 2: Apply Unicode normalization to the semantically normalized text
+    let mut normalized = String::with_capacity(semantically_normalized.len());
     let mut char_mapping = Vec::new();
 
-    for (orig_idx, ch) in text.char_indices() {
+    for (orig_idx, ch) in semantically_normalized.char_indices() {
         match ch {
             // Left and right double quotes → ASCII double quote
             '\u{201C}' | '\u{201D}' | '\u{201E}' | '\u{201F}' => {
