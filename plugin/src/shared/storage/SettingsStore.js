@@ -7,7 +7,9 @@ export class SettingsStore {
       apiUrl: DEFAULT_SETTINGS.apiUrl,
       selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
       selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
-      speed: DEFAULT_SETTINGS.speed
+      speed: DEFAULT_SETTINGS.speed,
+      skipInterval: DEFAULT_SETTINGS.skipInterval,
+      enableSkipControls: DEFAULT_SETTINGS.enableSkipControls
     });
 
     const localData = await chrome.storage.local.get({
@@ -24,17 +26,21 @@ export class SettingsStore {
       apiKey,
       selectedVoiceId: syncData.selectedVoiceId,
       selectedVoiceName: syncData.selectedVoiceName,
-      speed: syncData.speed
+      speed: syncData.speed,
+      skipInterval: syncData.skipInterval,
+      enableSkipControls: syncData.enableSkipControls
     };
   }
 
-  static async set({ apiUrl, apiKey, selectedVoiceId, selectedVoiceName, speed }) {
+  static async set({ apiUrl, apiKey, selectedVoiceId, selectedVoiceName, speed, skipInterval, enableSkipControls }) {
     // Build sync data object dynamically
     const syncData = {};
     if (apiUrl !== undefined) syncData.apiUrl = apiUrl;
     if (selectedVoiceId !== undefined) syncData.selectedVoiceId = selectedVoiceId;
     if (selectedVoiceName !== undefined) syncData.selectedVoiceName = selectedVoiceName;
     if (speed !== undefined) syncData.speed = speed;
+    if (skipInterval !== undefined) syncData.skipInterval = skipInterval;
+    if (enableSkipControls !== undefined) syncData.enableSkipControls = enableSkipControls;
 
     if (Object.keys(syncData).length > 0) {
       await chrome.storage.sync.set(syncData);
