@@ -2,12 +2,15 @@ import { createElement } from '../utils/dom.js';
 import { PLAYER_STATES, Z_INDEX } from '../../shared/utils/constants.js';
 
 export class PlayerControl {
-  constructor(state, eventManager, onButtonClick) {
+  constructor(state, eventManager, onButtonClick, skipInterval = 10) {
     this.state = state;
     this.eventManager = eventManager;
     this.onButtonClick = onButtonClick;
+    this.skipInterval = skipInterval;
     this.element = null;
     this.button = null;
+    this.skipBackwardButton = null;
+    this.skipForwardButton = null;
     this.progressRing = null;
     this.progressArc = null;
     this.circumference = 2 * Math.PI * 27; // 2πr where r=27
@@ -18,6 +21,9 @@ export class PlayerControl {
     this.pendingProgress = null;
     this.progressRafId = null;
     this.lastProgressUpdate = 0;
+
+    // Skip callback (set by parent)
+    this.onSkip = null;
 
     this.state.subscribe((newState) => this.updateUI(newState));
   }
@@ -60,24 +66,81 @@ export class PlayerControl {
     return svg;
   }
 
+  createSkipButton(direction) {
+    const button = createElement('button', `tts-skip-button tts-skip-${direction}`);
+
+    const icon = createElement('span', 'tts-skip-icon');
+    icon.textContent = direction === 'forward' ? '⏩' : '⏪';
+
+    const time = createElement('span', 'tts-skip-time');
+    time.textContent = this.skipInterval.toString();
+
+    // Layout: backward shows icon-time (⏪10), forward shows time-icon (10⏩)
+    if (direction === 'forward') {
+      button.appendChild(time);
+      button.appendChild(icon);
+    } else {
+      button.appendChild(icon);
+      button.appendChild(time);
+    }
+
+    button.setAttribute('aria-label', `Skip ${direction} ${this.skipInterval} seconds`);
+    button.setAttribute('title', `Skip ${direction} ${this.skipInterval} seconds`);
+
+    return button;
+  }
+
+  handleSkipBackward(e) {
+    e.stopPropagation();
+    if (this.onSkip) {
+      this.onSkip(-this.skipInterval);
+    }
+  }
+
+  handleSkipForward(e) {
+    e.stopPropagation();
+    if (this.onSkip) {
+      this.onSkip(this.skipInterval);
+    }
+  }
+
+  setOnSkip(callback) {
+    this.onSkip = callback;
+  }
+
   create() {
     const control = createElement('div', 'tts-player-control');
 
-    // Add progress ring first (behind button)
+    // Add progress ring first (behind buttons)
     this.progressRing = this.createProgressRing();
     control.appendChild(this.progressRing);
 
+    // Create button container for horizontal layout
+    const buttonContainer = createElement('div', 'tts-control-buttons');
+
+    // Skip backward button
+    this.skipBackwardButton = this.createSkipButton('backward');
+    this.eventManager.on(this.skipBackwardButton, 'click', (e) => this.handleSkipBackward(e));
+    buttonContainer.appendChild(this.skipBackwardButton);
+
+    // Play/pause button (existing)
     this.button = createElement('button', 'tts-player-button');
     this.button.innerHTML = '▶';
-
     this.eventManager.on(this.button, 'click', (e) => {
       e.stopPropagation();
       this.onButtonClick();
     });
+    buttonContainer.appendChild(this.button);
 
+    // Skip forward button
+    this.skipForwardButton = this.createSkipButton('forward');
+    this.eventManager.on(this.skipForwardButton, 'click', (e) => this.handleSkipForward(e));
+    buttonContainer.appendChild(this.skipForwardButton);
+
+    control.appendChild(buttonContainer);
+
+    // Setup drag handler
     this.eventManager.on(control, 'mousedown', (e) => this.startDrag(e));
-
-    control.appendChild(this.button);
 
     const viewportHeight = window.innerHeight;
     control.style.position = 'fixed';
@@ -89,7 +152,10 @@ export class PlayerControl {
   }
 
   startDrag(e) {
-    if (e.target.classList.contains('tts-player-button')) {
+    // Don't drag when clicking any button
+    if (e.target.classList.contains('tts-player-button') ||
+        e.target.classList.contains('tts-skip-button') ||
+        e.target.closest('.tts-control-buttons')) {
       return;
     }
 
@@ -231,6 +297,8 @@ export class PlayerControl {
     }
     this.element = null;
     this.button = null;
+    this.skipBackwardButton = null;
+    this.skipForwardButton = null;
     this.progressRing = null;
     this.progressArc = null;
     this.pendingProgress = null;

@@ -105,7 +105,7 @@ describe('PlayerControl', () => {
       playerControl.create();
 
       const clickHandler = mockEventManager.on.mock.calls.find(
-        call => call[1] === 'click'
+        call => call[0] === playerControl.button && call[1] === 'click'
       )[2];
 
       const event = { stopPropagation: vi.fn() };
@@ -461,6 +461,230 @@ describe('PlayerControl', () => {
     });
   });
 
+  describe('skip buttons', () => {
+    describe('createSkipButton', () => {
+      it('should create backward skip button', () => {
+        const button = playerControl.createSkipButton('backward');
+
+        expect(button).toBeDefined();
+        expect(button.className).toContain('tts-skip-button');
+        expect(button.className).toContain('tts-skip-backward');
+      });
+
+      it('should create forward skip button', () => {
+        const button = playerControl.createSkipButton('forward');
+
+        expect(button).toBeDefined();
+        expect(button.className).toContain('tts-skip-button');
+        expect(button.className).toContain('tts-skip-forward');
+      });
+
+      it('should include skip interval in button text', () => {
+        const button = playerControl.createSkipButton('forward');
+        const timeSpan = button.querySelector('.tts-skip-time');
+
+        expect(timeSpan.textContent).toBe('10');
+      });
+
+      it('should use custom skip interval', () => {
+        const customControl = new PlayerControl(mockState, mockEventManager, mockOnButtonClick, 15);
+        const button = customControl.createSkipButton('forward');
+        const timeSpan = button.querySelector('.tts-skip-time');
+
+        expect(timeSpan.textContent).toBe('15');
+      });
+
+      it('should have correct aria-label for accessibility', () => {
+        const button = playerControl.createSkipButton('forward');
+
+        expect(button.getAttribute('aria-label')).toBe('Skip forward 10 seconds');
+      });
+
+      it('should have correct title attribute', () => {
+        const button = playerControl.createSkipButton('backward');
+
+        expect(button.getAttribute('title')).toBe('Skip backward 10 seconds');
+      });
+
+      it('should layout backward button as icon-time', () => {
+        const button = playerControl.createSkipButton('backward');
+        const children = Array.from(button.children);
+
+        expect(children[0].className).toContain('tts-skip-icon');
+        expect(children[1].className).toContain('tts-skip-time');
+      });
+
+      it('should layout forward button as time-icon', () => {
+        const button = playerControl.createSkipButton('forward');
+        const children = Array.from(button.children);
+
+        expect(children[0].className).toContain('tts-skip-time');
+        expect(children[1].className).toContain('tts-skip-icon');
+      });
+    });
+
+    describe('create with skip buttons', () => {
+      it('should create skip backward button', () => {
+        const control = playerControl.create();
+
+        expect(playerControl.skipBackwardButton).not.toBeNull();
+        expect(playerControl.skipBackwardButton.className).toContain('tts-skip-backward');
+      });
+
+      it('should create skip forward button', () => {
+        const control = playerControl.create();
+
+        expect(playerControl.skipForwardButton).not.toBeNull();
+        expect(playerControl.skipForwardButton.className).toContain('tts-skip-forward');
+      });
+
+      it('should include button container', () => {
+        const control = playerControl.create();
+        const container = control.querySelector('.tts-control-buttons');
+
+        expect(container).not.toBeNull();
+      });
+
+      it('should place buttons in correct order', () => {
+        const control = playerControl.create();
+        const container = control.querySelector('.tts-control-buttons');
+        const buttons = Array.from(container.children);
+
+        expect(buttons[0].className).toContain('tts-skip-backward');
+        expect(buttons[1].className).toContain('tts-player-button');
+        expect(buttons[2].className).toContain('tts-skip-forward');
+      });
+
+      it('should attach click handlers to skip buttons', () => {
+        playerControl.create();
+
+        const calls = mockEventManager.on.mock.calls;
+        const skipBackwardCall = calls.find(call =>
+          call[0] === playerControl.skipBackwardButton && call[1] === 'click'
+        );
+        const skipForwardCall = calls.find(call =>
+          call[0] === playerControl.skipForwardButton && call[1] === 'click'
+        );
+
+        expect(skipBackwardCall).toBeDefined();
+        expect(skipForwardCall).toBeDefined();
+      });
+    });
+
+    describe('handleSkipBackward', () => {
+      it('should call onSkip with negative interval', () => {
+        const mockOnSkip = vi.fn();
+        playerControl.setOnSkip(mockOnSkip);
+
+        const event = { stopPropagation: vi.fn() };
+        playerControl.handleSkipBackward(event);
+
+        expect(event.stopPropagation).toHaveBeenCalled();
+        expect(mockOnSkip).toHaveBeenCalledWith(-10);
+      });
+
+      it('should not throw if onSkip not set', () => {
+        const event = { stopPropagation: vi.fn() };
+
+        expect(() => {
+          playerControl.handleSkipBackward(event);
+        }).not.toThrow();
+      });
+    });
+
+    describe('handleSkipForward', () => {
+      it('should call onSkip with positive interval', () => {
+        const mockOnSkip = vi.fn();
+        playerControl.setOnSkip(mockOnSkip);
+
+        const event = { stopPropagation: vi.fn() };
+        playerControl.handleSkipForward(event);
+
+        expect(event.stopPropagation).toHaveBeenCalled();
+        expect(mockOnSkip).toHaveBeenCalledWith(10);
+      });
+
+      it('should not throw if onSkip not set', () => {
+        const event = { stopPropagation: vi.fn() };
+
+        expect(() => {
+          playerControl.handleSkipForward(event);
+        }).not.toThrow();
+      });
+    });
+
+    describe('setOnSkip', () => {
+      it('should set skip callback', () => {
+        const mockCallback = vi.fn();
+
+        playerControl.setOnSkip(mockCallback);
+
+        expect(playerControl.onSkip).toBe(mockCallback);
+      });
+
+      it('should allow updating callback', () => {
+        const callback1 = vi.fn();
+        const callback2 = vi.fn();
+
+        playerControl.setOnSkip(callback1);
+        playerControl.setOnSkip(callback2);
+
+        expect(playerControl.onSkip).toBe(callback2);
+      });
+    });
+
+    describe('drag interaction with skip buttons', () => {
+      beforeEach(() => {
+        playerControl.element = document.createElement('div');
+        playerControl.element.getBoundingClientRect = vi.fn(() => ({
+          left: 100,
+          top: 200,
+          width: 150,
+          height: 50
+        }));
+        playerControl.skipBackwardButton = document.createElement('button');
+        playerControl.skipBackwardButton.classList.add('tts-skip-button');
+      });
+
+      it('should not start drag when clicking skip button', () => {
+        const event = {
+          target: playerControl.skipBackwardButton,
+          clientX: 150,
+          clientY: 250,
+          preventDefault: vi.fn()
+        };
+
+        playerControl.startDrag(event);
+
+        expect(playerControl.isDragging).toBe(false);
+      });
+
+      it('should not start drag when clicking inside button container', () => {
+        const container = document.createElement('div');
+        container.classList.add('tts-control-buttons');
+        const span = document.createElement('span');
+        container.appendChild(span);
+
+        const event = {
+          target: span,
+          clientX: 150,
+          clientY: 250,
+          preventDefault: vi.fn()
+        };
+
+        // Mock closest to return container
+        span.closest = vi.fn((selector) => {
+          if (selector === '.tts-control-buttons') return container;
+          return null;
+        });
+
+        playerControl.startDrag(event);
+
+        expect(playerControl.isDragging).toBe(false);
+      });
+    });
+  });
+
   describe('cleanup', () => {
     it('should remove element from DOM', () => {
       playerControl.element = document.createElement('div');
@@ -479,9 +703,11 @@ describe('PlayerControl', () => {
       expect(mockParent.removeChild).toHaveBeenCalledWith(element);
     });
 
-    it('should null element and button', () => {
+    it('should null element and all buttons', () => {
       playerControl.element = document.createElement('div');
       playerControl.button = document.createElement('button');
+      playerControl.skipBackwardButton = document.createElement('button');
+      playerControl.skipForwardButton = document.createElement('button');
       Object.defineProperty(playerControl.element, 'parentNode', {
         value: null,
         writable: true,
@@ -492,6 +718,8 @@ describe('PlayerControl', () => {
 
       expect(playerControl.element).toBeNull();
       expect(playerControl.button).toBeNull();
+      expect(playerControl.skipBackwardButton).toBeNull();
+      expect(playerControl.skipForwardButton).toBeNull();
     });
 
     it('should handle element without parent', () => {
