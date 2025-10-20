@@ -36,13 +36,13 @@ async fn main() -> error::Result<()> {
                 if let Some(install_dir) = exe_dir.parent() {
                     let env_path = install_dir.join(".env");
                     if env_path.exists() {
-                        return dotenvy::from_path(&env_path);
+                        return dotenvy::from_path(&env_path).map(|_| env_path);
                     }
                 }
                 // Try ../.env (for simpler layouts)
                 let env_path = exe_dir.join(".env");
                 if env_path.exists() {
-                    return dotenvy::from_path(&env_path);
+                    return dotenvy::from_path(&env_path).map(|_| env_path);
                 }
             }
         }
