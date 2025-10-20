@@ -28,8 +28,7 @@ porua-server-v0.1.0-[platform]-[arch]/
 ├── download_models.sh            # Model download script
 ├── install.sh                    # Installation script
 ├── docs/README.md                # Full documentation
-├── INSTALL.md                    # Installation guide
-└── README.txt                    # Quick start
+└── INSTALL.md                    # Installation guide and quick start
 ```
 
 **Package size:** ~55 MB compressed (includes eSpeak-ng phoneme data)

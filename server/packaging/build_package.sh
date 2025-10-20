@@ -235,51 +235,6 @@ else
     exit 1
 fi
 
-# Create a simple README in the root
-cat > "$PACKAGE_DIR/README.txt" << 'EOF'
-Porua Server - Text-to-Speech HTTP Server
-========================================
-
-QUICK START:
-
-1. Download TTS models (~337 MB):
-   ./download_models.sh
-
-2. Install the server:
-   ./install.sh
-
-3. Start server:
-   porua_server --server --port 3000
-
-4. Test API:
-   curl -X POST http://localhost:3000/tts \
-     -H "Content-Type: application/json" \
-     -d '{"text": "Hello world!", "voice": "bf_lily"}' \
-     --output test.wav
-
-PACKAGE CONTENTS:
-bin/porua_server         - Server binary (~29 MB)
-espeak-ng-data/          - Phoneme data (~25 MB)
-.env.example             - Environment configuration template
-api_keys.txt.example     - API keys template (optional)
-download_models.sh       - Download TTS models (~337 MB)
-install.sh               - Installation script
-docs/README.md           - Full documentation
-INSTALL.md               - Installation guide
-
-CONFIGURATION:
-Copy .env.example to .env and customize settings:
-  cp .env.example .env
-  # Edit .env to configure port, rate limits, API keys, etc.
-
-MODELS:
-Models are downloaded from: github.com/thewh1teagle/kokoro-onnx
-- kokoro-v1.0.onnx (310 MB)
-- voices-v1.0.bin (27 MB)
-
-For details, see INSTALL.md or docs/README.md
-EOF
-
 echo -e "${GREEN}✓ Documentation copied${NC}"
 echo ""
 

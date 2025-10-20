@@ -1,5 +1,22 @@
 # Porua Server - Installation Guide
 
+## Package Contents
+
+This package includes:
+
+- `bin/porua_server` - Server binary (~29 MB)
+- `espeak-ng-data/` - Phoneme data (~25 MB, bundled)
+- `.env.example` - Environment configuration template
+- `api_keys.txt.example` - API keys template (optional)
+- `download_models.sh` - Script to download TTS models (~337 MB)
+- `install.sh` - Installation script
+- `docs/README.md` - Full project documentation
+
+**Note:** TTS models are downloaded separately (not bundled in package):
+- `kokoro-v1.0.onnx` (310 MB)
+- `voices-v1.0.bin` (27 MB)
+- Source: https://github.com/thewh1teagle/kokoro-onnx/releases
+
 ## Quick Install
 
 ### Automated Installation (Recommended)
@@ -98,6 +115,12 @@ porua_server "Hello world"
 # Test server
 porua_server --server --port 3000
 curl http://localhost:3000/health
+
+# Test API
+curl -X POST http://localhost:3000/tts \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello world!", "voice": "bf_lily"}' \
+  --output test.wav
 ```
 
 ## Configuration
