@@ -22,15 +22,17 @@ Output: `dist/porua-server-v0.1.0-[platform]-[arch].tar.gz` and `.zip`
 ```
 porua-server-v0.1.0-[platform]-[arch]/
 ├── bin/porua_server              # Binary (~29 MB)
+├── espeak-ng-data/               # Phoneme data (~25 MB)
+├── .env.example                  # Environment configuration template
+├── api_keys.txt.example          # API keys template (optional)
 ├── download_models.sh            # Model download script
 ├── install.sh                    # Installation script
 ├── docs/README.md                # Full documentation
 ├── INSTALL.md                    # Installation guide
-├── api_keys.txt.example          # API keys template
 └── README.txt                    # Quick start
 ```
 
-**Package size:** ~30 MB compressed
+**Package size:** ~55 MB compressed (includes eSpeak-ng phoneme data)
 **Models (downloaded separately):** ~337 MB
   - kokoro-v1.0.onnx (310 MB)
   - voices-v1.0.bin (27 MB)
@@ -85,11 +87,15 @@ The `build_package.sh` script accepts the following options:
 
 **For local builds:**
 - Rust 1.75+
-- At least 50 MB free disk space
+- eSpeak-ng installed (for development: `brew install espeak-ng` on macOS)
+- At least 80 MB free disk space (includes espeak-ng-data in package)
 
 **For CI builds:**
 - Pre-compiled binary for target platform
+- eSpeak-ng data files from system installation or repository
 - curl or wget (for model downloads during installation)
+
+**Note:** The packaging script will copy `packaging/espeak-ng-data/` into the distribution. This data is required for phonemization during TTS processing.
 
 ## Usage Examples
 
@@ -136,6 +142,33 @@ cd server
 
 **Note:** Models are NOT included in packages. Users download them via `download_models.sh`.
 
+## Configuration
+
+The package includes `.env.example` with configuration templates for:
+
+- **Server settings:** Port, host binding
+- **TTS pool size:** Number of concurrent TTS engines
+- **Authentication:** API key file path
+- **Rate limiting:** Per-key and per-IP limits
+- **Logging:** Log levels for different modules
+- **Model paths:** Custom model locations (advanced)
+
+**Setup:**
+```bash
+# Copy template to .env
+cp .env.example .env
+
+# Edit configuration
+nano .env
+
+# Or use environment variables directly
+export PORT=3000
+export TTS_POOL_SIZE=4
+export RATE_LIMIT_MODE=auto
+```
+
+The `install.sh` script offers to create `.env` from `.env.example` during installation.
+
 ## Distribution
 
 ### GitHub Releases
@@ -171,6 +204,15 @@ shasum -a 256 -c porua-server-v0.1.0-macos-arm64.tar.gz.sha256
 - [ ] Publish release notes
 
 ## Troubleshooting
+
+**Missing eSpeak-ng Data Files**
+  - **Problem:** Binary couldn't find eSpeak-ng phoneme data required for TTS processing
+  - **Error:** `Failed to initialize eSpeak-ng. Try setting PIPER_ESPEAKNG_DATA_DIRECTORY`
+  - **Solution:** The package now includes `espeak-ng-data/` directory. Ensure it's copied during installation and set the environment variable:
+    ```bash
+    export PIPER_ESPEAKNG_DATA_DIRECTORY="/path/to/installation/share"
+    ```
+  - **Note:** When running locally (development), the binary uses the system's eSpeak-ng installation (Homebrew on macOS). For distribution, the data is bundled in the package.
 
 **Models not downloading:**
 ```bash
