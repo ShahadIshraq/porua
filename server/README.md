@@ -610,9 +610,35 @@ The server automatically detects client IP addresses from:
 
 ### Creating Distribution Packages
 
+The `build_package.sh` script supports both local builds and CI/cross-compilation scenarios.
+
+**Local build (auto-detect platform):**
 ```bash
-# Build package (binary + scripts, ~30 MB)
+cd server
 ./packaging/build_package.sh
+```
+
+**CI build with pre-compiled binary:**
+```bash
+# Example: macOS ARM64 cross-compiled build
+./packaging/build_package.sh \
+  --version 0.1.0 \
+  --platform macos \
+  --arch arm64 \
+  --binary-path target/aarch64-apple-darwin/release/porua_server \
+  --skip-build
+```
+
+**Available options:**
+```bash
+--version VERSION      Version string (default: from Cargo.toml)
+--platform PLATFORM    macos/linux/windows (default: auto-detect)
+--arch ARCH            arm64/x64 (default: auto-detect)
+--binary-path PATH     Path to pre-built binary
+--binary-name NAME     Binary filename (porua_server or porua_server.exe)
+--output-dir DIR       Output directory (default: dist)
+--skip-build           Skip cargo build (useful for CI)
+--help                 Show help message
 ```
 
 **Note:** Models are NOT included in packages. Users download them separately via `download_models.sh` script.
@@ -622,4 +648,5 @@ This approach:
 - Faster downloads and CI builds
 - Bandwidth savings: Users download models once, can use with multiple binary versions
 - Separation of concerns: Binary updates don't require re-downloading models
+- Single source of truth: Same script for local and CI builds
 - Downloads from official source: https://github.com/thewh1teagle/kokoro-onnx
