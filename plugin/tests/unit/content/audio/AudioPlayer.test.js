@@ -3,12 +3,29 @@ import { AudioPlayer } from '../../../../src/content/audio/AudioPlayer.js';
 import { AudioRegistry } from '../../../../src/content/audio/AudioRegistry.js';
 import { ChunkId } from '../../../../src/content/audio/ChunkId.js';
 
-// Mock dependencies
-vi.mock('idb');
+// Mock dependencies - must be BEFORE imports
+vi.mock('idb', () => ({
+  openDB: vi.fn(() => Promise.resolve({
+    get: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+    clear: vi.fn(),
+    transaction: vi.fn(() => ({
+      objectStore: vi.fn(() => ({
+        index: vi.fn(() => ({
+          getAll: vi.fn(() => Promise.resolve([]))
+        })),
+        count: vi.fn(() => Promise.resolve(0)),
+        getAll: vi.fn(() => Promise.resolve([]))
+      }))
+    }))
+  }))
+}));
+
 vi.mock('../../../../src/shared/cache/AudioCacheManager.js', () => ({
   AudioCacheManager: vi.fn(() => ({
-    get: vi.fn(),
-    set: vi.fn()
+    get: vi.fn(() => Promise.resolve(null)),
+    set: vi.fn(() => Promise.resolve())
   }))
 }));
 
