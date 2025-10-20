@@ -128,6 +128,11 @@ fi
 echo -e "${GREEN}Platform:${NC} $PLATFORM-$ARCH"
 echo ""
 
+# Normalize OUTPUT_DIR path (remove trailing slashes and resolve relative paths)
+OUTPUT_DIR=$(cd "$(dirname "$OUTPUT_DIR")" && pwd)/$(basename "$OUTPUT_DIR")
+# Remove trailing slash if present
+OUTPUT_DIR="${OUTPUT_DIR%/}"
+
 # Package name
 PACKAGE_NAME="porua-server-v${VERSION}-${PLATFORM}-${ARCH}"
 PACKAGE_DIR="${OUTPUT_DIR}/${PACKAGE_NAME}"
