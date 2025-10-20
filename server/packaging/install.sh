@@ -120,15 +120,17 @@ run_cmd chmod +x "$INSTALL_DIR/bin/porua_server"
 BINARY_SIZE=$(du -h "$INSTALL_DIR/bin/porua_server" | cut -f1)
 echo -e "${GREEN}✓ Binary installed${NC} (${BINARY_SIZE})"
 
-# Copy espeak-ng-data if it exists in the package
+# Copy espeak-ng-data (should always be present in packages)
 if [ -d "espeak-ng-data" ]; then
     echo -e "${YELLOW}Installing eSpeak-ng phoneme data...${NC}"
     run_cmd cp -r espeak-ng-data "$INSTALL_DIR/share/"
     ESPEAK_SIZE=$(du -sh "$INSTALL_DIR/share/espeak-ng-data" | cut -f1)
     echo -e "${GREEN}✓ eSpeak-ng data installed${NC} (${ESPEAK_SIZE})"
 else
-    echo -e "${YELLOW}Warning: espeak-ng-data not found in package${NC}"
-    echo -e "${YELLOW}Phonemization may require manual setup of PIPER_ESPEAKNG_DATA_DIRECTORY${NC}"
+    echo -e "${RED}✗ Error: espeak-ng-data directory not found in package${NC}"
+    echo -e "${RED}This is a packaging error - eSpeak-ng data should always be bundled.${NC}"
+    echo -e "${YELLOW}Please re-download the package or report this issue.${NC}"
+    exit 1
 fi
 
 echo ""

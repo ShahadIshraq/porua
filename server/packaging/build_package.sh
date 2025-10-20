@@ -221,14 +221,18 @@ else
     echo -e "${YELLOW}Warning: .env.example not found${NC}"
 fi
 
-# Copy espeak-ng-data for phonemization
+# Copy espeak-ng-data for phonemization (should always be in repository)
 if [ -d "packaging/espeak-ng-data" ]; then
     echo -e "${YELLOW}Copying eSpeak-ng phoneme data...${NC}"
     cp -r packaging/espeak-ng-data "$PACKAGE_DIR/"
     ESPEAK_SIZE=$(du -sh "$PACKAGE_DIR/espeak-ng-data" | cut -f1)
     echo -e "${GREEN}✓ eSpeak-ng data copied${NC} (${ESPEAK_SIZE})"
 else
-    echo -e "${YELLOW}Warning: packaging/espeak-ng-data not found - phonemization may not work${NC}"
+    echo -e "${RED}✗ ERROR: packaging/espeak-ng-data not found!${NC}"
+    echo -e "${RED}This is a critical error - eSpeak-ng data is required for TTS.${NC}"
+    echo -e "${YELLOW}The data should be in the repository. Did you clone properly?${NC}"
+    echo -e "${YELLOW}See server/packaging/README-ESPEAK.md for details.${NC}"
+    exit 1
 fi
 
 # Create a simple README in the root
