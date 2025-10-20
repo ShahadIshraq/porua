@@ -87,15 +87,14 @@ The `build_package.sh` script accepts the following options:
 
 **For local builds:**
 - Rust 1.75+
-- eSpeak-ng installed (for development: `brew install espeak-ng` on macOS)
+- eSpeak-ng (for development/testing only: `brew install espeak-ng` on macOS)
 - At least 80 MB free disk space (includes espeak-ng-data in package)
 
 **For CI builds:**
 - Pre-compiled binary for target platform
-- eSpeak-ng data files from system installation or repository
 - curl or wget (for model downloads during installation)
 
-**Note:** The packaging script will copy `packaging/espeak-ng-data/` into the distribution. This data is required for phonemization during TTS processing.
+**Note:** The eSpeak-ng phoneme data (~25 MB) is **included in the repository** at `packaging/espeak-ng-data/` and will be automatically bundled with distribution packages. No setup required.
 
 ## Usage Examples
 
@@ -208,11 +207,11 @@ shasum -a 256 -c porua-server-v0.1.0-macos-arm64.tar.gz.sha256
 **Missing eSpeak-ng Data Files**
   - **Problem:** Binary couldn't find eSpeak-ng phoneme data required for TTS processing
   - **Error:** `Failed to initialize eSpeak-ng. Try setting PIPER_ESPEAKNG_DATA_DIRECTORY`
-  - **Solution:** The package now includes `espeak-ng-data/` directory. Ensure it's copied during installation and set the environment variable:
+  - **Solution:** The eSpeak-ng data is **always bundled** in distribution packages (located in `espeak-ng-data/` directory). Ensure it's copied during installation and set the environment variable:
     ```bash
     export PIPER_ESPEAKNG_DATA_DIRECTORY="/path/to/installation/share"
     ```
-  - **Note:** When running locally (development), the binary uses the system's eSpeak-ng installation (Homebrew on macOS). For distribution, the data is bundled in the package.
+  - **Note:** During development, the binary can use either the system's eSpeak-ng installation (e.g., Homebrew on macOS) or the bundled data in `packaging/espeak-ng-data/`.
 
 **Models not downloading:**
 ```bash

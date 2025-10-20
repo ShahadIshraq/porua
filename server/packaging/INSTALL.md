@@ -17,6 +17,7 @@ cd porua-server-v0.1.0-macos-arm64
 ```
 
 The installer will:
+- Install binary and eSpeak-ng phoneme data (~25 MB, bundled in package)
 - Download TTS models from official source (if not already downloaded)
 - Install to `/usr/local/porua` (system) or `~/.local/porua` (user)
 - Create symlink to `/usr/local/bin/porua_server` or `~/.local/bin/porua_server`
