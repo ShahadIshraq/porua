@@ -29,12 +29,13 @@ cd porua-server-v0.1.0-macos-arm64
 # 2. Download models (~337 MB)
 ./download_models.sh
 
-# 3. Install
+# 3. Install (automatically handles macOS quarantine)
 ./install.sh
 ```
 
 The installer will:
 - Install binary and eSpeak-ng phoneme data (~25 MB, bundled in package)
+- **Automatically remove macOS quarantine attribute** (no manual xattr needed!)
 - Download TTS models from official source (if not already downloaded)
 - Install to `/usr/local/porua` (system) or `~/.local/porua` (user)
 - Create `.env` file with configured paths
@@ -97,6 +98,30 @@ sudo ln -sf /usr/local/porua/bin/porua_server /usr/local/bin/porua_server
 - Models via symlink resolution and fallback search paths
 - Configuration from `.env` file (loaded automatically via dotenvy)
 - eSpeak-ng data from bundled installation
+
+## macOS Security (Automatic)
+
+**Good news!** The install script automatically removes the macOS quarantine attribute, so you don't need to do anything manually.
+
+During installation, you'll see:
+```
+Removing macOS quarantine attribute...
+✓ macOS quarantine attribute removed
+```
+
+**Manual removal (only if needed):**
+
+If you installed manually without using `install.sh`, you can remove the quarantine attribute:
+
+```bash
+# For system install
+sudo xattr -d com.apple.quarantine /usr/local/porua/bin/porua_server
+
+# For user install
+xattr -d com.apple.quarantine ~/.local/porua/bin/porua_server
+```
+
+**Why this matters:** macOS marks downloaded files as quarantined by Gatekeeper, preventing execution. The install script automatically removes this security flag for a seamless experience.
 
 ## Verification
 
@@ -287,6 +312,20 @@ sudo rm /usr/local/bin/porua_server  # or rm ~/.local/bin/porua_server
 ```
 
 ## Troubleshooting
+
+**macOS: "Cannot be opened because the developer cannot be verified":**
+
+This should not happen if you used `install.sh`, which automatically removes the quarantine attribute. If you see this error:
+
+```bash
+# Option 1: Run the install script (recommended)
+./install.sh  # Handles quarantine removal automatically
+
+# Option 2: Manual removal
+sudo xattr -d com.apple.quarantine /usr/local/porua/bin/porua_server
+# or for user install:
+xattr -d com.apple.quarantine ~/.local/porua/bin/porua_server
+```
 
 **Models not downloading:**
 ```bash
