@@ -142,6 +142,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
 
+      - name: Install OpenSSL (Windows)
+        if: matrix.target.os == 'windows-latest'
+        run: |
+          # Install OpenSSL via vcpkg (pre-installed on GitHub Actions Windows runners)
+          vcpkg install openssl:x64-windows-static
+          echo "VCPKG_ROOT=$env:VCPKG_INSTALLATION_ROOT" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          echo "OPENSSL_DIR=$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+        shell: pwsh
+
       - name: Validate version matches Cargo.toml
         shell: bash
         run: |

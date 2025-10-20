@@ -33,8 +33,15 @@ num2words = "0.3"
 regex = "1.10"
 lazy_static = "1.4"
 
-# OpenSSL with vendored feature for cross-compilation
+# Platform-specific OpenSSL configuration
+# Use vendored OpenSSL only for ARM64 Linux cross-compilation
+# where system OpenSSL may not be available or compatible
+[target.'cfg(all(target_os = "linux", target_arch = "aarch64"))'.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }
+
+# Use system OpenSSL for other platforms (better compatibility and faster builds)
+[target.'cfg(not(all(target_os = "linux", target_arch = "aarch64")))'.dependencies]
+openssl = "0.10"
 
 [dev-dependencies]
 tempfile = "3.8"
