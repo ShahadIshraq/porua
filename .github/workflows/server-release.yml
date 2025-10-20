@@ -3,7 +3,7 @@ name: Server Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'server-v*.*.*'
   workflow_dispatch:
     inputs:
       version:
@@ -50,7 +50,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
           else
-            VERSION="${GITHUB_REF#refs/tags/v}"
+            VERSION="${GITHUB_REF#refs/tags/server-v}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
@@ -144,7 +144,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSION="${{ github.event.inputs.version }}"
           else
-            VERSION="${GITHUB_REF#refs/tags/v}"
+            VERSION="${GITHUB_REF#refs/tags/server-v}"
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
@@ -177,10 +177,26 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: Porua Server v${{ steps.version.outputs.version }}
+          tag_name: server-v${{ steps.version.outputs.version }}
+          name: Porua TTS Server v${{ steps.version.outputs.version }}
           draft: false
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
+          body: |
+            # Porua TTS Server
+
+            This release contains the **Porua TTS Server** binaries for multiple platforms.
+
+            ## What's Included
+            - Cross-platform server binaries (macOS ARM64, Windows x64, Linux x64, Linux ARM64)
+            - Bengali TTS models
+            - Ready-to-run packages with all dependencies
+
+            ## Installation
+            1. Download the appropriate binary for your platform
+            2. Extract the archive
+            3. Run the `porua_server` executable
+
+            ---
           generate_release_notes: true
           files: |
             release-assets/*
