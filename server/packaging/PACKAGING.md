@@ -66,37 +66,75 @@ The script automatically detects your platform:
 - macOS Intel: `porua-server-v0.1.0-macos-x86_64`
 - Linux: `porua-server-v0.1.0-linux-x86_64`
 
-## Prerequisites
+## Script Options
 
-- Rust 1.75+
-- At least 500 MB free disk space for models
-- curl or wget (for downloading models)
-
-## Manual Build
-
-If you prefer manual control:
+The `build_package.sh` script accepts the following options:
 
 ```bash
-# 1. Build
-cargo build --release
-
-# 2. Create structure
-mkdir -p dist/my-package/{bin,docs}
-
-# 3. Copy files
-cp target/release/porua_server dist/my-package/bin/
-cp README.md dist/my-package/docs/
-cp packaging/INSTALL.md dist/my-package/
-cp packaging/install.sh dist/my-package/
-cp packaging/download_models.sh dist/my-package/
-chmod +x dist/my-package/install.sh dist/my-package/download_models.sh
-
-# 4. Archive
-cd dist
-tar -czf my-package.tar.gz my-package/
+--version VERSION      Version string (default: from Cargo.toml)
+--platform PLATFORM    Target platform (macos/linux/windows, default: auto-detect)
+--arch ARCH            Target architecture (arm64/x64, default: auto-detect)
+--binary-path PATH     Path to pre-built binary (default: target/release/porua_server)
+--binary-name NAME     Binary filename (default: porua_server or porua_server.exe)
+--output-dir DIR       Output directory (default: dist)
+--skip-build           Skip cargo build (useful for CI with pre-built binaries)
+--help                 Show help message
 ```
 
-**Note:** Models are NOT included in the package. Users download them via `download_models.sh`.
+## Prerequisites
+
+**For local builds:**
+- Rust 1.75+
+- At least 50 MB free disk space
+
+**For CI builds:**
+- Pre-compiled binary for target platform
+- curl or wget (for model downloads during installation)
+
+## Usage Examples
+
+### Local Development Build
+
+```bash
+# Build for current platform
+cd server
+./packaging/build_package.sh
+```
+
+### CI/GitHub Actions Build
+
+```bash
+# After cross-compiling with cargo
+./packaging/build_package.sh \
+  --version 0.1.0 \
+  --platform linux \
+  --arch x64 \
+  --binary-path target/x86_64-unknown-linux-gnu/release/porua_server \
+  --skip-build
+```
+
+### Windows Build
+
+```bash
+# Cross-compiled Windows binary
+./packaging/build_package.sh \
+  --version 0.1.0 \
+  --platform windows \
+  --arch x64 \
+  --binary-path target/x86_64-pc-windows-msvc/release/porua_server.exe \
+  --binary-name porua_server.exe \
+  --skip-build
+```
+
+### Custom Output Directory
+
+```bash
+# Output to specific directory
+./packaging/build_package.sh \
+  --output-dir /tmp/releases
+```
+
+**Note:** Models are NOT included in packages. Users download them via `download_models.sh`.
 
 ## Distribution
 

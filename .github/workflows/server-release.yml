@@ -75,66 +75,60 @@ jobs:
           fi
           cargo build --release --manifest-path server/Cargo.toml --target ${{ matrix.target.target }}
 
-      - name: Prepare binary
+      - name: Package release
         shell: bash
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           TARGET="${{ matrix.target.target }}"
           NAME="${{ matrix.target.name }}"
 
-          # Create staging directory
-          mkdir -p staging
-
-          # Copy binary
+          # Determine binary name
           if [[ "${{ matrix.target.os }}" == "windows-latest" ]]; then
-            cp "server/target/$TARGET/release/porua_server.exe" staging/
+            BINARY_NAME="porua_server.exe"
           else
-            cp "server/target/$TARGET/release/porua_server" staging/
+            BINARY_NAME="porua_server"
           fi
 
-          # Copy installation scripts
-          if [ -f "server/packaging/download_models.sh" ]; then
-            cp server/packaging/download_models.sh staging/
-            chmod +x staging/download_models.sh
-          fi
+          # Determine platform
+          case "$NAME" in
+            macos-arm64)
+              PLATFORM="macos"
+              ARCH="arm64"
+              ;;
+            windows-x64)
+              PLATFORM="windows"
+              ARCH="x64"
+              ;;
+            linux-x64)
+              PLATFORM="linux"
+              ARCH="x64"
+              ;;
+            linux-arm64)
+              PLATFORM="linux"
+              ARCH="arm64"
+              ;;
+          esac
 
-          if [ -f "server/packaging/install.sh" ]; then
-            cp server/packaging/install.sh staging/
-            chmod +x staging/install.sh
-          fi
+          # Run packaging script
+          cd server
+          chmod +x packaging/build_package.sh
+          ./packaging/build_package.sh \
+            --version "$VERSION" \
+            --platform "$PLATFORM" \
+            --arch "$ARCH" \
+            --binary-path "target/$TARGET/release/$BINARY_NAME" \
+            --binary-name "$BINARY_NAME" \
+            --output-dir "../" \
+            --skip-build
 
-          # Copy documentation
-          if [ -f "server/packaging/INSTALL.md" ]; then
-            cp server/packaging/INSTALL.md staging/
-          fi
-
-          if [ -f "server/README.md" ]; then
-            mkdir -p staging/docs
-            cp server/README.md staging/docs/
-          fi
-
-          # Create archive
-          cd staging
-          if [[ "${{ matrix.target.ext }}" == "zip" ]]; then
-            7z a "../porua_server-v$VERSION-$NAME.zip" *
-          else
-            tar -czf "../porua_server-v$VERSION-$NAME.tar.gz" *
-          fi
           cd ..
 
-      - name: Generate checksum
-        shell: bash
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          NAME="${{ matrix.target.name }}"
-          EXT="${{ matrix.target.ext }}"
-          FILENAME="porua_server-v$VERSION-$NAME.$EXT"
+          # Rename to match expected naming
+          mv "porua-server-v$VERSION-$PLATFORM-$ARCH.tar.gz" "porua_server-v$VERSION-$NAME.tar.gz" 2>/dev/null || true
+          mv "porua-server-v$VERSION-$PLATFORM-$ARCH.zip" "porua_server-v$VERSION-$NAME.zip" 2>/dev/null || true
+          mv "porua-server-v$VERSION-$PLATFORM-$ARCH.tar.gz.sha256" "porua_server-v$VERSION-$NAME.tar.gz.sha256" 2>/dev/null || true
+          mv "porua-server-v$VERSION-$PLATFORM-$ARCH.zip.sha256" "porua_server-v$VERSION-$NAME.zip.sha256" 2>/dev/null || true
 
-          if [[ "${{ matrix.target.os }}" == "windows-latest" ]]; then
-            certutil -hashfile "$FILENAME" SHA256 | findstr /v ":" | findstr /v "CertUtil" > "$FILENAME.sha256"
-          else
-            shasum -a 256 "$FILENAME" > "$FILENAME.sha256"
-          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
