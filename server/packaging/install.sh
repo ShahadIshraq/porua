@@ -312,7 +312,7 @@ echo -e "${YELLOW}Verifying installation...${NC}"
 
 # Set temporary environment for verification
 export TTS_MODEL_DIR="$INSTALL_DIR/models"
-export PIPER_ESPEAKNG_DATA_DIRECTORY="$INSTALL_DIR/share"
+export PIPER_ESPEAKNG_DATA_DIRECTORY="$INSTALL_DIR/share/espeak-ng-data"
 
 # Test if binary is accessible
 if command -v porua_server &> /dev/null; then

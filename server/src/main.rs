@@ -24,8 +24,33 @@ use std::time::Duration;
 #[tokio::main]
 async fn main() -> error::Result<()> {
     // Load .env file if it exists (silently ignore if it doesn't)
-    // This allows configuration via .env file without requiring it
-    let _ = dotenvy::dotenv();
+    // Try multiple locations in order:
+    // 1. Current working directory (for development)
+    // 2. Binary's installation directory (for packaged installations)
+    // 3. Parent of binary's directory (alternative layout)
+    let _ = dotenvy::dotenv().or_else(|_| {
+        // Try loading from binary's directory
+        if let Ok(exe_path) = env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                // Try ../../../.env (for bin/ subdirectory: /usr/local/porua/bin -> /usr/local/porua/)
+                if let Some(install_dir) = exe_dir.parent() {
+                    let env_path = install_dir.join(".env");
+                    if env_path.exists() {
+                        return dotenvy::from_path(&env_path);
+                    }
+                }
+                // Try ../.env (for simpler layouts)
+                let env_path = exe_dir.join(".env");
+                if env_path.exists() {
+                    return dotenvy::from_path(&env_path);
+                }
+            }
+        }
+        Err(dotenvy::Error::Io(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            ".env not found",
+        )))
+    });
 
     // Initialize tracing for logging with environment variable support
     // Default log level is INFO for tts_server, WARN for dependencies
