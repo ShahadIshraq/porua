@@ -334,10 +334,14 @@ async fn test_rate_limit_response_format() {
     let retry_after = response.headers().get("retry-after");
     assert!(retry_after.is_some(), "Should have Retry-After header");
 
-    // Parse and verify retry after value is a number
+    // Parse and verify retry after value is a valid number
     let retry_after_str = retry_after.unwrap().to_str().unwrap();
     let retry_seconds: u64 = retry_after_str.parse().unwrap();
-    assert!(retry_seconds >= 0, "Retry-After should be >= 0");
+    // u64 is always >= 0, so we just verify it parsed successfully and is reasonable
+    assert!(
+        retry_seconds <= 60,
+        "Retry-After should be reasonable (<= 60 seconds)"
+    );
 
     // Check response body
     let body = axum::body::to_bytes(response.into_body(), usize::MAX)
