@@ -23,6 +23,22 @@ High-performance Rust HTTP server featuring:
 - Streaming multipart responses with timing data
 - REST API with health monitoring
 
+## Model Attribution
+
+Porua uses the **Kokoro-82M** TTS model, an open-source, high-quality text-to-speech model:
+
+- **Model:** [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) by hexgrad
+- **ONNX Version:** [thewh1teagle/kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx)
+- **License:** Apache 2.0
+- **Parameters:** 82M
+- **Quality:** Comparable to much larger models, optimized for real-time generation
+
+The server automatically downloads model files from the official source during installation:
+- `kokoro-v1.0.onnx` (310 MB) - TTS model weights
+- `voices-v1.0.bin` (27 MB) - Voice style vectors for 28 English voices
+
+**Source:** https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
+
 ## Quick Start
 
 **1. Start the server:**
@@ -51,17 +67,21 @@ npm run build
 ## Architecture
 
 ```
-tts-plugin/
+porua/
 ├── plugin/          # Browser extension (ES modules + esbuild)
 │   ├── src/         # Modular source code
 │   ├── dist/        # Bundled output
 │   └── README.md    # Extension documentation
 ├── server/          # Rust TTS server (Actix Web + Kokoro)
 │   ├── src/         # Server source
-│   ├── models/      # TTS model files (310 MB + 27 MB)
+│   ├── packaging/   # Build and installation scripts
+│   │   ├── download_models.sh  # Download TTS models
+│   │   └── install.sh          # Installation script
 │   └── README.md    # Server documentation
 └── README.md        # This file
 ```
+
+**Note:** The `server/models/` directory is NOT included in the repository or releases. Models are downloaded during installation.
 
 ## Features
 

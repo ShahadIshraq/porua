@@ -5,31 +5,69 @@
 ### Automated Installation (Recommended)
 
 ```bash
-# Extract package
+# 1. Extract package
 tar -xzf porua-server-v0.1.0-macos-arm64.tar.gz
 cd porua-server-v0.1.0-macos-arm64
 
-# Run installer
+# 2. Download models (~337 MB)
+./download_models.sh
+
+# 3. Install
 ./install.sh
 ```
 
 The installer will:
+- Download TTS models from official source (if not already downloaded)
 - Install to `/usr/local/porua` (system) or `~/.local/porua` (user)
 - Create symlink to `/usr/local/bin/porua_server` or `~/.local/bin/porua_server`
 - Set up environment variables (optional)
 
+## Model Download
+
+Models are downloaded separately from the official Kokoro ONNX repository.
+
+### Automatic Download (Recommended)
+
+```bash
+./download_models.sh
+```
+
+This downloads:
+- `kokoro-v1.0.onnx` (310 MB) - TTS model
+- `voices-v1.0.bin` (27 MB) - Voice style vectors
+- **Source:** https://github.com/thewh1teagle/kokoro-onnx/releases
+
+### Manual Download
+
+```bash
+mkdir -p models
+curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx' -o models/kokoro-v1.0.onnx
+curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin' -o models/voices-v1.0.bin
+```
+
+### Resume Interrupted Downloads
+
+The download script supports resume:
+```bash
+# If download was interrupted, just run again
+./download_models.sh  # Will resume from where it stopped
+```
+
 ### Manual Installation
 
 ```bash
-# Copy files
+# 1. Download models
+./download_models.sh
+
+# 2. Copy files
 sudo mkdir -p /usr/local/porua/{bin,models}
 sudo cp bin/porua_server /usr/local/porua/bin/
 sudo cp models/* /usr/local/porua/models/
 
-# Create symlink
+# 3. Create symlink
 sudo ln -sf /usr/local/porua/bin/porua_server /usr/local/bin/porua_server
 
-# Set environment variable
+# 4. Set environment variable
 export TTS_MODEL_DIR=/usr/local/porua/models
 ```
 
@@ -157,6 +195,14 @@ sudo rm /usr/local/bin/porua_server
 ```
 
 ## Troubleshooting
+
+**Models not downloading:**
+```bash
+# Check internet connection
+# Try manual download
+curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx' -o models/kokoro-v1.0.onnx
+curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin' -o models/voices-v1.0.bin
+```
 
 **Models not found:**
 ```bash

@@ -92,8 +92,26 @@ jobs:
             cp "server/target/$TARGET/release/porua_server" staging/
           fi
 
-          # Copy models directory
-          cp -r server/models staging/
+          # Copy installation scripts
+          if [ -f "server/packaging/download_models.sh" ]; then
+            cp server/packaging/download_models.sh staging/
+            chmod +x staging/download_models.sh
+          fi
+
+          if [ -f "server/packaging/install.sh" ]; then
+            cp server/packaging/install.sh staging/
+            chmod +x staging/install.sh
+          fi
+
+          # Copy documentation
+          if [ -f "server/packaging/INSTALL.md" ]; then
+            cp server/packaging/INSTALL.md staging/
+          fi
+
+          if [ -f "server/README.md" ]; then
+            mkdir -p staging/docs
+            cp server/README.md staging/docs/
+          fi
 
           # Create archive
           cd staging
@@ -182,19 +200,50 @@ jobs:
           draft: false
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           body: |
-            # Porua TTS Server
+            # Porua TTS Server v${{ steps.version.outputs.version }}
 
-            This release contains the **Porua TTS Server** binaries for multiple platforms.
+            High-performance Text-to-Speech HTTP server with Kokoro TTS engine.
 
-            ## What's Included
+            ## 📦 What's Included
             - Cross-platform server binaries (macOS ARM64, Windows x64, Linux x64, Linux ARM64)
-            - Bengali TTS models
-            - Ready-to-run packages with all dependencies
+            - Automated model download script
+            - Installation scripts and documentation
 
-            ## Installation
-            1. Download the appropriate binary for your platform
-            2. Extract the archive
-            3. Run the `porua_server` executable
+            ## 🚀 Quick Start
+
+            ```bash
+            # 1. Download and extract
+            tar -xzf porua_server-v${{ steps.version.outputs.version }}-<platform>.tar.gz
+            cd porua_server-v${{ steps.version.outputs.version }}-<platform>
+
+            # 2. Download TTS models (~337 MB, one-time)
+            ./download_models.sh
+
+            # 3. Install
+            ./install.sh
+
+            # 4. Run
+            porua_server --server --port 3000
+            ```
+
+            ## 📥 Models
+
+            TTS models are downloaded separately from official sources:
+            - **Source:** https://github.com/thewh1teagle/kokoro-onnx/releases
+            - **Files:**
+              - `kokoro-v1.0.onnx` (310 MB)
+              - `voices-v1.0.bin` (27 MB)
+            - **Download:** Automated via `./download_models.sh`
+
+            ## 📋 Package Sizes
+
+            - **Binary package:** ~30 MB (no models)
+            - **Models** (separate download): ~337 MB
+            - **Total:** ~370 MB after installation
+
+            ## 📚 Documentation
+
+            See `INSTALL.md` and `docs/README.md` for details.
 
             ---
           generate_release_notes: true

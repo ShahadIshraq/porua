@@ -73,32 +73,19 @@ BINARY_SIZE=$(du -h "$PACKAGE_DIR/bin/porua_server" | cut -f1)
 echo -e "${GREEN}✓ Binary copied${NC} (${BINARY_SIZE})"
 echo ""
 
-# Step 4: Copy model files
-echo -e "${YELLOW}Step 4/6:${NC} Copying model files..."
-if [ -f "models/kokoro-v1.0.onnx" ] && [ -f "models/voices-v1.0.bin" ]; then
-    cp models/kokoro-v1.0.onnx "$PACKAGE_DIR/models/"
-    cp models/voices-v1.0.bin "$PACKAGE_DIR/models/"
-
-    # Get model sizes
-    MODEL_SIZE=$(du -h models/kokoro-v1.0.onnx | cut -f1)
-    VOICES_SIZE=$(du -h models/voices-v1.0.bin | cut -f1)
-    echo -e "${GREEN}✓ Models copied${NC}"
-    echo -e "  - kokoro-v1.0.onnx: ${MODEL_SIZE}"
-    echo -e "  - voices-v1.0.bin: ${VOICES_SIZE}"
-else
-    echo -e "${RED}✗ Model files not found in models/ directory${NC}"
-    echo -e "${YELLOW}Please run models/download_models.py first${NC}"
-    exit 1
-fi
-echo ""
-
-# Step 5: Copy documentation and scripts
-echo -e "${YELLOW}Step 5/6:${NC} Copying documentation and installation scripts..."
+# Step 4: Copy documentation and scripts
+echo -e "${YELLOW}Step 4/5:${NC} Copying documentation and installation scripts..."
 cp README.md "$PACKAGE_DIR/docs/"
 cp packaging/INSTALL.md "$PACKAGE_DIR/" 2>/dev/null || echo -e "${YELLOW}Warning: packaging/INSTALL.md not found${NC}"
 cp packaging/install.sh "$PACKAGE_DIR/" 2>/dev/null || echo -e "${YELLOW}Warning: packaging/install.sh not found${NC}"
-if [ -f "packaging/install.sh" ]; then
+cp packaging/download_models.sh "$PACKAGE_DIR/" 2>/dev/null || echo -e "${YELLOW}Warning: packaging/download_models.sh not found${NC}"
+
+# Make scripts executable
+if [ -f "$PACKAGE_DIR/install.sh" ]; then
     chmod +x "$PACKAGE_DIR/install.sh"
+fi
+if [ -f "$PACKAGE_DIR/download_models.sh" ]; then
+    chmod +x "$PACKAGE_DIR/download_models.sh"
 fi
 
 # Copy example API key file if it exists
@@ -112,20 +99,33 @@ Porua Server - Text-to-Speech HTTP Server
 ========================================
 
 QUICK START:
-Run ./install.sh for automatic installation, then:
 
-  porua_server --server --port 3000
-  curl -X POST http://localhost:3000/tts \
-    -H "Content-Type: application/json" \
-    -d '{"text": "Hello world!", "voice": "bf_lily"}' \
-    --output test.wav
+1. Download TTS models (~337 MB):
+   ./download_models.sh
+
+2. Install the server:
+   ./install.sh
+
+3. Start server:
+   porua_server --server --port 3000
+
+4. Test API:
+   curl -X POST http://localhost:3000/tts \
+     -H "Content-Type: application/json" \
+     -d '{"text": "Hello world!", "voice": "bf_lily"}' \
+     --output test.wav
 
 PACKAGE CONTENTS:
-bin/porua_server       - Binary executable
-models/              - TTS model files
-docs/README.md       - Full documentation
-INSTALL.md           - Installation guide
-install.sh           - Installation script
+bin/porua_server         - Server binary (~29 MB)
+download_models.sh       - Download TTS models (~337 MB)
+install.sh               - Installation script
+docs/README.md           - Full documentation
+INSTALL.md               - Installation guide
+
+MODELS:
+Models are downloaded from: github.com/thewh1teagle/kokoro-onnx
+- kokoro-v1.0.onnx (310 MB)
+- voices-v1.0.bin (27 MB)
 
 For details, see INSTALL.md or docs/README.md
 EOF
@@ -133,8 +133,8 @@ EOF
 echo -e "${GREEN}✓ Documentation copied${NC}"
 echo ""
 
-# Step 6: Create archives
-echo -e "${YELLOW}Step 6/6:${NC} Creating distribution archives..."
+# Step 5: Create archives
+echo -e "${YELLOW}Step 5/5:${NC} Creating distribution archives..."
 
 # Create tar.gz
 cd dist

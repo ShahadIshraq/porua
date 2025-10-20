@@ -97,12 +97,6 @@ if [ ! -f "bin/porua_server" ]; then
 fi
 echo -e "${GREEN}✓ Package structure verified${NC}"
 
-# Check if models exist
-if [ ! -f "models/kokoro-v1.0.onnx" ] || [ ! -f "models/voices-v1.0.bin" ]; then
-    echo -e "${RED}✗ Model files not found${NC}"
-    exit 1
-fi
-echo -e "${GREEN}✓ Model files found${NC}"
 echo ""
 
 # Step 2: Create directories
@@ -126,16 +120,51 @@ BINARY_SIZE=$(du -h "$INSTALL_DIR/bin/porua_server" | cut -f1)
 echo -e "${GREEN}✓ Binary installed${NC} (${BINARY_SIZE})"
 echo ""
 
-# Step 4: Copy models
-echo -e "${YELLOW}Step 4/7:${NC} Installing model files..."
-run_cmd cp models/kokoro-v1.0.onnx "$INSTALL_DIR/models/"
-run_cmd cp models/voices-v1.0.bin "$INSTALL_DIR/models/"
+# Step 4: Download models
+echo -e "${YELLOW}Step 4/7:${NC} Downloading TTS model files..."
+echo -e "${BLUE}Source: github.com/thewh1teagle/kokoro-onnx${NC}"
+echo -e "${BLUE}Total size: ~337 MB (kokoro-v1.0.onnx + voices-v1.0.bin)${NC}"
+echo ""
 
-MODEL_SIZE=$(du -h "$INSTALL_DIR/models/kokoro-v1.0.onnx" | cut -f1)
-VOICES_SIZE=$(du -h "$INSTALL_DIR/models/voices-v1.0.bin" | cut -f1)
-echo -e "${GREEN}✓ Models installed${NC}"
-echo -e "  - kokoro-v1.0.onnx: ${MODEL_SIZE}"
-echo -e "  - voices-v1.0.bin: ${VOICES_SIZE}"
+# Check if download script exists
+if [ ! -f "./download_models.sh" ]; then
+    echo -e "${RED}✗ download_models.sh not found${NC}"
+    echo -e "${YELLOW}Manual download required:${NC}"
+    echo -e "  mkdir -p \"$INSTALL_DIR/models\""
+    echo -e "  curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx' -o \"$INSTALL_DIR/models/kokoro-v1.0.onnx\""
+    echo -e "  curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin' -o \"$INSTALL_DIR/models/voices-v1.0.bin\""
+    echo ""
+
+    read -p "Continue without models? [y/N] " continue_without
+    if [[ ! "$continue_without" =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+else
+    # Run download script
+    MODEL_DIR="$INSTALL_DIR/models" ./download_models.sh
+
+    if [ $? -ne 0 ]; then
+        echo -e "${RED}✗ Model download failed${NC}"
+        echo -e "${YELLOW}You can download models later by running:${NC}"
+        echo -e "  MODEL_DIR=\"$INSTALL_DIR/models\" ./download_models.sh"
+        echo ""
+
+        read -p "Continue without models? [y/N] " continue_without
+        if [[ ! "$continue_without" =~ ^[Yy]$ ]]; then
+            exit 1
+        fi
+    else
+        echo -e "${GREEN}✓ Models downloaded successfully${NC}"
+
+        # Verify and show sizes
+        if [ -f "$INSTALL_DIR/models/kokoro-v1.0.onnx" ] && [ -f "$INSTALL_DIR/models/voices-v1.0.bin" ]; then
+            MODEL_SIZE=$(du -h "$INSTALL_DIR/models/kokoro-v1.0.onnx" | cut -f1)
+            VOICES_SIZE=$(du -h "$INSTALL_DIR/models/voices-v1.0.bin" | cut -f1)
+            echo -e "  - kokoro-v1.0.onnx: ${MODEL_SIZE}"
+            echo -e "  - voices-v1.0.bin: ${VOICES_SIZE}"
+        fi
+    fi
+fi
 echo ""
 
 # Step 5: Copy optional files
