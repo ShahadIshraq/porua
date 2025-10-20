@@ -60,20 +60,28 @@ The download script supports resume:
 ./download_models.sh
 
 # 2. Copy files
-sudo mkdir -p /usr/local/porua/{bin,models}
+sudo mkdir -p /usr/local/porua/{bin,models,share}
 sudo cp bin/porua_server /usr/local/porua/bin/
 sudo cp models/* /usr/local/porua/models/
+sudo cp -r espeak-ng-data /usr/local/porua/share/
+sudo cp .env.example /usr/local/porua/
 
-# 3. Create symlink
+# 3. Create configuration (optional)
+sudo cp /usr/local/porua/.env.example /usr/local/porua/.env
+# Edit /usr/local/porua/.env as needed
+
+# 4. Create symlink
 sudo ln -sf /usr/local/porua/bin/porua_server /usr/local/bin/porua_server
 
-# 4. Set environment variable
+# 5. Set environment variables
 export TTS_MODEL_DIR=/usr/local/porua/models
+export PIPER_ESPEAKNG_DATA_DIRECTORY=/usr/local/porua/share
 ```
 
 Add to your shell profile (`~/.bashrc`, `~/.zshrc`):
 ```bash
 export TTS_MODEL_DIR=/usr/local/porua/models
+export PIPER_ESPEAKNG_DATA_DIRECTORY=/usr/local/porua/share
 export TTS_POOL_SIZE=2
 ```
 
@@ -93,12 +101,55 @@ curl http://localhost:3000/health
 
 ## Configuration
 
-### Environment Variables
+### Using .env File (Recommended)
+
+The package includes `.env.example` with all available configuration options:
+
+```bash
+# Copy template to create your configuration
+cp .env.example .env
+
+# Edit configuration file
+nano .env
+```
+
+**Available settings in .env:**
+- **Server:** Port, host binding
+- **TTS Pool:** Number of concurrent TTS engines
+- **Authentication:** API key file path
+- **Rate Limiting:** Per-key and per-IP rate limits
+- **Logging:** Log levels (error, warn, info, debug, trace)
+- **Model Paths:** Custom model locations
+
+**Example .env:**
+```bash
+# Server
+PORT=3000
+
+# TTS Pool
+TTS_POOL_SIZE=2
+
+# Rate Limiting
+RATE_LIMIT_MODE=auto
+RATE_LIMIT_AUTHENTICATED_PER_SECOND=10
+RATE_LIMIT_UNAUTHENTICATED_PER_SECOND=5
+
+# Logging
+RUST_LOG=porua_server=info,ort=warn,kokoros=warn
+
+# Models (if not in default location)
+# TTS_MODEL_DIR=/usr/local/porua/models
+```
+
+### Environment Variables (Alternative)
+
+You can also set configuration via environment variables:
 
 ```bash
 TTS_MODEL_DIR=/path/to/models    # Model location (required if not in default location)
 TTS_POOL_SIZE=2                   # Number of TTS engines (default: 2)
 RUST_LOG=info                     # Log level: error, warn, info, debug
+PORT=3000                         # Server port
 ```
 
 ### API Keys (Optional)
@@ -118,6 +169,25 @@ TTS_API_KEYS_FILE=/usr/local/porua/api_keys.txt porua_server --server
 
 Create `/etc/systemd/system/porua-server.service`:
 
+**Option 1: Using .env file (Recommended)**
+```ini
+[Unit]
+Description=Porua Server
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+WorkingDirectory=/usr/local/porua
+EnvironmentFile=/usr/local/porua/.env
+ExecStart=/usr/local/bin/porua_server --server
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Option 2: Using environment variables directly**
 ```ini
 [Unit]
 Description=Porua Server
@@ -127,7 +197,9 @@ After=network.target
 Type=simple
 User=www-data
 Environment="TTS_MODEL_DIR=/usr/local/porua/models"
+Environment="PIPER_ESPEAKNG_DATA_DIRECTORY=/usr/local/porua/share"
 Environment="TTS_POOL_SIZE=2"
+Environment="PORT=3000"
 ExecStart=/usr/local/bin/porua_server --server --port 3000
 Restart=always
 
@@ -164,8 +236,12 @@ Create `~/Library/LaunchAgents/com.porua-server.plist`:
     <dict>
         <key>TTS_MODEL_DIR</key>
         <string>/usr/local/porua/models</string>
+        <key>PIPER_ESPEAKNG_DATA_DIRECTORY</key>
+        <string>/usr/local/porua/share</string>
         <key>TTS_POOL_SIZE</key>
         <string>2</string>
+        <key>PORT</key>
+        <string>3000</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>

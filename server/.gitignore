@@ -20,3 +20,7 @@ output.wav
 # Distribution packages
 /dist
 server.log
+
+# eSpeak-ng data (copied from system for packaging)
+# See packaging/README-ESPEAK.md for setup instructions
+packaging/espeak-ng-data/

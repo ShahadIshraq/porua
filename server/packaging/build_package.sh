@@ -208,9 +208,27 @@ if [ -f "$PACKAGE_DIR/download_models.sh" ]; then
     chmod +x "$PACKAGE_DIR/download_models.sh"
 fi
 
-# Copy example API key file if it exists
+# Copy example configuration files
 if [ -f "api_keys.txt.example" ]; then
     cp api_keys.txt.example "$PACKAGE_DIR/"
+    echo -e "${GREEN}✓ api_keys.txt.example copied${NC}"
+fi
+
+if [ -f ".env.example" ]; then
+    cp .env.example "$PACKAGE_DIR/"
+    echo -e "${GREEN}✓ .env.example copied${NC}"
+else
+    echo -e "${YELLOW}Warning: .env.example not found${NC}"
+fi
+
+# Copy espeak-ng-data for phonemization
+if [ -d "packaging/espeak-ng-data" ]; then
+    echo -e "${YELLOW}Copying eSpeak-ng phoneme data...${NC}"
+    cp -r packaging/espeak-ng-data "$PACKAGE_DIR/"
+    ESPEAK_SIZE=$(du -sh "$PACKAGE_DIR/espeak-ng-data" | cut -f1)
+    echo -e "${GREEN}✓ eSpeak-ng data copied${NC} (${ESPEAK_SIZE})"
+else
+    echo -e "${YELLOW}Warning: packaging/espeak-ng-data not found - phonemization may not work${NC}"
 fi
 
 # Create a simple README in the root
@@ -237,10 +255,18 @@ QUICK START:
 
 PACKAGE CONTENTS:
 bin/porua_server         - Server binary (~29 MB)
+espeak-ng-data/          - Phoneme data (~25 MB)
+.env.example             - Environment configuration template
+api_keys.txt.example     - API keys template (optional)
 download_models.sh       - Download TTS models (~337 MB)
 install.sh               - Installation script
 docs/README.md           - Full documentation
 INSTALL.md               - Installation guide
+
+CONFIGURATION:
+Copy .env.example to .env and customize settings:
+  cp .env.example .env
+  # Edit .env to configure port, rate limits, API keys, etc.
 
 MODELS:
 Models are downloaded from: github.com/thewh1teagle/kokoro-onnx

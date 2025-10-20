@@ -103,6 +103,7 @@ echo ""
 echo -e "${YELLOW}Step 2/7:${NC} Creating installation directories..."
 run_cmd mkdir -p "$INSTALL_DIR/bin"
 run_cmd mkdir -p "$INSTALL_DIR/models"
+run_cmd mkdir -p "$INSTALL_DIR/share"
 
 if [ "$INSTALL_MODE" = "user" ]; then
     mkdir -p "$HOME/.local/bin"
@@ -111,13 +112,25 @@ fi
 echo -e "${GREEN}✓ Directories created${NC}"
 echo ""
 
-# Step 3: Copy binary
-echo -e "${YELLOW}Step 3/7:${NC} Installing binary..."
+# Step 3: Copy binary and dependencies
+echo -e "${YELLOW}Step 3/7:${NC} Installing binary and dependencies..."
 run_cmd cp bin/porua_server "$INSTALL_DIR/bin/"
 run_cmd chmod +x "$INSTALL_DIR/bin/porua_server"
 
 BINARY_SIZE=$(du -h "$INSTALL_DIR/bin/porua_server" | cut -f1)
 echo -e "${GREEN}✓ Binary installed${NC} (${BINARY_SIZE})"
+
+# Copy espeak-ng-data if it exists in the package
+if [ -d "espeak-ng-data" ]; then
+    echo -e "${YELLOW}Installing eSpeak-ng phoneme data...${NC}"
+    run_cmd cp -r espeak-ng-data "$INSTALL_DIR/share/"
+    ESPEAK_SIZE=$(du -sh "$INSTALL_DIR/share/espeak-ng-data" | cut -f1)
+    echo -e "${GREEN}✓ eSpeak-ng data installed${NC} (${ESPEAK_SIZE})"
+else
+    echo -e "${YELLOW}Warning: espeak-ng-data not found in package${NC}"
+    echo -e "${YELLOW}Phonemization may require manual setup of PIPER_ESPEAKNG_DATA_DIRECTORY${NC}"
+fi
+
 echo ""
 
 # Step 4: Download models
@@ -168,11 +181,32 @@ fi
 echo ""
 
 # Step 5: Copy optional files
-echo -e "${YELLOW}Step 5/7:${NC} Installing documentation and examples..."
+echo -e "${YELLOW}Step 5/7:${NC} Installing documentation and configuration templates..."
+
+# Copy .env.example
+if [ -f ".env.example" ]; then
+    run_cmd cp .env.example "$INSTALL_DIR/"
+    echo -e "${GREEN}✓ .env.example copied${NC}"
+
+    # Offer to create .env from template
+    if [ ! -f "$INSTALL_DIR/.env" ]; then
+        echo ""
+        echo -e "${BLUE}Would you like to create .env from .env.example? [y/N]${NC}"
+        read -p "> " create_env
+        if [[ "$create_env" =~ ^[Yy]$ ]]; then
+            run_cmd cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
+            echo -e "${GREEN}✓ .env created - you can customize it later${NC}"
+            echo -e "${YELLOW}  Edit: $INSTALL_DIR/.env${NC}"
+        fi
+    fi
+fi
+
+# Copy api_keys.txt.example
 if [ -f "api_keys.txt.example" ]; then
     run_cmd cp api_keys.txt.example "$INSTALL_DIR/"
-    echo -e "${GREEN}✓ API keys example copied${NC}"
+    echo -e "${GREEN}✓ api_keys.txt.example copied${NC}"
 fi
+
 echo ""
 
 # Step 6: Create symlink
@@ -206,12 +240,14 @@ else
         echo "# Porua Server configuration" >> "$SHELL_RC"
         echo "export TTS_MODEL_DIR=\"$INSTALL_DIR/models\"" >> "$SHELL_RC"
         echo "export TTS_POOL_SIZE=2  # Adjust based on your needs" >> "$SHELL_RC"
+        echo "export PIPER_ESPEAKNG_DATA_DIRECTORY=\"$INSTALL_DIR/share\"" >> "$SHELL_RC"
         echo "" >> "$SHELL_RC"
         echo -e "${GREEN}✓ Environment variables added to $SHELL_RC${NC}"
         echo -e "${YELLOW}Run: source $SHELL_RC${NC}"
     else
-        echo -e "${YELLOW}! Skipped. You'll need to set TTS_MODEL_DIR manually:${NC}"
+        echo -e "${YELLOW}! Skipped. You'll need to set environment variables manually:${NC}"
         echo -e "  export TTS_MODEL_DIR=\"$INSTALL_DIR/models\""
+        echo -e "  export PIPER_ESPEAKNG_DATA_DIRECTORY=\"$INSTALL_DIR/share\""
     fi
 fi
 
@@ -250,6 +286,7 @@ echo -e "${YELLOW}Verifying installation...${NC}"
 
 # Set temporary environment for verification
 export TTS_MODEL_DIR="$INSTALL_DIR/models"
+export PIPER_ESPEAKNG_DATA_DIRECTORY="$INSTALL_DIR/share"
 
 # Test if binary is accessible
 if command -v porua_server &> /dev/null; then
@@ -269,10 +306,17 @@ echo -e "${BLUE}========================================${NC}"
 echo -e "${GREEN}Quick Start Guide${NC}"
 echo -e "${BLUE}========================================${NC}"
 echo ""
+echo -e "${YELLOW}Configuration (optional):${NC}"
+echo -e "   cd $INSTALL_DIR"
+echo -e "   cp .env.example .env"
+echo -e "   # Edit .env to customize port, rate limits, logging, etc."
+echo ""
 echo -e "${YELLOW}1. Test CLI mode:${NC}"
+echo -e "   PIPER_ESPEAKNG_DATA_DIRECTORY=\"$INSTALL_DIR/share\" \\"
 echo -e "   TTS_MODEL_DIR=\"$INSTALL_DIR/models\" porua_server \"Hello world!\""
 echo ""
 echo -e "${YELLOW}2. Start HTTP server:${NC}"
+echo -e "   PIPER_ESPEAKNG_DATA_DIRECTORY=\"$INSTALL_DIR/share\" \\"
 echo -e "   TTS_MODEL_DIR=\"$INSTALL_DIR/models\" porua_server --server --port 3000"
 echo ""
 echo -e "${YELLOW}3. Test API:${NC}"
@@ -298,7 +342,7 @@ if [[ "$run_test" =~ ^[Yy]$ ]]; then
     cd "$TEST_DIR"
 
     # Run test
-    if TTS_MODEL_DIR="$INSTALL_DIR/models" "$BIN_LINK" "Installation test successful!" 2>&1 | grep -q "Speech saved"; then
+    if PIPER_ESPEAKNG_DATA_DIRECTORY="$INSTALL_DIR/share" TTS_MODEL_DIR="$INSTALL_DIR/models" "$BIN_LINK" "Installation test successful!" 2>&1 | grep -q "Speech saved"; then
         echo -e "${GREEN}✓ Test passed! Audio saved to: ${TEST_DIR}/output.wav${NC}"
 
         # Offer to play audio
