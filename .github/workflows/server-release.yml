@@ -40,10 +40,9 @@ jobs:
       - name: Install cross-compilation tools (Linux ARM64)
         if: matrix.target.target == 'aarch64-unknown-linux-gnu'
         run: |
-          sudo dpkg --add-architecture arm64
+          # Install cross-compilation toolchain
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
-          sudo apt-get install -y libssl-dev:arm64 pkg-config
 
       - name: Extract version
         id: version
@@ -74,8 +73,9 @@ jobs:
         run: |
           if [ "${{ matrix.target.target }}" = "aarch64-unknown-linux-gnu" ]; then
             export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
-            export PKG_CONFIG_ALLOW_CROSS=1
-            export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
+            # Use vendored OpenSSL to avoid cross-compilation issues
+            export OPENSSL_STATIC=1
+            export OPENSSL_NO_VENDOR=0
           fi
           cargo build --release --manifest-path server/Cargo.toml --target ${{ matrix.target.target }}
 
