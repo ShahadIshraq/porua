@@ -39,14 +39,12 @@ pub fn find_model_file(filename: &str) -> PathBuf {
             .ok()
             .map(|h| PathBuf::from(h).join(".tts-server/models")),
         // Relative to executable (for packaged installations with symlinks)
-        env::current_exe()
-            .ok()
-            .and_then(|path| {
-                // Resolve symlinks to find the actual binary location
-                std::fs::canonicalize(&path)
-                    .ok()
-                    .and_then(|p| p.parent().map(|parent| parent.join("../models")))
-            }),
+        env::current_exe().ok().and_then(|path| {
+            // Resolve symlinks to find the actual binary location
+            std::fs::canonicalize(&path)
+                .ok()
+                .and_then(|p| p.parent().map(|parent| parent.join("../models")))
+        }),
         // Current directory (lowest priority - for local development only)
         Some(PathBuf::from("models")),
     ];
