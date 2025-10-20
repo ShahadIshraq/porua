@@ -159,7 +159,12 @@ fi
 
 # Step 2: Create package directory
 echo -e "${YELLOW}Step 2/5:${NC} Creating package directory..."
-rm -rf "$OUTPUT_DIR"
+# Only remove the specific package directory if it exists, not the entire output directory
+if [ -d "$PACKAGE_DIR" ]; then
+    rm -rf "$PACKAGE_DIR"
+fi
+# Ensure output directory exists
+mkdir -p "$OUTPUT_DIR"
 mkdir -p "$PACKAGE_DIR"
 mkdir -p "$PACKAGE_DIR/bin"
 mkdir -p "$PACKAGE_DIR/docs"
