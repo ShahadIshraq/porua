@@ -117,6 +117,17 @@ echo -e "${YELLOW}Step 3/7:${NC} Installing binary and dependencies..."
 run_cmd cp bin/porua_server "$INSTALL_DIR/bin/"
 run_cmd chmod +x "$INSTALL_DIR/bin/porua_server"
 
+# Remove macOS quarantine attribute (if on macOS)
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    echo -e "${BLUE}Removing macOS quarantine attribute...${NC}"
+    if run_cmd xattr -d com.apple.quarantine "$INSTALL_DIR/bin/porua_server" 2>/dev/null; then
+        echo -e "${GREEN}✓ macOS quarantine attribute removed${NC}"
+    else
+        # Attribute may not exist if downloaded via curl/wget
+        echo -e "${BLUE}  (no quarantine attribute found - this is normal)${NC}"
+    fi
+fi
+
 BINARY_SIZE=$(du -h "$INSTALL_DIR/bin/porua_server" | cut -f1)
 echo -e "${GREEN}✓ Binary installed${NC} (${BINARY_SIZE})"
 
