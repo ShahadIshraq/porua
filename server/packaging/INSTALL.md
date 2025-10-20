@@ -37,8 +37,9 @@ The installer will:
 - Install binary and eSpeak-ng phoneme data (~25 MB, bundled in package)
 - Download TTS models from official source (if not already downloaded)
 - Install to `/usr/local/porua` (system) or `~/.local/porua` (user)
+- Create `.env` file with configured paths
 - Create symlink to `/usr/local/bin/porua_server` or `~/.local/bin/porua_server`
-- Set up environment variables (optional)
+- Binary automatically finds models via intelligent path resolution
 
 ## Model Download
 
@@ -90,18 +91,12 @@ sudo cp /usr/local/porua/.env.example /usr/local/porua/.env
 
 # 4. Create symlink
 sudo ln -sf /usr/local/porua/bin/porua_server /usr/local/bin/porua_server
-
-# 5. Set environment variables
-export TTS_MODEL_DIR=/usr/local/porua/models
-export PIPER_ESPEAKNG_DATA_DIRECTORY=/usr/local/porua/share
 ```
 
-Add to your shell profile (`~/.bashrc`, `~/.zshrc`):
-```bash
-export TTS_MODEL_DIR=/usr/local/porua/models
-export PIPER_ESPEAKNG_DATA_DIRECTORY=/usr/local/porua/share
-export TTS_POOL_SIZE=2
-```
+**Note:** No shell profile configuration needed! The binary uses intelligent path resolution to automatically find:
+- Models via symlink resolution and fallback search paths
+- Configuration from `.env` file (loaded automatically via dotenvy)
+- eSpeak-ng data from bundled installation
 
 ## Verification
 
@@ -127,54 +122,63 @@ curl -X POST http://localhost:3000/tts \
 
 ### Using .env File (Recommended)
 
-The package includes `.env.example` with all available configuration options:
+The installer automatically creates a `.env` file with configured paths. You can customize it for your needs:
 
 ```bash
-# Copy template to create your configuration
-cp .env.example .env
-
 # Edit configuration file
-nano .env
+nano /usr/local/porua/.env  # or ~/.local/porua/.env
 ```
+
+**The .env file is automatically loaded by the binary** using the dotenvy library.
 
 **Available settings in .env:**
-- **Server:** Port, host binding
-- **TTS Pool:** Number of concurrent TTS engines
+- **TTS_MODEL_DIR:** Model location (auto-configured during install)
+- **PIPER_ESPEAKNG_DATA_DIRECTORY:** eSpeak-ng data path (auto-configured)
+- **TTS_POOL_SIZE:** Number of concurrent TTS engines (default: 2)
+- **PORT:** Server port (default: 3000)
+- **RATE_LIMIT_MODE:** Rate limiting strategy (auto, per-key, per-ip, disabled)
+- **RUST_LOG:** Log levels (error, warn, info, debug, trace)
 - **Authentication:** API key file path
-- **Rate Limiting:** Per-key and per-IP rate limits
-- **Logging:** Log levels (error, warn, info, debug, trace)
-- **Model Paths:** Custom model locations
+- **Rate Limits:** Per-key and per-IP configurations
 
-**Example .env:**
+**Example customization:**
 ```bash
-# Server
-PORT=3000
+# Increase TTS pool for better concurrency
+TTS_POOL_SIZE=4
 
-# TTS Pool
-TTS_POOL_SIZE=2
+# Change server port
+PORT=8080
 
-# Rate Limiting
-RATE_LIMIT_MODE=auto
-RATE_LIMIT_AUTHENTICATED_PER_SECOND=10
-RATE_LIMIT_UNAUTHENTICATED_PER_SECOND=5
+# Enable debug logging
+RUST_LOG=debug
 
-# Logging
-RUST_LOG=porua_server=info,ort=warn,kokoros=warn
-
-# Models (if not in default location)
-# TTS_MODEL_DIR=/usr/local/porua/models
+# Enable per-IP rate limiting
+RATE_LIMIT_MODE=per-ip
+RATE_LIMIT_UNAUTHENTICATED_PER_SECOND=10
 ```
 
-### Environment Variables (Alternative)
+### Environment Variables (Override)
 
-You can also set configuration via environment variables:
+Environment variables take precedence over `.env` file settings:
 
 ```bash
-TTS_MODEL_DIR=/path/to/models    # Model location (required if not in default location)
-TTS_POOL_SIZE=2                   # Number of TTS engines (default: 2)
-RUST_LOG=info                     # Log level: error, warn, info, debug
-PORT=3000                         # Server port
+# Override specific settings
+TTS_MODEL_DIR=/custom/path porua_server --server
+TTS_POOL_SIZE=4 PORT=8080 porua_server --server
 ```
+
+### How Path Resolution Works
+
+The binary uses intelligent path resolution (no shell config needed):
+
+1. **TTS_MODEL_DIR set?** → Use that path
+2. **Symlink resolution:** Resolves `~/.local/bin/porua_server` → `~/.local/porua/bin/porua_server` → checks `../models`
+3. **Fallback search paths:**
+   - `/opt/models`
+   - `/usr/local/porua/models`
+   - `~/.local/porua/models`
+   - `~/.tts-server/models`
+   - `./models` (current directory, for development)
 
 ### API Keys (Optional)
 
@@ -193,7 +197,6 @@ TTS_API_KEYS_FILE=/usr/local/porua/api_keys.txt porua_server --server
 
 Create `/etc/systemd/system/porua-server.service`:
 
-**Option 1: Using .env file (Recommended)**
 ```ini
 [Unit]
 Description=Porua Server
@@ -203,7 +206,6 @@ After=network.target
 Type=simple
 User=www-data
 WorkingDirectory=/usr/local/porua
-EnvironmentFile=/usr/local/porua/.env
 ExecStart=/usr/local/bin/porua_server --server
 Restart=always
 
@@ -211,24 +213,20 @@ Restart=always
 WantedBy=multi-user.target
 ```
 
-**Option 2: Using environment variables directly**
-```ini
-[Unit]
-Description=Porua Server
-After=network.target
+**The binary automatically:**
+- Loads configuration from `/usr/local/porua/.env`
+- Finds models via symlink resolution
+- Discovers eSpeak-ng data from bundled installation
 
+**Optional: Override settings with EnvironmentFile**
+```ini
 [Service]
 Type=simple
 User=www-data
-Environment="TTS_MODEL_DIR=/usr/local/porua/models"
-Environment="PIPER_ESPEAKNG_DATA_DIRECTORY=/usr/local/porua/share"
-Environment="TTS_POOL_SIZE=2"
-Environment="PORT=3000"
-ExecStart=/usr/local/bin/porua_server --server --port 3000
+WorkingDirectory=/usr/local/porua
+EnvironmentFile=/usr/local/porua/.env
+ExecStart=/usr/local/bin/porua_server --server
 Restart=always
-
-[Install]
-WantedBy=multi-user.target
 ```
 
 Enable and start:
@@ -256,17 +254,8 @@ Create `~/Library/LaunchAgents/com.porua-server.plist`:
         <string>--port</string>
         <string>3000</string>
     </array>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>TTS_MODEL_DIR</key>
-        <string>/usr/local/porua/models</string>
-        <key>PIPER_ESPEAKNG_DATA_DIRECTORY</key>
-        <string>/usr/local/porua/share</string>
-        <key>TTS_POOL_SIZE</key>
-        <string>2</string>
-        <key>PORT</key>
-        <string>3000</string>
-    </dict>
+    <key>WorkingDirectory</key>
+    <string>/usr/local/porua</string>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
@@ -274,6 +263,11 @@ Create `~/Library/LaunchAgents/com.porua-server.plist`:
 </dict>
 </plist>
 ```
+
+**The binary automatically:**
+- Loads configuration from `/usr/local/porua/.env` via dotenvy
+- Finds models via symlink resolution
+- No environment variables needed in plist!
 
 Load:
 ```bash
@@ -288,10 +282,8 @@ sudo systemctl stop porua-server  # Linux
 launchctl unload ~/Library/LaunchAgents/com.porua-server.plist  # macOS
 
 # Remove files
-sudo rm -rf /usr/local/porua
-sudo rm /usr/local/bin/porua_server
-
-# Remove environment variables from shell profile
+sudo rm -rf /usr/local/porua  # or rm -rf ~/.local/porua
+sudo rm /usr/local/bin/porua_server  # or rm ~/.local/bin/porua_server
 ```
 
 ## Troubleshooting
@@ -306,7 +298,14 @@ curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-fil
 
 **Models not found:**
 ```bash
-export TTS_MODEL_DIR=/usr/local/porua/models
+# Check if models exist
+ls -lh /usr/local/porua/models/  # or ~/.local/porua/models/
+
+# If models are missing, download them
+./download_models.sh
+
+# If installed in custom location, set TTS_MODEL_DIR in .env:
+echo "TTS_MODEL_DIR=/custom/path/models" >> /usr/local/porua/.env
 ```
 
 **Permission denied:**
