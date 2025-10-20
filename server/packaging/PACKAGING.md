@@ -21,18 +21,43 @@ Output: `dist/porua-server-v0.1.0-[platform]-[arch].tar.gz` and `.zip`
 
 ```
 porua-server-v0.1.0-[platform]-[arch]/
-├── bin/porua_server            # Binary (~29 MB)
-├── models/
-│   ├── kokoro-v1.0.onnx        # Model (310 MB)
-│   └── voices-v1.0.bin         # Voices (27 MB)
-├── docs/README.md              # Full documentation
-├── INSTALL.md                  # Installation guide
-├── install.sh                  # Installation script
-├── api_keys.txt.example        # API keys template
-└── README.txt                  # Quick start
+├── bin/porua_server              # Binary (~29 MB)
+├── download_models.sh            # Model download script
+├── install.sh                    # Installation script
+├── docs/README.md                # Full documentation
+├── INSTALL.md                    # Installation guide
+├── api_keys.txt.example          # API keys template
+└── README.txt                    # Quick start
 ```
 
-**Total size:** ~337 MB compressed, ~370 MB uncompressed
+**Package size:** ~30 MB compressed
+**Models (downloaded separately):** ~337 MB
+  - kokoro-v1.0.onnx (310 MB)
+  - voices-v1.0.bin (27 MB)
+
+## Model Download
+
+Models are **NOT included** in release packages. They are downloaded separately during installation.
+
+**Source:** https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
+
+**Files:**
+- `kokoro-v1.0.onnx` - 310 MB (TTS model)
+- `voices-v1.0.bin` - 27 MB (voice style vectors)
+
+**Download methods:**
+
+1. **Automatic** (recommended):
+   ```bash
+   ./download_models.sh
+   ```
+
+2. **Manual**:
+   ```bash
+   mkdir -p models
+   curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx' -o models/kokoro-v1.0.onnx
+   curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin' -o models/voices-v1.0.bin
+   ```
 
 ## Platform Detection
 
@@ -44,15 +69,8 @@ The script automatically detects your platform:
 ## Prerequisites
 
 - Rust 1.75+
-- Model files in `models/` directory
-- At least 1 GB free disk space
-
-If models are missing:
-```bash
-cd models/
-python3 download_models.py
-cd ..
-```
+- At least 500 MB free disk space for models
+- curl or wget (for downloading models)
 
 ## Manual Build
 
@@ -63,18 +81,22 @@ If you prefer manual control:
 cargo build --release
 
 # 2. Create structure
-mkdir -p dist/my-package/{bin,models,docs}
+mkdir -p dist/my-package/{bin,docs}
 
 # 3. Copy files
 cp target/release/porua_server dist/my-package/bin/
-cp models/*.{onnx,bin} dist/my-package/models/
 cp README.md dist/my-package/docs/
-cp INSTALL.md install.sh dist/my-package/
+cp packaging/INSTALL.md dist/my-package/
+cp packaging/install.sh dist/my-package/
+cp packaging/download_models.sh dist/my-package/
+chmod +x dist/my-package/install.sh dist/my-package/download_models.sh
 
 # 4. Archive
 cd dist
 tar -czf my-package.tar.gz my-package/
 ```
+
+**Note:** Models are NOT included in the package. Users download them via `download_models.sh`.
 
 ## Distribution
 
@@ -112,9 +134,12 @@ shasum -a 256 -c porua-server-v0.1.0-macos-arm64.tar.gz.sha256
 
 ## Troubleshooting
 
-**Models not found:**
+**Models not downloading:**
 ```bash
-cd models/ && python3 download_models.py
+# Check internet connection
+# Try manual download
+curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx' -o models/kokoro-v1.0.onnx
+curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin' -o models/voices-v1.0.bin
 ```
 
 **Build fails:**
@@ -123,13 +148,9 @@ cargo clean
 cargo build --release
 ```
 
-**Package too large:**
-- Binary: ~29 MB (use `strip target/release/porua_server` to reduce)
-- Models: ~337 MB (cannot compress, required by ONNX)
-
 **Permission denied:**
 ```bash
-chmod +x build_package.sh
+chmod +x build_package.sh download_models.sh install.sh
 ```
 
 ## Cross-Platform Builds

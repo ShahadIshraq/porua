@@ -14,13 +14,36 @@ The server runs in two modes:
 1. **HTTP Server Mode** - Production-ready REST API (recommended)
 2. **CLI Mode** - Simple command-line interface for testing
 
+## Model Attribution
+
+This server uses the **Kokoro-82M** TTS model:
+
+- **Model:** [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) by hexgrad
+- **ONNX Implementation:** [thewh1teagle/kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx)
+- **License:** Apache 2.0
+- **Parameters:** 82 million
+- **Voices:** 28 English voices (American & British)
+- **Quality:** Frontier TTS model delivering high-quality speech synthesis comparable to much larger models
+
+### Model Files
+
+The server requires two model files (automatically downloaded during installation):
+
+- `kokoro-v1.0.onnx` (310 MB) - ONNX format TTS model weights (fp32 precision)
+- `voices-v1.0.bin` (27 MB) - Voice style vectors for 28 English voices
+
+**Download source:** https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
+
+Models are **NOT included** in the repository or release packages to keep download sizes small. They are downloaded automatically via the installation script.
+
 ## Prerequisites
 
 - **Rust** (1.75 or later): [Install Rust](https://rustup.rs/)
-- **macOS/Linux**: Tested on macOS (Apple Silicon and Intel)
-- **Model files**: Already included in `models/` directory
-  - `kokoro-v1.0.onnx` (310 MB)
+- **macOS/Linux**: Tested on macOS (Apple Silicon and Intel) and Linux
+- **Model files**: Downloaded automatically during installation
+  - `kokoro-v1.0.onnx` (310 MB) - from [thewh1teagle/kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases)
   - `voices-v1.0.bin` (27 MB)
+  - Source: https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
 
 ## Installation Options
 
@@ -30,18 +53,23 @@ Download and install the pre-built package for your platform:
 
 ```bash
 # Download the package (replace URL with your release URL)
-wget https://[your-url]/tts-server-v0.1.0-macos-arm64.tar.gz
+wget https://[your-url]/porua_server-v0.1.0-macos-arm64.tar.gz
 
 # Extract
-tar -xzf tts-server-v0.1.0-macos-arm64.tar.gz
-cd tts-server-v0.1.0-macos-arm64
+tar -xzf porua_server-v0.1.0-macos-arm64.tar.gz
+cd porua_server-v0.1.0-macos-arm64
+
+# Download TTS models (~337 MB from official source)
+./download_models.sh
 
 # Run automated installer
 ./install.sh
 
 # Verify installation
-tts_server --version
+porua_server --version
 ```
+
+**Models are downloaded from the official Kokoro ONNX repository:** https://github.com/thewh1teagle/kokoro-onnx
 
 For detailed installation instructions, see [INSTALL.md](packaging/INSTALL.md).
 
@@ -333,9 +361,31 @@ The server automatically searches for models in the following locations (in prio
 ```bash
 # Set custom model directory
 export TTS_MODEL_DIR=/path/to/your/models
-./target/release/tts_server "Test message"
+./target/release/porua_server "Test message"
 ```
 
+### Downloading Models
+
+Models are sourced from the official Kokoro ONNX repository:
+
+**Automatic download (recommended):**
+```bash
+# If using pre-built package
+./download_models.sh
+
+# If building from source
+cd server/packaging
+./download_models.sh
+```
+
+**Manual download:**
+```bash
+mkdir -p models
+curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.onnx' -o models/kokoro-v1.0.onnx
+curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin' -o models/voices-v1.0.bin
+```
+
+**Model source:** https://github.com/thewh1teagle/kokoro-onnx/releases/tag/model-files-v1.0
 
 ## Development
 
@@ -560,9 +610,16 @@ The server automatically detects client IP addresses from:
 
 ### Creating Distribution Packages
 
-To create distributable packages for deployment:
-
 ```bash
-# Run the packaging script
+# Build package (binary + scripts, ~30 MB)
 ./packaging/build_package.sh
 ```
+
+**Note:** Models are NOT included in packages. Users download them separately via `download_models.sh` script.
+
+This approach:
+- Keeps package sizes small (~30 MB vs ~370 MB)
+- Faster downloads and CI builds
+- Bandwidth savings: Users download models once, can use with multiple binary versions
+- Separation of concerns: Binary updates don't require re-downloading models
+- Downloads from official source: https://github.com/thewh1teagle/kokoro-onnx
