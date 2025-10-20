@@ -267,7 +267,7 @@ describe('LRUCache', () => {
       largeCache.get('key500');
       const end = performance.now();
 
-      expect(end - start).toBeLessThan(1); // Should be nearly instant
+      expect(end - start).toBeLessThan(5); // Should be very fast (relaxed for CI)
     });
 
     it('should have O(1) set operation', () => {

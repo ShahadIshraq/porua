@@ -60,7 +60,8 @@ describe('AudioPlayer', () => {
       setState: vi.fn(),
       getState: vi.fn(() => 'idle'),
       isContinuousMode: vi.fn(() => false),
-      getPlayingParagraph: vi.fn()
+      getPlayingParagraph: vi.fn(),
+      setPlayingParagraph: vi.fn()
     };
 
     mockHighlightManager = {
@@ -345,6 +346,253 @@ describe('AudioPlayer', () => {
       player.pause();
 
       expect(mockState.setState).toHaveBeenCalledWith('paused');
+    });
+  });
+
+  describe('finish', () => {
+    beforeEach(async () => {
+      const mockBlob = new Blob(['test']);
+      await registry.registerParagraph(0, 'Test', {
+        audioBlobs: [mockBlob],
+        metadataArray: [{ start_offset_ms: 0, phrases: [] }],
+        phraseTimeline: []
+      }, 'voice1', 1.0);
+
+      const chunks = registry.getParagraphChunks(0);
+      await player.playChunk(chunks[0]);
+    });
+
+    it('should stop playback and cleanup audio', () => {
+      player.finish();
+
+      expect(player.isPlaying).toBe(false);
+      expect(player.currentAudio).toBeNull();
+      expect(player.currentAudioUrl).toBeNull();
+    });
+
+    it('should call onQueueEmpty callback in continuous mode', () => {
+      const callback = vi.fn();
+      player.setOnQueueEmpty(callback);
+      mockState.isContinuousMode.mockReturnValue(true);
+
+      player.finish();
+
+      expect(callback).toHaveBeenCalled();
+    });
+
+    it('should not cleanup state in continuous mode', () => {
+      mockState.isContinuousMode.mockReturnValue(true);
+      mockState.setState.mockClear();
+
+      player.finish();
+
+      expect(mockState.setState).not.toHaveBeenCalled();
+    });
+
+    it('should set state to idle in single paragraph mode', () => {
+      mockState.isContinuousMode.mockReturnValue(false);
+      mockState.setState.mockClear();
+
+      player.finish();
+
+      expect(mockState.setState).toHaveBeenCalledWith('idle');
+    });
+
+    it('should clear highlights in single paragraph mode', () => {
+      mockState.isContinuousMode.mockReturnValue(false);
+
+      player.finish();
+
+      expect(mockHighlightManager.clearHighlights).toHaveBeenCalled();
+    });
+
+    it('should restore paragraph in single paragraph mode', () => {
+      const mockParagraph = document.createElement('p');
+      mockState.isContinuousMode.mockReturnValue(false);
+      mockState.getPlayingParagraph.mockReturnValue(mockParagraph);
+
+      player.finish();
+
+      expect(mockHighlightManager.restoreParagraph).toHaveBeenCalledWith(mockParagraph);
+    });
+
+    it('should reset playing paragraph', () => {
+      mockState.isContinuousMode.mockReturnValue(false);
+
+      player.finish();
+
+      expect(mockState.setPlayingParagraph).toHaveBeenCalledWith(null);
+      expect(player.currentChunkId).toBeNull();
+    });
+  });
+
+  describe('getCurrentDuration', () => {
+    it('should return 0 when no audio loaded', () => {
+      expect(player.getCurrentDuration()).toBe(0);
+    });
+
+    it('should return audio duration when playing', async () => {
+      const mockBlob = new Blob(['test']);
+      await registry.registerParagraph(0, 'Test', {
+        audioBlobs: [mockBlob],
+        metadataArray: [{ start_offset_ms: 0, phrases: [] }],
+        phraseTimeline: []
+      }, 'voice1', 1.0);
+
+      const chunks = registry.getParagraphChunks(0);
+      await player.playChunk(chunks[0]);
+
+      const duration = player.getCurrentDuration();
+
+      expect(duration).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('resume error recovery', () => {
+    it('should replay chunk if resume fails', async () => {
+      const mockBlob = new Blob(['test']);
+      await registry.registerParagraph(0, 'Test', {
+        audioBlobs: [mockBlob],
+        metadataArray: [{ start_offset_ms: 0, phrases: [] }],
+        phraseTimeline: []
+      }, 'voice1', 1.0);
+
+      const chunks = registry.getParagraphChunks(0);
+      await player.playChunk(chunks[0]);
+
+      player.pause();
+
+      // Mock play to fail once, then succeed
+      let playCallCount = 0;
+      player.currentAudio.play = vi.fn().mockImplementation(() => {
+        playCallCount++;
+        if (playCallCount === 1) {
+          return Promise.reject(new Error('Play failed'));
+        }
+        return Promise.resolve();
+      });
+
+      await player.resume();
+
+      expect(player.isPlaying).toBe(true);
+    });
+  });
+
+  describe('seekToTime with chunk switching', () => {
+    beforeEach(async () => {
+      const mockBlob1 = new Blob(['chunk1']);
+      const mockBlob2 = new Blob(['chunk2']);
+
+      await registry.registerParagraph(0, 'Test', {
+        audioBlobs: [mockBlob1, mockBlob2],
+        metadataArray: [
+          { start_offset_ms: 0, phrases: [] },
+          { start_offset_ms: 5000, phrases: [] }
+        ],
+        phraseTimeline: []
+      }, 'voice1', 1.0);
+
+      const chunks = registry.getParagraphChunks(0);
+      registry.updateChunkDuration(chunks[0], 5000);
+      registry.updateChunkDuration(chunks[1], 5000);
+
+      await player.playChunk(chunks[0]);
+    });
+
+    it('should switch to different chunk when seeking', async () => {
+      const initialChunkId = player.currentChunkId;
+
+      await player.seekToTime(7000);
+
+      expect(player.currentChunkId).not.toEqual(initialChunkId);
+    });
+
+    it('should seek within current chunk when in same chunk', async () => {
+      await player.seekToTime(2000);
+
+      // Should still be in first chunk
+      expect(player.currentChunkId.chunkIndex).toBe(0);
+    });
+
+    it('should update highlights when seeking within chunk', async () => {
+      mockHighlightManager.updateHighlight.mockClear();
+
+      await player.seekToTime(2000);
+
+      expect(mockHighlightManager.updateHighlight).toHaveBeenCalled();
+    });
+
+    it('should return false for out of range seek', async () => {
+      const result = await player.seekToTime(999999);
+
+      expect(result).toBe(false);
+    });
+
+    it('should handle seek errors gracefully', async () => {
+      // Mock registry to return null
+      vi.spyOn(registry, 'findChunkAtTime').mockReturnValue(null);
+
+      const result = await player.seekToTime(5000);
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('setTotalChunks', () => {
+    it('should update total chunks count', () => {
+      player.setTotalChunks(50);
+
+      expect(player.totalChunksInSession).toBe(50);
+    });
+  });
+
+  describe('event handlers', () => {
+    beforeEach(async () => {
+      const mockBlob = new Blob(['test']);
+      await registry.registerParagraph(0, 'Test', {
+        audioBlobs: [mockBlob],
+        metadataArray: [{ start_offset_ms: 0, phrases: [] }],
+        phraseTimeline: [{ text: 'test', start_ms: 0, end_ms: 1000 }]
+      }, 'voice1', 1.0);
+
+      const chunks = registry.getParagraphChunks(0);
+      await player.playChunk(chunks[0]);
+    });
+
+    it('should have onended event handler attached', () => {
+      expect(player.currentAudio.onended).toBeTruthy();
+    });
+
+    it('should have ontimeupdate event handler attached', () => {
+      expect(player.currentAudio.ontimeupdate).toBeTruthy();
+    });
+
+    it('should have onerror event handler attached', () => {
+      expect(player.currentAudio.onerror).toBeTruthy();
+    });
+
+    it('should call progress callback on timeupdate', () => {
+      const progressCallback = vi.fn();
+      player.setOnProgress(progressCallback);
+      player.setTotalChunks(10); // Need total chunks for progress callback to fire
+
+      // Trigger timeupdate
+      if (player.currentAudio.ontimeupdate) {
+        player.currentAudio.ontimeupdate();
+      }
+
+      expect(progressCallback).toHaveBeenCalled();
+    });
+
+    it('should call finish on ended event', () => {
+      const finishSpy = vi.spyOn(player, 'finish');
+
+      // Trigger ended
+      if (player.currentAudio.onended) {
+        player.currentAudio.onended();
+      }
+
+      expect(finishSpy).toHaveBeenCalled();
     });
   });
 });

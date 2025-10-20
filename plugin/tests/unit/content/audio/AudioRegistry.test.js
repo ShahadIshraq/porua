@@ -264,4 +264,278 @@ describe('AudioRegistry', () => {
       expect(registry.sessionId).not.toBe(oldSessionId);
     });
   });
+
+  describe('getChunk', () => {
+    beforeEach(async () => {
+      await registry.registerParagraph(0, 'Test', mockAudioData, 'voice1', 1.0);
+    });
+
+    it('should return blob from hot cache', async () => {
+      const chunks = registry.getParagraphChunks(0);
+      const blob = await registry.getChunk(chunks[0]);
+
+      expect(blob).toBeTruthy();
+      expect(blob).toBeInstanceOf(Blob);
+    });
+
+    it('should throw error for non-existent chunk', async () => {
+      const fakeId = new ChunkId('fake', 99, 99);
+
+      await expect(registry.getChunk(fakeId)).rejects.toThrow('Chunk not found');
+    });
+
+    it('should update access tracking', async () => {
+      const chunks = registry.getParagraphChunks(0);
+      const metadata = registry.getMetadata(chunks[0]);
+      const initialAccessCount = metadata.accessCount;
+      const beforeTime = Date.now();
+
+      await registry.getChunk(chunks[0]);
+
+      expect(metadata.accessCount).toBeGreaterThan(initialAccessCount);
+      expect(metadata.lastAccess).toBeGreaterThanOrEqual(beforeTime);
+    });
+
+    it('should promote from warm to hot cache', async () => {
+      const chunks = registry.getParagraphChunks(0);
+      const blob = registry.hotCache.get(chunks[0]);
+
+      // Remove from hot cache to simulate warm cache scenario
+      registry.hotCache.delete(chunks[0]);
+
+      // Mock warm cache to return the blob
+      vi.spyOn(registry.warmCache, 'get').mockResolvedValue(blob);
+
+      const retrievedBlob = await registry.getChunk(chunks[0]);
+
+      expect(retrievedBlob).toBeTruthy();
+      expect(registry.hotCache.get(chunks[0])).toBeTruthy();
+    });
+  });
+
+  describe('manageTiers', () => {
+    beforeEach(async () => {
+      // Register multiple paragraphs to have enough chunks
+      await registry.registerParagraph(0, 'Para 0', mockAudioData, 'voice1', 1.0);
+      await registry.registerParagraph(1, 'Para 1', mockAudioData, 'voice1', 1.0);
+    });
+
+    it('should evict from hot cache when full', async () => {
+      // Force hot cache to be over limit
+      vi.spyOn(registry.hotCache, 'shouldEvict').mockReturnValue(true);
+      vi.spyOn(registry.hotCache, 'selectEvictionCandidates').mockReturnValue([
+        registry.getParagraphChunks(0)[0]
+      ]);
+
+      const chunks = registry.getParagraphChunks(0);
+      await registry.manageTiers(chunks[1]);
+
+      expect(registry.hotCache.shouldEvict).toHaveBeenCalled();
+    });
+
+    it('should move chunks from hot to warm cache', async () => {
+      vi.spyOn(registry.hotCache, 'shouldEvict').mockReturnValue(true);
+      const victim = registry.getParagraphChunks(0)[0];
+      vi.spyOn(registry.hotCache, 'selectEvictionCandidates').mockReturnValue([victim]);
+
+      const warmSetSpy = vi.spyOn(registry.warmCache, 'set');
+
+      await registry.manageTiers(registry.getParagraphChunks(0)[2]);
+
+      expect(warmSetSpy).toHaveBeenCalled();
+    });
+
+    it('should evict from warm cache when full', async () => {
+      vi.spyOn(registry.hotCache, 'shouldEvict').mockReturnValue(false);
+      vi.spyOn(registry.warmCache, 'shouldEvict').mockReturnValue(true);
+      vi.spyOn(registry.warmCache, 'selectEvictionCandidates').mockResolvedValue([
+        registry.getParagraphChunks(0)[0]
+      ]);
+
+      const warmDeleteSpy = vi.spyOn(registry.warmCache, 'delete');
+
+      await registry.manageTiers(registry.getParagraphChunks(1)[0]);
+
+      expect(warmDeleteSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('prefetchChunks', () => {
+    beforeEach(async () => {
+      await registry.registerParagraph(0, 'Test', mockAudioData, 'voice1', 1.0);
+    });
+
+    it('should prefetch specified chunks', async () => {
+      const chunks = registry.getParagraphChunks(0);
+      const getChunkSpy = vi.spyOn(registry, 'getChunk');
+
+      await registry.prefetchChunks([chunks[1], chunks[2]]);
+
+      expect(getChunkSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle prefetch errors gracefully', async () => {
+      const fakeId = new ChunkId('fake', 99, 99);
+      const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await registry.prefetchChunks([fakeId]);
+
+      expect(consoleSpy).toHaveBeenCalled();
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('getStats', () => {
+    beforeEach(async () => {
+      await registry.registerParagraph(0, 'Para 0', mockAudioData, 'voice1', 1.0);
+      await registry.registerParagraph(1, 'Para 1', mockAudioData, 'voice1', 1.0);
+    });
+
+    it('should return registry statistics', async () => {
+      const stats = await registry.getStats();
+
+      expect(stats).toHaveProperty('sessionId');
+      expect(stats).toHaveProperty('totalChunks');
+      expect(stats).toHaveProperty('totalParagraphs');
+      expect(stats).toHaveProperty('totalDurationMs');
+      expect(stats).toHaveProperty('hotCount');
+      expect(stats).toHaveProperty('warmCount');
+      expect(stats).toHaveProperty('coldCount');
+    });
+
+    it('should count chunks in each tier', async () => {
+      const stats = await registry.getStats();
+
+      expect(stats.totalChunks).toBe(6); // 2 paragraphs × 3 chunks
+      expect(stats.totalParagraphs).toBe(2);
+      expect(stats.hotCount).toBeGreaterThan(0);
+    });
+  });
+
+  describe('recalculateTotalDuration', () => {
+    it('should calculate correct total duration', async () => {
+      await registry.registerParagraph(0, 'Test', mockAudioData, 'voice1', 1.0);
+
+      const chunks = registry.getParagraphChunks(0);
+      registry.updateChunkDuration(chunks[0], 5000);
+      registry.updateChunkDuration(chunks[1], 5000);
+      registry.updateChunkDuration(chunks[2], 5000);
+
+      // Total should be start of last chunk + duration = 10000 + 5000 = 15000
+      expect(registry.totalDurationMs).toBe(15000);
+    });
+
+    it('should handle chunks without duration', async () => {
+      await registry.registerParagraph(0, 'Test', mockAudioData, 'voice1', 1.0);
+
+      // Don't set any durations
+      expect(registry.totalDurationMs).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('reconstructFromCold', () => {
+    beforeEach(async () => {
+      await registry.registerParagraph(0, 'Test paragraph', mockAudioData, 'voice1', 1.0);
+    });
+
+    it('should reconstruct chunk from cold cache', async () => {
+      const chunks = registry.getParagraphChunks(0);
+      const metadata = registry.getMetadata(chunks[1]);
+
+      // Mock coldCache to return full audioData
+      vi.spyOn(registry.coldCache, 'get').mockResolvedValue(mockAudioData);
+
+      const blob = await registry.reconstructFromCold(chunks[1], metadata);
+
+      expect(blob).toBeTruthy();
+      expect(blob).toBeInstanceOf(Blob);
+    });
+
+    it('should return null if paragraph text not found', async () => {
+      const fakeId = new ChunkId(registry.sessionId, 99, 0);
+      const fakeMetadata = {
+        paragraphIndex: 99,
+        chunkId: fakeId
+      };
+
+      const blob = await registry.reconstructFromCold(fakeId, fakeMetadata);
+
+      expect(blob).toBeNull();
+    });
+
+    it('should return null if cold cache has no data', async () => {
+      const chunks = registry.getParagraphChunks(0);
+      const metadata = registry.getMetadata(chunks[0]);
+
+      vi.spyOn(registry.coldCache, 'get').mockResolvedValue(null);
+
+      const blob = await registry.reconstructFromCold(chunks[0], metadata);
+
+      expect(blob).toBeNull();
+    });
+
+    it('should extract correct chunk from audioData', async () => {
+      const chunks = registry.getParagraphChunks(0);
+      const metadata = registry.getMetadata(chunks[2]);
+
+      vi.spyOn(registry.coldCache, 'get').mockResolvedValue(mockAudioData);
+
+      const blob = await registry.reconstructFromCold(chunks[2], metadata);
+
+      expect(blob).toBe(mockAudioData.audioBlobs[2]);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle empty audioBlobs array', async () => {
+      const emptyData = {
+        audioBlobs: [],
+        metadataArray: [],
+        phraseTimeline: []
+      };
+
+      await registry.registerParagraph(0, 'Empty', emptyData, 'voice1', 1.0);
+
+      expect(registry.totalChunks).toBe(0);
+      expect(registry.getParagraphChunks(0)).toEqual([]);
+    });
+
+    it('should handle metadata array shorter than blob array', async () => {
+      const shortMetadata = {
+        audioBlobs: [new Blob(['a']), new Blob(['b'])],
+        metadataArray: [{ start_offset_ms: 0 }], // Only 1 metadata for 2 blobs
+        phraseTimeline: []
+      };
+
+      await registry.registerParagraph(0, 'Test', shortMetadata, 'voice1', 1.0);
+
+      expect(registry.totalChunks).toBe(2);
+    });
+
+    it('should handle findChunkAtTime with no chunks with duration', async () => {
+      await registry.registerParagraph(0, 'Test', mockAudioData, 'voice1', 1.0);
+
+      // Don't set any durations
+      const resultAtZero = registry.findChunkAtTime(0);
+      const resultAtOtherTime = registry.findChunkAtTime(5000);
+
+      // Should return first chunk when at time 0
+      expect(resultAtZero).toBeTruthy();
+      expect(resultAtZero.chunkId).toBeTruthy();
+
+      // Should return null for non-zero time when no durations set
+      expect(resultAtOtherTime).toBeNull();
+    });
+
+    it('should handle getNextChunks from last chunk', async () => {
+      await registry.registerParagraph(0, 'Test', mockAudioData, 'voice1', 1.0);
+
+      const chunks = registry.getParagraphChunks(0);
+      const lastChunk = chunks[chunks.length - 1];
+
+      const nextChunks = registry.getNextChunks(lastChunk, 10);
+
+      expect(nextChunks).toEqual([]);
+    });
+  });
 });
