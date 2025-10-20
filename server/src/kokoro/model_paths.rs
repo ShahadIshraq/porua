@@ -3,24 +3,52 @@ use std::path::PathBuf;
 
 // Search multiple standard paths for models
 pub fn find_model_file(filename: &str) -> PathBuf {
+    // 1. If TTS_MODEL_DIR is explicitly set, ONLY check that location
+    // This ensures the environment variable is strictly respected when configured
+    if let Ok(model_dir) = env::var("TTS_MODEL_DIR") {
+        let explicit_path = PathBuf::from(model_dir);
+        let model_path = explicit_path.join(filename);
+
+        // If the file exists at the explicit path, use it
+        if model_path.exists() {
+            return model_path;
+        }
+
+        // If TTS_MODEL_DIR is set but file doesn't exist, still return that path
+        // This gives a clear error message about the configured location
+        // Only fall through to search paths if the directory itself doesn't exist
+        if explicit_path.exists() {
+            return model_path;
+        }
+        // If TTS_MODEL_DIR points to a non-existent directory, fall through to search
+    }
+
+    // 2. Search fallback paths (only if TTS_MODEL_DIR not set or points to invalid location)
     let search_paths = vec![
-        // 1. Environment variable (highest priority)
-        env::var("TTS_MODEL_DIR").ok().map(PathBuf::from),
-        // 2. AWS Lambda container image standard location
+        // AWS Lambda container image standard location
         Some(PathBuf::from("/opt/models")),
-        // 3. System-wide installation paths
+        // System-wide installation paths
+        Some(PathBuf::from("/usr/local/porua/models")),
         Some(PathBuf::from("/usr/local/share/tts-server/models")),
         Some(PathBuf::from("/opt/tts-server/models")),
-        // 4. User home directory
+        // User home directory installations
+        env::var("HOME")
+            .ok()
+            .map(|h| PathBuf::from(h).join(".local/porua/models")),
         env::var("HOME")
             .ok()
             .map(|h| PathBuf::from(h).join(".tts-server/models")),
-        // 5. Current directory (for local development)
-        Some(PathBuf::from("models")),
-        // 6. Relative to executable (for dev builds in target/release/)
+        // Relative to executable (for packaged installations with symlinks)
         env::current_exe()
             .ok()
-            .and_then(|path| path.parent().map(|p| p.join("../../models"))),
+            .and_then(|path| {
+                // Resolve symlinks to find the actual binary location
+                std::fs::canonicalize(&path)
+                    .ok()
+                    .and_then(|p| p.parent().map(|parent| parent.join("../models")))
+            }),
+        // Current directory (lowest priority - for local development only)
+        Some(PathBuf::from("models")),
     ];
 
     // Search all paths in order

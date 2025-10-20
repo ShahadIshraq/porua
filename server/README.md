@@ -346,23 +346,35 @@ Get real-time statistics about the TTS engine pool.
 
 ## Model Path Resolution
 
-The server automatically searches for models in the following locations (in priority order):
+The server uses intelligent path resolution to automatically find models:
 
-1. **`TTS_MODEL_DIR` environment variable** ← Recommended for production
-2. `/opt/models` (AWS Lambda standard location)
-3. `/usr/local/share/porua/models`
-4. `/opt/porua/models`
-5. `~/.porua/models`
-6. `models/` (current directory)
-7. `../../models/` (relative to binary location)
-
-**How it works:** The server checks each location in order and uses the **first path where the model files actually exist**. This allows the binary to work in different environments (development, production, Lambda) without code changes.
-
+### Priority 1: Environment Variable (Strict)
+If `TTS_MODEL_DIR` is set, it takes absolute priority:
 ```bash
-# Set custom model directory
+# Set custom model directory (highest priority)
 export TTS_MODEL_DIR=/path/to/your/models
 ./target/release/porua_server "Test message"
 ```
+
+Or configure in `.env` file (auto-loaded via dotenvy):
+```bash
+echo "TTS_MODEL_DIR=/path/to/models" >> ~/.local/porua/.env
+```
+
+### Priority 2: Fallback Search Paths
+If `TTS_MODEL_DIR` is not set, the server searches in order:
+
+1. `/opt/models` - AWS Lambda standard location
+2. `/usr/local/porua/models` - System installation
+3. `~/.local/porua/models` - User installation
+4. `~/.tts-server/models` - Alternative user location
+5. Symlink resolution - Resolves binary symlinks to find `../models`
+6. `./models` - Current directory (development only)
+
+**How it works:**
+- Packaged installations use symlink resolution: `~/.local/bin/porua_server` → `~/.local/porua/bin/porua_server` → finds `../models`
+- `.env` file is automatically loaded from installation directory
+- No shell profile configuration needed!
 
 ### Downloading Models
 

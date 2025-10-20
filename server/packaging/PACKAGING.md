@@ -152,20 +152,22 @@ The package includes `.env.example` with configuration templates for:
 - **Model paths:** Custom model locations (advanced)
 
 **Setup:**
+
+The `install.sh` script automatically creates a `.env` file with configured installation paths during installation. Users can then customize it:
+
 ```bash
-# Copy template to .env
-cp .env.example .env
+# Edit configuration in installation directory
+nano /usr/local/porua/.env  # or ~/.local/porua/.env
 
-# Edit configuration
-nano .env
-
-# Or use environment variables directly
-export PORT=3000
-export TTS_POOL_SIZE=4
-export RATE_LIMIT_MODE=auto
+# Or override with environment variables
+TTS_POOL_SIZE=4 PORT=8080 porua_server --server
 ```
 
-The `install.sh` script offers to create `.env` from `.env.example` during installation.
+**Key improvements:**
+- `.env` file is auto-created with correct paths during installation
+- Binary automatically loads `.env` via dotenvy library
+- Intelligent path resolution finds models via symlink resolution
+- No shell profile configuration needed
 
 ## Distribution
 
@@ -206,9 +208,13 @@ shasum -a 256 -c porua-server-v0.1.0-macos-arm64.tar.gz.sha256
 **Missing eSpeak-ng Data Files**
   - **Problem:** Binary couldn't find eSpeak-ng phoneme data required for TTS processing
   - **Error:** `Failed to initialize eSpeak-ng. Try setting PIPER_ESPEAKNG_DATA_DIRECTORY`
-  - **Solution:** The eSpeak-ng data is **always bundled** in distribution packages (located in `espeak-ng-data/` directory). Ensure it's copied during installation and set the environment variable:
+  - **Solution:** The eSpeak-ng data is **always bundled** in distribution packages (located in `espeak-ng-data/` directory). The installer automatically:
+    - Copies data to `$INSTALL_DIR/share/espeak-ng-data`
+    - Configures `PIPER_ESPEAKNG_DATA_DIRECTORY` in `.env` file
+    - The binary automatically loads this via dotenvy
+  - **Manual override:** If needed, set in `.env`:
     ```bash
-    export PIPER_ESPEAKNG_DATA_DIRECTORY="/path/to/installation/share"
+    echo "PIPER_ESPEAKNG_DATA_DIRECTORY=/custom/path" >> /usr/local/porua/.env
     ```
   - **Note:** During development, the binary can use either the system's eSpeak-ng installation (e.g., Homebrew on macOS) or the bundled data in `packaging/espeak-ng-data/`.
 
