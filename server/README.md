@@ -401,6 +401,30 @@ curl -L 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-fil
 
 ## Development
 
+### Initial Setup
+
+**Configure Git Hooks (Required for Contributors):**
+
+The repository includes pre-commit hooks that automatically check code formatting and run tests before each commit. To enable them:
+
+```bash
+# From the repository root
+git config core.hooksPath .githooks
+```
+
+**What the pre-commit hook does:**
+- ✅ Runs `cargo fmt --check` to ensure code is properly formatted
+- ✅ Runs `cargo test` to ensure all tests pass
+- ✅ Prevents commits with formatting issues or failing tests
+- ⚠️ Can be bypassed with `git commit --no-verify` (not recommended)
+
+**To fix formatting issues:**
+```bash
+cargo fmt --manifest-path server/Cargo.toml
+```
+
+**Why this matters:** The pre-commit hook catches compilation errors and formatting issues locally before they reach CI, saving time and preventing failed builds.
+
 ### Clean Build
 
 ```bash
