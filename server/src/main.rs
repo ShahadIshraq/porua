@@ -19,6 +19,7 @@ use kokoro::{TTSPool, TTS};
 use rate_limit::{PerIpRateLimiter, PerKeyRateLimiter, RateLimitConfig, RateLimiterMode};
 use server::{create_router, AppState};
 use std::env;
+use std::io::IsTerminal;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -82,6 +83,17 @@ async fn async_main(args: Vec<String>) -> error::Result<()> {
     // Default log level is INFO for tts_server, WARN for dependencies
     // This hides noisy voice listings and ONNX logs by default
     // Override with RUST_LOG env var: RUST_LOG=debug for verbose, RUST_LOG=warn for quiet
+    //
+    // ANSI color codes: Auto-detect TTY by default. When stdout is not a TTY
+    // (e.g., systemd, Docker, log files), ANSI codes are disabled to prevent
+    // literal escape sequences from appearing in logs.
+    // Override with LOG_ANSI environment variable: LOG_ANSI=true to force enable,
+    // LOG_ANSI=false to force disable.
+    let use_ansi = env::var("LOG_ANSI")
+        .ok()
+        .and_then(|v| v.parse::<bool>().ok())
+        .unwrap_or_else(|| std::io::stdout().is_terminal());
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -89,6 +101,7 @@ async fn async_main(args: Vec<String>) -> error::Result<()> {
             }),
         )
         .with_target(false) // Hide module path for cleaner output
+        .with_ansi(use_ansi) // Disable ANSI colors by default for clean server logs
         .compact() // Use compact formatting
         .init();
 
