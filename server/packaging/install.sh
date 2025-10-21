@@ -218,7 +218,8 @@ TTS_MODEL_DIR=$INSTALL_DIR/models
 TTS_POOL_SIZE=2
 
 # eSpeak-ng Data Directory (required for text processing)
-PIPER_ESPEAKNG_DATA_DIRECTORY=$INSTALL_DIR/share/espeak-ng-data
+# Note: Must point to directory that CONTAINS espeak-ng-data subdirectory
+PIPER_ESPEAKNG_DATA_DIRECTORY=$INSTALL_DIR/share/
 
 # Log Level (error, warn, info, debug, trace)
 RUST_LOG=info
@@ -312,7 +313,7 @@ echo -e "${YELLOW}Verifying installation...${NC}"
 
 # Set temporary environment for verification
 export TTS_MODEL_DIR="$INSTALL_DIR/models"
-export PIPER_ESPEAKNG_DATA_DIRECTORY="$INSTALL_DIR/share/espeak-ng-data"
+export PIPER_ESPEAKNG_DATA_DIRECTORY="$INSTALL_DIR/share/"
 
 # Test if binary is accessible
 if command -v porua_server &> /dev/null; then

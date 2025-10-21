@@ -1,6 +1,7 @@
 mod audio;
 mod auth;
 mod chunking;
+mod cli;
 mod config;
 mod error;
 mod kokoro;
@@ -21,36 +22,61 @@ use std::env;
 use std::sync::Arc;
 use std::time::Duration;
 
-#[tokio::main]
-async fn main() -> error::Result<()> {
+fn main() -> error::Result<()> {
+    // Parse command line arguments FIRST before any initialization
+    let args: Vec<String> = env::args().collect();
+
+    // Check for --help flag (no initialization needed)
+    if args.contains(&"--help".to_string()) || args.contains(&"-h".to_string()) {
+        cli::print_help();
+        return Ok(());
+    }
+
+    // Check for --version flag (no initialization needed)
+    if args.contains(&"--version".to_string()) || args.contains(&"-v".to_string()) {
+        cli::print_version();
+        return Ok(());
+    }
+
+    // Start async runtime for actual work
+    tokio::runtime::Runtime::new()?.block_on(async_main(args))?;
+    Ok(())
+}
+
+async fn async_main(args: Vec<String>) -> error::Result<()> {
     // Load .env file if it exists (silently ignore if it doesn't)
     // Try multiple locations in order:
-    // 1. Current working directory (for development)
-    // 2. Binary's installation directory (for packaged installations)
-    // 3. Parent of binary's directory (alternative layout)
-    let _ = dotenvy::dotenv().or_else(|_| {
-        // Try loading from binary's directory
-        if let Ok(exe_path) = env::current_exe() {
-            if let Some(exe_dir) = exe_path.parent() {
-                // Try ../../../.env (for bin/ subdirectory: /usr/local/porua/bin -> /usr/local/porua/)
-                if let Some(install_dir) = exe_dir.parent() {
-                    let env_path = install_dir.join(".env");
+    // 1. Binary's installation directory (for packaged installations) - PRIORITY
+    // 2. Current working directory (for development)
+    let _ = if let Ok(exe_path) = env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            // Try parent directory first (for bin/ subdirectory: /usr/local/porua/bin -> /usr/local/porua/)
+            if let Some(install_dir) = exe_dir.parent() {
+                let env_path = install_dir.join(".env");
+                if env_path.exists() {
+                    dotenvy::from_path(&env_path).map(|_| env_path)
+                } else {
+                    // Try exe_dir/.env (simpler layouts)
+                    let env_path = exe_dir.join(".env");
                     if env_path.exists() {
-                        return dotenvy::from_path(&env_path).map(|_| env_path);
+                        dotenvy::from_path(&env_path).map(|_| env_path)
+                    } else {
+                        // Fall back to current directory
+                        dotenvy::dotenv()
                     }
                 }
-                // Try ../.env (for simpler layouts)
-                let env_path = exe_dir.join(".env");
-                if env_path.exists() {
-                    return dotenvy::from_path(&env_path).map(|_| env_path);
-                }
+            } else {
+                // Fall back to current directory
+                dotenvy::dotenv()
             }
+        } else {
+            // Fall back to current directory
+            dotenvy::dotenv()
         }
-        Err(dotenvy::Error::Io(std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            ".env not found",
-        )))
-    });
+    } else {
+        // Fall back to current directory
+        dotenvy::dotenv()
+    };
 
     // Initialize tracing for logging with environment variable support
     // Default log level is INFO for tts_server, WARN for dependencies
@@ -65,15 +91,6 @@ async fn main() -> error::Result<()> {
         .with_target(false) // Hide module path for cleaner output
         .compact() // Use compact formatting
         .init();
-
-    // Parse command line arguments
-    let args: Vec<String> = env::args().collect();
-
-    // Check for --version flag
-    if args.contains(&"--version".to_string()) || args.contains(&"-v".to_string()) {
-        println!("Porua Server v{}", env!("CARGO_PKG_VERSION"));
-        return Ok(());
-    }
 
     // Check if we should run in server mode
     let server_mode = args.contains(&"--server".to_string());
