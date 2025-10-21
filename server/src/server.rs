@@ -16,7 +16,7 @@ use crate::auth::ApiKeys;
 use crate::chunking::{chunk_text, ChunkingConfig};
 use crate::config::constants::MAX_TEXT_LENGTH;
 use crate::error::{Result, TtsError};
-use crate::kokoro::{voice_config::Voice, TTSPool};
+use crate::kokoro::{model_paths::get_samples_dir, voice_config::Voice, TTSPool};
 use crate::models::{HealthResponse, PoolStatsResponse, TTSRequest, VoiceInfo, VoicesResponse};
 use crate::rate_limit::RateLimiterMode;
 use crate::utils::temp_file::TempFile;
@@ -222,8 +222,11 @@ pub fn create_router(state: AppState) -> Router<()> {
     let timeout_duration = state.request_timeout;
 
     // Create static file service for audio samples
-    // Samples are served from server/samples/ directory
-    let samples_service = ServeDir::new("samples").append_index_html_on_directories(false);
+    // Samples directory is resolved using smart path resolution (similar to models)
+    // Supports: TTS_SAMPLES_DIR env var, /usr/local/porua/samples, ~/.local/porua/samples, etc.
+    let samples_dir = get_samples_dir();
+    tracing::debug!("Serving samples from: {:?}", samples_dir);
+    let samples_service = ServeDir::new(samples_dir).append_index_html_on_directories(false);
 
     let mut router = Router::new()
         .route("/tts", post(generate_tts))

@@ -62,10 +62,67 @@ pub fn find_model_file(filename: &str) -> PathBuf {
     PathBuf::from("models").join(filename)
 }
 
+// Search multiple standard paths for samples directory
+pub fn find_samples_dir() -> PathBuf {
+    // 1. If TTS_SAMPLES_DIR is explicitly set, ONLY check that location
+    if let Ok(samples_dir) = env::var("TTS_SAMPLES_DIR") {
+        let explicit_path = PathBuf::from(samples_dir);
+
+        // If the directory exists at the explicit path, use it
+        if explicit_path.exists() {
+            return explicit_path;
+        }
+
+        // If TTS_SAMPLES_DIR is set but directory doesn't exist, still return that path
+        // This gives a clear error message about the configured location
+        return explicit_path;
+    }
+
+    // 2. Search fallback paths (only if TTS_SAMPLES_DIR not set)
+    let search_paths = vec![
+        // AWS Lambda container image standard location
+        Some(PathBuf::from("/opt/samples")),
+        // System-wide installation paths
+        Some(PathBuf::from("/usr/local/porua/samples")),
+        Some(PathBuf::from("/usr/local/share/tts-server/samples")),
+        Some(PathBuf::from("/opt/tts-server/samples")),
+        // User home directory installations
+        env::var("HOME")
+            .ok()
+            .map(|h| PathBuf::from(h).join(".local/porua/samples")),
+        env::var("HOME")
+            .ok()
+            .map(|h| PathBuf::from(h).join(".tts-server/samples")),
+        // Relative to executable (for packaged installations with symlinks)
+        env::current_exe().ok().and_then(|path| {
+            // Resolve symlinks to find the actual binary location
+            std::fs::canonicalize(&path)
+                .ok()
+                .and_then(|p| p.parent().map(|parent| parent.join("../samples")))
+        }),
+        // Current directory (lowest priority - for local development only)
+        Some(PathBuf::from("samples")),
+    ];
+
+    // Search all paths in order
+    for base_path in search_paths.into_iter().flatten() {
+        if base_path.exists() {
+            return base_path;
+        }
+    }
+
+    // Fallback: return "samples" for current directory (development mode)
+    PathBuf::from("samples")
+}
+
 pub fn get_model_path() -> PathBuf {
     find_model_file("kokoro-v1.0.onnx")
 }
 
 pub fn get_voices_path() -> PathBuf {
     find_model_file("voices-v1.0.bin")
+}
+
+pub fn get_samples_dir() -> PathBuf {
+    find_samples_dir()
 }
