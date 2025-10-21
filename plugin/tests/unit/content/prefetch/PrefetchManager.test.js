@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PrefetchManager } from '../../../../src/content/prefetch/PrefetchManager.js';
 
 // Mock modules
-vi.mock('../../../../src/shared/services/TTSService.js', () => ({
-  ttsService: {
+vi.mock('../../../../src/shared/api/BackgroundTTSClient.js', () => ({
+  backgroundTTSClient: {
     synthesizeStream: vi.fn()
   }
 }));
@@ -15,7 +15,7 @@ vi.mock('../../../../src/shared/api/MultipartStreamHandler.js', () => ({
 describe('PrefetchManager', () => {
   let prefetchManager;
   let mockSettingsStore;
-  let mockTtsService;
+  let mockBackgroundTTSClient;
   let mockParseMultipartStream;
 
   beforeEach(async () => {
@@ -33,8 +33,8 @@ describe('PrefetchManager', () => {
     // Create prefetch manager instance
     prefetchManager = new PrefetchManager(mockSettingsStore);
 
-    // Setup TTSService mock
-    mockTtsService = (await import('../../../../src/shared/services/TTSService.js')).ttsService;
+    // Setup BackgroundTTSClient mock
+    mockBackgroundTTSClient = (await import('../../../../src/shared/api/BackgroundTTSClient.js')).backgroundTTSClient;
 
     // Setup parseMultipartStream mock
     mockParseMultipartStream = (await import('../../../../src/shared/api/MultipartStreamHandler.js')).parseMultipartStream;
@@ -64,13 +64,11 @@ describe('PrefetchManager', () => {
 
     it('should return true for cached text', async () => {
       // Setup mocks for successful prefetch
-      const mockReader = { read: vi.fn() };
-      mockTtsService.synthesizeStream.mockResolvedValue({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => mockReader
+      mockBackgroundTTSClient.synthesizeStream.mockResolvedValue({
+        ok: true,
+        __backgroundClientData: {
+          audioBlobs: [new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' })],
+          metadataArray: [{ chunk_index: 0, phrases: [] }]
         }
       });
 
@@ -87,12 +85,11 @@ describe('PrefetchManager', () => {
 
     it('should trim text before checking', async () => {
       // Setup successful prefetch
-      mockTtsService.synthesizeStream.mockResolvedValue({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => ({ read: vi.fn() })
+      mockBackgroundTTSClient.synthesizeStream.mockResolvedValue({
+        ok: true,
+        __backgroundClientData: {
+          audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
+          metadataArray: [{}]
         }
       });
 
@@ -118,12 +115,11 @@ describe('PrefetchManager', () => {
     it('should return cached data', async () => {
       // Setup successful prefetch
       const mockAudioData = new Uint8Array([1, 2, 3]);
-      mockTtsService.synthesizeStream.mockResolvedValue({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => ({ read: vi.fn() })
+      mockBackgroundTTSClient.synthesizeStream.mockResolvedValue({
+        ok: true,
+        __backgroundClientData: {
+          audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
+          metadataArray: [{}]
         }
       });
 
@@ -156,12 +152,11 @@ describe('PrefetchManager', () => {
   describe('prefetch', () => {
     it('should not prefetch if already cached', async () => {
       // First prefetch
-      mockTtsService.synthesizeStream.mockResolvedValue({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => ({ read: vi.fn() })
+      mockBackgroundTTSClient.synthesizeStream.mockResolvedValue({
+        ok: true,
+        __backgroundClientData: {
+          audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
+          metadataArray: [{}]
         }
       });
 
@@ -174,12 +169,12 @@ describe('PrefetchManager', () => {
       await prefetchManager.prefetch('test');
 
       // Reset mock
-      mockTtsService.synthesizeStream.mockClear();
+      mockBackgroundTTSClient.synthesizeStream.mockClear();
 
       // Second prefetch should skip
       await prefetchManager.prefetch('test');
 
-      expect(mockTtsService.synthesizeStream).not.toHaveBeenCalled();
+      expect(mockBackgroundTTSClient.synthesizeStream).not.toHaveBeenCalled();
     });
 
     it('should not start duplicate prefetch for same text', async () => {
@@ -189,7 +184,7 @@ describe('PrefetchManager', () => {
         resolveFirst = resolve;
       });
 
-      mockTtsService.synthesizeStream.mockReturnValue(firstPromise);
+      mockBackgroundTTSClient.synthesizeStream.mockReturnValue(firstPromise);
 
       // Start first prefetch (doesn't await)
       const firstFetch = prefetchManager.prefetch('test');
@@ -199,11 +194,10 @@ describe('PrefetchManager', () => {
 
       // Resolve first
       resolveFirst({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => ({ read: vi.fn() })
+        ok: true,
+        __backgroundClientData: {
+          audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
+          metadataArray: [{}]
         }
       });
 
@@ -216,11 +210,11 @@ describe('PrefetchManager', () => {
       await Promise.all([firstFetch, secondFetch]);
 
       // Should only call once
-      expect(mockTtsService.synthesizeStream).toHaveBeenCalledTimes(1);
+      expect(mockBackgroundTTSClient.synthesizeStream).toHaveBeenCalledTimes(1);
     });
 
     it('should handle prefetch failure gracefully', async () => {
-      mockTtsService.synthesizeStream.mockRejectedValue(new Error('Network error'));
+      mockBackgroundTTSClient.synthesizeStream.mockRejectedValue(new Error('Network error'));
 
       await expect(prefetchManager.prefetch('test')).rejects.toThrow('Network error');
 
@@ -232,7 +226,7 @@ describe('PrefetchManager', () => {
       const abortError = new Error('Aborted');
       abortError.name = 'AbortError';
 
-      mockTtsService.synthesizeStream.mockRejectedValue(abortError);
+      mockBackgroundTTSClient.synthesizeStream.mockRejectedValue(abortError);
 
       // Should not throw
       await prefetchManager.prefetch('test');
@@ -244,12 +238,11 @@ describe('PrefetchManager', () => {
   describe('cache management', () => {
     it('should evict oldest entry when cache exceeds limit', async () => {
       // Setup mock for successful prefetches
-      mockTtsService.synthesizeStream.mockResolvedValue({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => ({ read: vi.fn() })
+      mockBackgroundTTSClient.synthesizeStream.mockResolvedValue({
+        ok: true,
+        __backgroundClientData: {
+          audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
+          metadataArray: [{}]
         }
       });
 
@@ -291,7 +284,7 @@ describe('PrefetchManager', () => {
       global.AbortController = vi.fn(() => mockAbortController);
 
       // Start a prefetch but don't await
-      mockTtsService.synthesizeStream.mockImplementation(() =>
+      mockBackgroundTTSClient.synthesizeStream.mockImplementation(() =>
         new Promise(() => {}) // Never resolves
       );
 
@@ -310,12 +303,11 @@ describe('PrefetchManager', () => {
   describe('clearCache', () => {
     it('should clear all cached entries', async () => {
       // Setup mock
-      mockTtsService.synthesizeStream.mockResolvedValue({
-        headers: {
-          get: vi.fn().mockReturnValue('multipart/mixed; boundary=test')
-        },
-        body: {
-          getReader: () => ({ read: vi.fn() })
+      mockBackgroundTTSClient.synthesizeStream.mockResolvedValue({
+        ok: true,
+        __backgroundClientData: {
+          audioBlobs: [new Blob([new Uint8Array([1])], { type: 'audio/wav' })],
+          metadataArray: [{}]
         }
       });
 
