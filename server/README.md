@@ -505,6 +505,43 @@ RUST_LOG=warn ./target/release/tts_server --server
 RUST_LOG=tts_server=debug,ort=warn,kokoros=warn ./target/release/tts_server --server
 ```
 
+### ANSI Color Codes in Logs
+
+The server automatically detects whether to use colored output in logs to prevent ANSI escape codes from appearing as literal characters in non-terminal environments (systemd, Docker, log files, etc.).
+
+**Default behavior:** Auto-detect terminal (TTY)
+- **Terminal/interactive**: Colors enabled for better readability
+- **Non-terminal** (systemd, Docker, pipes, log files): Colors disabled for clean logs
+
+This prevents logs like this:
+```
+# Bad: ANSI codes appearing literally
+2025-10-21T10:41:27.364342Z  INFO \x1b[90mBritish Male(bm): bm_daniel\x1b[0m
+```
+
+And ensures clean logs like this:
+```
+# Good: Clean output
+2025-10-21T10:41:27.364342Z  INFO British Male(bm): bm_daniel
+```
+
+**Override with `LOG_ANSI` environment variable:**
+
+```bash
+# Force enable colors (even in non-TTY environments)
+LOG_ANSI=true ./target/release/tts_server --server
+
+# Force disable colors (even in interactive terminal)
+LOG_ANSI=false ./target/release/tts_server --server
+
+# Auto-detect (default - recommended)
+./target/release/tts_server --server
+```
+
+**When to use manual override:**
+- `LOG_ANSI=true`: Testing colors in CI or when piping to a color-aware pager
+- `LOG_ANSI=false`: Ensuring clean logs when output is redirected or stored
+
 ### Authentication & Rate Limiting
 
 The server supports optional API key authentication and intelligent rate limiting to protect against abuse.
