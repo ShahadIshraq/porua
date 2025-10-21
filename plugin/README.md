@@ -1,6 +1,56 @@
 # Porua - Text-to-Speech Browser Extension
 
-This is a modernized, modular browser extension for text-to-speech functionality.
+A high-quality, privacy-focused text-to-speech browser extension powered by Kokoro TTS.
+
+## Version
+
+**Current Version:** 0.1.0
+
+[View Changelog](CHANGELOG.md) | [Release Notes](https://github.com/YOUR_USERNAME/porua/releases)
+
+## Installation
+
+### From GitHub Releases (Recommended for Testing)
+
+**Chrome/Edge:**
+1. Download the latest `porua-extension-chrome-v0.1.0.zip` from [Releases](https://github.com/YOUR_USERNAME/porua/releases)
+2. Extract the zip file
+3. Open `chrome://extensions/` in your browser
+4. Enable "Developer mode" (toggle in top right)
+5. Click "Load unpacked"
+6. Select the extracted folder
+
+**Firefox:**
+1. Download the latest `porua-extension-firefox-v0.1.0.zip` from [Releases](https://github.com/YOUR_USERNAME/porua/releases)
+2. Open `about:debugging#/runtime/this-firefox` in Firefox
+3. Click "Load Temporary Add-on"
+4. Select the downloaded zip file
+
+### From Browser Stores (Coming Soon)
+
+- Chrome Web Store: *Pending submission*
+- Firefox Add-ons: *Pending submission*
+
+### Server Requirement
+
+This extension requires the Porua TTS Server to be running locally.
+
+**Quick server setup:**
+```bash
+# Download server from releases
+# https://github.com/YOUR_USERNAME/porua/releases
+
+# Extract and install
+tar -xzf porua_server-v0.1.1-{platform}.tar.gz
+cd porua_server-v0.1.1-{platform}
+./download_models.sh  # Download TTS models (~337 MB, one-time)
+./install.sh          # Install server
+
+# Run server
+porua_server --server --port 3000
+```
+
+See the [Server README](../server/README.md) for detailed installation instructions.
 
 ## Architecture
 
@@ -172,3 +222,88 @@ This restructuring maintains 100% feature parity with the original monolithic ve
 - Enhanced performance
 - Proper resource cleanup
 - Modern development workflow
+
+## Packaging and Releases
+
+### Building Release Packages
+
+```bash
+# Build and package both browsers
+npm run release
+
+# Package Chrome only
+npm run package:chrome
+
+# Package Firefox only
+npm run package:firefox
+```
+
+Generated packages are placed in `packages/` directory:
+- `porua-extension-chrome-v0.1.0.zip` - Chrome extension
+- `porua-extension-firefox-v0.1.0.zip` - Firefox add-on
+- `porua-extension-source-v0.1.0.zip` - Source code (for Firefox AMO)
+- `SHA256SUMS` - Checksums for verification
+
+### Version Management
+
+```bash
+# Validate version consistency
+npm run version:validate
+
+# Update version across all files
+npm run version:sync 0.2.0
+```
+
+### Creating a Release
+
+1. Update version: `npm run version:sync 0.2.0`
+2. Update `CHANGELOG.md`
+3. Commit: `git commit -m "chore: bump version to 0.2.0"`
+4. Tag: `git tag plugin-v0.2.0`
+5. Push: `git push origin plugin-v0.2.0`
+6. GitHub Actions automatically builds and creates release
+
+See [RELEASING.md](RELEASING.md) for complete release process.
+
+## Documentation
+
+- [CHANGELOG.md](CHANGELOG.md) - Version history and changes
+- [RELEASING.md](RELEASING.md) - Complete release process guide
+- [packaging/PACKAGING.md](packaging/PACKAGING.md) - Packaging details
+- [packaging/RELEASE_CHECKLIST.md](packaging/RELEASE_CHECKLIST.md) - Pre-release checklist
+
+## Browser Compatibility
+
+- Chrome/Edge 96+
+- Firefox 109+
+- Safari: Not yet supported
+
+## Server Compatibility
+
+- Requires Porua TTS Server v0.1.0 or higher
+- Default connection: `http://localhost:3000`
+
+## Contributing
+
+Contributions are welcome! Please:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Run tests: `npm test`
+5. Submit a pull request
+
+## License
+
+See LICENSE file in the repository root.
+
+## Support
+
+- GitHub Issues: [Report bugs or request features](https://github.com/YOUR_USERNAME/porua/issues)
+- Documentation: [Full documentation](https://github.com/YOUR_USERNAME/porua)
+
+## Acknowledgments
+
+- Built with [Kokoro TTS](https://github.com/thewh1teagle/kokoro-onnx) engine
+- Uses [esbuild](https://esbuild.github.io/) for fast bundling
+- Tested with [Vitest](https://vitest.dev/)

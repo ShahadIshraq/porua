@@ -1,6 +1,6 @@
 {
   "name": "porua-extension",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "test": "vitest run",
@@ -12,7 +12,9 @@
     "package": "node build/package.cjs",
     "package:chrome": "node build/package.cjs --chrome",
     "package:firefox": "node build/package.cjs --firefox",
-    "release": "npm run build && npm run package"
+    "release": "npm run build && npm run package",
+    "version:validate": "node build/validate-version.cjs",
+    "version:sync": "node build/sync-version.cjs"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^3.2.4",

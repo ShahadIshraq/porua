@@ -1,0 +1,68 @@
+name: Plugin Tests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'plugin/**'
+      - '.github/workflows/plugin-test.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'plugin/**'
+      - '.github/workflows/plugin-test.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Plugin Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: plugin/package-lock.json
+
+      - name: Install dependencies
+        working-directory: plugin
+        run: npm ci
+
+      - name: Validate version consistency
+        working-directory: plugin
+        run: npm run version:validate
+
+      - name: Run tests
+        working-directory: plugin
+        run: npm test
+
+      - name: Build extension
+        working-directory: plugin
+        run: npm run build
+
+      - name: Verify build output
+        working-directory: plugin
+        run: |
+          echo "Checking build artifacts..."
+          if [ ! -f "dist/content.js" ]; then
+            echo "Error: dist/content.js not found"
+            exit 1
+          fi
+          if [ ! -f "dist/popup.js" ]; then
+            echo "Error: dist/popup.js not found"
+            exit 1
+          fi
+          echo "All build artifacts present"
+
+      - name: Check test results
+        if: failure()
+        run: |
+          echo "Tests failed! Please fix the failing tests before merging."
+          exit 1

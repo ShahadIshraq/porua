@@ -1,0 +1,211 @@
+name: Plugin Release
+
+on:
+  push:
+    tags:
+      - 'plugin-v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.1.0)'
+        required: true
+
+jobs:
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      is_prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/plugin-v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Check if pre-release
+        id: prerelease
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ "$VERSION" =~ -alpha|-beta|-rc ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: plugin-v${{ steps.version.outputs.version }}
+          name: Porua Browser Extension v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
+          body: |
+            # Porua Browser Extension v${{ steps.version.outputs.version }}
+
+            Text-to-speech reader for web pages powered by Kokoro TTS.
+
+            ## 📦 What's Included
+            - Chrome extension package (ready for Chrome Web Store)
+            - Firefox add-on package (ready for Firefox AMO)
+            - Source code archive (for Firefox review)
+
+            ## 🚀 Installation
+
+            ### Chrome/Edge
+            1. Download `porua-extension-chrome-v${{ steps.version.outputs.version }}.zip`
+            2. Extract the zip file
+            3. Visit `chrome://extensions/`
+            4. Enable "Developer mode"
+            5. Click "Load unpacked" and select the extracted folder
+
+            ### Firefox
+            1. Download `porua-extension-firefox-v${{ steps.version.outputs.version }}.zip`
+            2. Visit `about:debugging#/runtime/this-firefox`
+            3. Click "Load Temporary Add-on"
+            4. Select the zip file or any file inside it
+
+            ## 🔌 Server Requirement
+
+            This extension requires the Porua TTS Server to be running locally.
+
+            **Download the server:**
+            - [Latest Server Release](https://github.com/${{ github.repository }}/releases?q=server-v)
+
+            **Quick server setup:**
+            ```bash
+            # Download and extract server for your platform
+            # See server release notes for platform-specific instructions
+
+            # Download TTS models (one-time, ~337 MB)
+            ./download_models.sh
+
+            # Install server
+            ./install.sh
+
+            # Run server
+            porua_server --server --port 3000
+            ```
+
+            ## 📋 Package Details
+
+            All packages include SHA256 checksums for verification.
+
+            **Verify checksums:**
+            ```bash
+            sha256sum -c SHA256SUMS
+            ```
+
+            ## 🔄 Compatibility
+
+            - **Chrome/Edge:** Version 96 or higher
+            - **Firefox:** Version 109 or higher
+            - **Server:** v0.1.0 or higher
+
+            ## 📚 Documentation
+
+            - [Extension README](https://github.com/${{ github.repository }}/blob/main/plugin/README.md)
+            - [Server Documentation](https://github.com/${{ github.repository }}/blob/main/server/README.md)
+
+            ## 🐛 Found a Bug?
+
+            Please report issues at: https://github.com/${{ github.repository }}/issues
+
+            ---
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    name: Build Browser Extensions
+    needs: create-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: plugin/package-lock.json
+
+      - name: Install dependencies
+        working-directory: plugin
+        run: npm ci
+
+      - name: Validate version matches manifest.json
+        working-directory: plugin
+        shell: bash
+        run: |
+          MANIFEST_VERSION=$(node -p "require('./manifest.json').version")
+          TAG_VERSION="${{ needs.create-release.outputs.version }}"
+          echo "manifest.json version: $MANIFEST_VERSION"
+          echo "Tag version: $TAG_VERSION"
+          if [ "$MANIFEST_VERSION" != "$TAG_VERSION" ]; then
+            echo "Error: Version mismatch! manifest.json has $MANIFEST_VERSION but tag is $TAG_VERSION"
+            exit 1
+          fi
+
+      - name: Validate version consistency
+        working-directory: plugin
+        run: npm run version:validate
+
+      - name: Run tests
+        working-directory: plugin
+        run: npm test
+
+      - name: Build extension
+        working-directory: plugin
+        run: npm run build
+
+      - name: Package Chrome extension
+        working-directory: plugin
+        run: npm run package:chrome
+
+      - name: Package Firefox extension
+        working-directory: plugin
+        run: npm run package:firefox
+
+      - name: List generated packages
+        working-directory: plugin/packages
+        run: |
+          echo "Generated packages:"
+          ls -lh
+          echo ""
+          echo "Checksums:"
+          cat SHA256SUMS
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: plugin-v${{ needs.create-release.outputs.version }}
+          files: |
+            plugin/packages/porua-extension-chrome-v${{ needs.create-release.outputs.version }}.zip
+            plugin/packages/porua-extension-chrome-v${{ needs.create-release.outputs.version }}.zip.sha256
+            plugin/packages/porua-extension-firefox-v${{ needs.create-release.outputs.version }}.zip
+            plugin/packages/porua-extension-firefox-v${{ needs.create-release.outputs.version }}.zip.sha256
+            plugin/packages/porua-extension-source-v${{ needs.create-release.outputs.version }}.zip
+            plugin/packages/porua-extension-source-v${{ needs.create-release.outputs.version }}.zip.sha256
+            plugin/packages/SHA256SUMS
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
