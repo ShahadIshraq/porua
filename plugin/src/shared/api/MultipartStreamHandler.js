@@ -25,6 +25,18 @@ import { APIError } from '../utils/errors.js';
  * audioQueue.enqueue(audioBlobs, metadataArray, phraseTimeline);
  */
 export async function parseMultipartStream(response) {
+  // Check if this is a BackgroundTTSClient response (already parsed)
+  if (response.__backgroundClientData) {
+    const { audioBlobs, metadataArray } = response.__backgroundClientData;
+    const phraseTimeline = buildPhraseTimeline(metadataArray);
+    return {
+      audioBlobs,
+      metadataArray,
+      phraseTimeline,
+    };
+  }
+
+  // Original path: Parse actual multipart stream from direct HTTP response
   // Validate response format
   validateMultipartResponse(response);
 
