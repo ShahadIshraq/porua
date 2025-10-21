@@ -89,12 +89,16 @@ export class BackgroundTTSClient {
       const chunks = [];
       const metadata = [];
       let streamStarted = false;
+      let audioContentType = 'audio/wav'; // Default
 
       // Handle incoming messages
       port.onMessage.addListener((message) => {
         switch (message.type) {
           case 'STREAM_START':
             streamStarted = true;
+            if (message.data && message.data.contentType) {
+              audioContentType = message.data.contentType;
+            }
             break;
 
           case 'STREAM_METADATA':
@@ -102,7 +106,10 @@ export class BackgroundTTSClient {
             break;
 
           case 'STREAM_AUDIO':
-            chunks.push(message.data.audioData);
+            chunks.push({
+              audioData: message.data.audioData,
+              contentType: message.data.contentType || audioContentType,
+            });
             break;
 
           case 'STREAM_COMPLETE':
@@ -111,7 +118,9 @@ export class BackgroundTTSClient {
             // Create multipart-like response for compatibility
             // Convert to format expected by parseMultipartStream
             const responseData = {
-              audioBlobs: chunks.map((buffer) => new Blob([buffer], { type: 'audio/wav' })),
+              audioBlobs: chunks.map((chunk) =>
+                new Blob([chunk.audioData], { type: chunk.contentType })
+              ),
               metadataArray: metadata,
             };
 
