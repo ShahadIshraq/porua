@@ -235,6 +235,18 @@ else
     exit 1
 fi
 
+# Copy voice samples (should always be in repository)
+if [ -d "samples" ]; then
+    echo -e "${YELLOW}Copying voice samples...${NC}"
+    cp -r samples "$PACKAGE_DIR/"
+    SAMPLES_SIZE=$(du -sh "$PACKAGE_DIR/samples" | cut -f1)
+    echo -e "${GREEN}✓ Voice samples copied${NC} (${SAMPLES_SIZE})"
+else
+    echo -e "${YELLOW}Warning: samples directory not found${NC}"
+    echo -e "${YELLOW}Voice preview functionality will not be available.${NC}"
+    echo -e "${YELLOW}Run 'cargo run --bin generate_samples' to create samples.${NC}"
+fi
+
 echo -e "${GREEN}✓ Documentation copied${NC}"
 echo ""
 
