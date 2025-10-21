@@ -11,7 +11,8 @@ const watch = process.argv.includes('--watch');
 const buildOptions = {
   entryPoints: {
     'content': join(rootDir, 'src/content/index.js'),
-    'popup': join(rootDir, 'src/popup/index.js')
+    'popup': join(rootDir, 'src/popup/index.js'),
+    'background': join(rootDir, 'src/background/service-worker.js')
   },
   bundle: true,
   outdir: join(rootDir, 'dist'),
