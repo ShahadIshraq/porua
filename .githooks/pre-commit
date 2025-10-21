@@ -1,9 +1,40 @@
 #!/bin/bash
 
-# Pre-commit hook to run Rust format check and tests
-# This hook prevents commits if format is incorrect or tests fail
+# Pre-commit hook to run format checks, version validation, and tests
+# This hook prevents commits if format is incorrect, versions are mismatched, or tests fail
 
 set -e
+
+# Check if plugin manifest files are staged for commit
+PLUGIN_FILES_CHANGED=$(git diff --cached --name-only | grep -E '^plugin/(manifest\.json|manifest\.firefox\.json|package\.json)$' || true)
+
+if [ -n "$PLUGIN_FILES_CHANGED" ]; then
+    echo "Validating plugin version consistency..."
+    echo ""
+
+    # Run version validation
+    if ! (cd plugin && npm run version:validate --silent); then
+        echo ""
+        echo "✗ Plugin version validation failed!"
+        echo ""
+        echo "Version mismatch detected in plugin manifest files."
+        echo ""
+        echo "To fix this, run:"
+        echo "  cd plugin && npm run version:sync"
+        echo ""
+        echo "Or manually update the versions in:"
+        echo "  - plugin/manifest.json"
+        echo "  - plugin/manifest.firefox.json"
+        echo "  - plugin/package.json"
+        echo ""
+        echo "To skip this hook (not recommended):"
+        echo "  git commit --no-verify"
+        exit 1
+    fi
+
+    echo "✓ Plugin versions are consistent!"
+    echo ""
+fi
 
 echo "Checking server code formatting..."
 echo ""

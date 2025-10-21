@@ -19,3 +19,10 @@ server/models/
 
 # Test coverage
 plugin/coverage/
+
+# Plugin build artifacts (also in plugin/.gitignore but added here for safety)
+plugin/dist/
+plugin/packages/
+plugin/.packaging-temp/
+plugin/*.zip
+plugin/*.xpi

@@ -97,19 +97,14 @@ See component READMEs for detailed instructions:
 - [Plugin Development](plugin/README.md)
 - [Server Development](server/README.md)
 
-### Git Hooks Setup
+### Git Hooks
 
-This project includes pre-commit hooks to run tests before each commit:
+Pre-commit hooks run automatically via `.githooks/`:
+- Validate plugin version consistency
+- Check server code formatting
+- Run server tests
 
-```bash
-# Install the hooks
-./scripts/install-hooks.sh
-```
-
-The pre-commit hook will automatically run server tests before allowing commits. To skip the hook (not recommended):
-```bash
-git commit --no-verify
-```
+Skip with `git commit --no-verify` (not recommended).
 
 ### Version Management
 
