@@ -5,7 +5,7 @@ import { PlayerControl } from './ui/PlayerControl.js';
 import { HighlightManager } from './ui/HighlightManager.js';
 import { AudioQueue } from './audio/AudioQueue.js';
 import { SettingsStore } from '../shared/storage/SettingsStore.js';
-import { ttsService } from '../shared/services/TTSService.js';
+import { backgroundTTSClient } from '../shared/api/BackgroundTTSClient.js';
 import { parseMultipartStream } from '../shared/api/MultipartStreamHandler.js';
 import { PLAYER_STATES } from '../shared/utils/constants.js';
 import { ParagraphQueue } from './queue/ParagraphQueue.js';
@@ -116,8 +116,8 @@ class TTSContentScript {
       paragraph = this.state.getPlayingParagraph();
     }
 
-    // Use TTSService for synthesis
-    const response = await ttsService.synthesizeStream(text);
+    // Use BackgroundTTSClient for synthesis (bypasses mixed content restrictions)
+    const response = await backgroundTTSClient.synthesizeStream(text);
 
     // Parse multipart stream using unified handler
     const { audioBlobs, metadataArray, phraseTimeline } = await parseMultipartStream(response);
