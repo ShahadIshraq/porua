@@ -1,4 +1,5 @@
 import { toBlob } from '../shared/api/ResponseHandler.js';
+import { withTimeout, TimeoutError } from '../shared/utils/timeout.js';
 
 /**
  * SpeedControl component for adjusting TTS playback speed
@@ -288,11 +289,15 @@ export class SpeedControl {
       // Get current voice from settings
       const voice = await this.settingsStore.getSelectedVoice();
 
-      // Synthesize test audio with current speed
-      const response = await this.ttsService.synthesize(this.TEST_SAMPLE_TEXT, {
-        voice: voice.id,
-        speed: this.currentSpeed
-      });
+      // Synthesize test audio with current speed - wrap with 60 second timeout
+      const response = await withTimeout(
+        this.ttsService.synthesize(this.TEST_SAMPLE_TEXT, {
+          voice: voice.id,
+          speed: this.currentSpeed
+        }),
+        60000,
+        'Speed test timeout (60s)'
+      );
 
       // Convert response to blob using ResponseHandler
       // Server may return application/octet-stream or audio/wav
@@ -309,7 +314,9 @@ export class SpeedControl {
 
       let errorMessage = 'Failed to test speed';
 
-      if (error.status === 401 || error.status === 403) {
+      if (error.isTimeout) {
+        errorMessage = error.message;
+      } else if (error.status === 401 || error.status === 403) {
         errorMessage = 'Authentication failed. Check your API key.';
       } else if (error.message) {
         errorMessage = `Test failed: ${error.message}`;
