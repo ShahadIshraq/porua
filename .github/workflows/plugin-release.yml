@@ -85,7 +85,7 @@ jobs:
             This extension requires the Porua TTS Server to be running locally.
 
             **Download the server:**
-            - [Latest Server Release](https://github.com/${{ github.repository }}/releases?q=server-v)
+            - [View Server Releases](https://github.com/${{ github.repository }}/releases) (look for `server-v*` tags)
 
             **Quick server setup:**
             ```bash
