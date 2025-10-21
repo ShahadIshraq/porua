@@ -84,23 +84,7 @@ jobs:
 
             This extension requires the Porua TTS Server to be running locally.
 
-            **Download the server:**
-            - [View Server Releases](https://github.com/${{ github.repository }}/releases) (look for `server-v*` tags)
-
-            **Quick server setup:**
-            ```bash
-            # Download and extract server for your platform
-            # See server release notes for platform-specific instructions
-
-            # Download TTS models (one-time, ~337 MB)
-            ./download_models.sh
-
-            # Install server
-            ./install.sh
-
-            # Run server
-            porua_server --server --port 3000
-            ```
+            **[Download Server →](https://github.com/${{ github.repository }}/releases)** (look for `server-v*` releases)
 
             ## 📋 Package Details
 
