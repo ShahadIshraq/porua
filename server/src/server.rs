@@ -210,10 +210,12 @@ async fn generate_tts_stream(
 /// Create and configure the HTTP server router
 pub fn create_router(state: AppState) -> Router<()> {
     // Configure CORS to allow all origins (adjust as needed for production)
+    // Expose headers needed for streaming responses (multipart/mixed with chunked encoding)
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
-        .allow_headers(Any);
+        .allow_headers(Any)
+        .expose_headers(Any); // Expose all response headers for streaming compatibility
 
     // Clone api_keys for middleware
     let api_keys_for_middleware = state.api_keys.clone();
