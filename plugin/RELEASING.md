@@ -38,6 +38,10 @@ git push origin plugin-v0.2.0
 - **npm** - Version 9 or higher
 - **GitHub CLI** (optional) - For manual releases
 
+### Recommended Setup
+
+- **Git hooks** - Pre-commit hooks in `.githooks/` automatically validate version consistency when manifest files are committed. This prevents accidental commits with mismatched versions.
+
 ### Required Access
 
 - **GitHub Repository** - Write access to push tags
@@ -406,6 +410,8 @@ Full changelog: https://github.com/YOUR_USERNAME/porua/blob/main/plugin/CHANGELO
 npm run version:validate  # See which files don't match
 npm run version:sync      # Fix automatically
 ```
+
+**Prevention:** The repository's pre-commit hook (`.githooks/pre-commit`) automatically validates version consistency when manifest files are committed.
 
 ### GitHub Actions Fails - Tests Don't Pass
 
