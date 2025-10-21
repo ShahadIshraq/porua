@@ -39,6 +39,9 @@ export async function handleStreamRequest(message, port) {
     // Extract boundary from headers
     const boundary = extractMultipartBoundary(response);
 
+    // Get content type for audio blobs
+    const contentType = response.headers.get('Content-Type') || 'multipart/mixed';
+
     // Get stream reader
     const reader = response.body.getReader();
 
@@ -50,6 +53,7 @@ export async function handleStreamRequest(message, port) {
       type: 'STREAM_START',
       data: {
         chunkCount: parts.filter((p) => p.type === 'audio').length,
+        contentType,
       },
     });
 
@@ -70,11 +74,12 @@ export async function handleStreamRequest(message, port) {
           part.audioData.byteOffset + part.audioData.byteLength
         );
 
-        // Send audio part
+        // Send audio part with content type
         port.postMessage({
           type: 'STREAM_AUDIO',
           data: {
             audioData: arrayBuffer,
+            contentType: 'audio/wav', // Default for TTS audio
           },
         });
       }
