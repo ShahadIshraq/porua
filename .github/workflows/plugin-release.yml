@@ -63,7 +63,7 @@ jobs:
             ## 📦 What's Included
             - Chrome extension package (ready for Chrome Web Store)
             - Firefox add-on package (ready for Firefox AMO)
-            - Source code archive (for Firefox review)
+            - SHA256 checksums for package verification
 
             ## 🚀 Installation
 
@@ -201,11 +201,7 @@ jobs:
           tag_name: plugin-v${{ needs.create-release.outputs.version }}
           files: |
             plugin/packages/porua-extension-chrome-v${{ needs.create-release.outputs.version }}.zip
-            plugin/packages/porua-extension-chrome-v${{ needs.create-release.outputs.version }}.zip.sha256
             plugin/packages/porua-extension-firefox-v${{ needs.create-release.outputs.version }}.zip
-            plugin/packages/porua-extension-firefox-v${{ needs.create-release.outputs.version }}.zip.sha256
-            plugin/packages/porua-extension-source-v${{ needs.create-release.outputs.version }}.zip
-            plugin/packages/porua-extension-source-v${{ needs.create-release.outputs.version }}.zip.sha256
             plugin/packages/SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
