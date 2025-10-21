@@ -1,4 +1,4 @@
-import { ttsService } from '../../shared/services/TTSService.js';
+import { backgroundTTSClient } from '../../shared/api/BackgroundTTSClient.js';
 import { parseMultipartStream } from '../../shared/api/MultipartStreamHandler.js';
 import { CACHE_CONFIG } from '../../shared/utils/constants.js';
 import { Logger } from '../../shared/utils/logger.js';
@@ -34,8 +34,8 @@ export class PrefetchManager {
     this.pendingFetches.set(normalizedText, abortController);
 
     try {
-      // Use TTSService for synthesis with abort signal
-      const response = await ttsService.synthesizeStream(normalizedText, {
+      // Use BackgroundTTSClient for synthesis with abort signal (bypasses mixed content restrictions)
+      const response = await backgroundTTSClient.synthesizeStream(normalizedText, {
         signal: abortController.signal
       });
 
