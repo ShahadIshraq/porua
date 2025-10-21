@@ -144,6 +144,19 @@ else
     exit 1
 fi
 
+# Copy voice samples (should always be present in packages)
+if [ -d "samples" ]; then
+    echo -e "${YELLOW}Installing voice samples...${NC}"
+    run_cmd cp -r samples "$INSTALL_DIR/"
+    SAMPLES_SIZE=$(du -sh "$INSTALL_DIR/samples" | cut -f1)
+    echo -e "${GREEN}✓ Voice samples installed${NC} (${SAMPLES_SIZE})"
+    echo -e "${BLUE}  Samples will be available at /samples/{voice_id}.wav endpoint${NC}"
+else
+    echo -e "${YELLOW}Warning: samples directory not found in package${NC}"
+    echo -e "${YELLOW}Voice preview functionality will not be available.${NC}"
+    echo -e "${YELLOW}This may be expected for older package versions.${NC}"
+fi
+
 echo ""
 
 # Step 4: Download models
@@ -344,6 +357,8 @@ echo -e "${YELLOW}1. Test CLI mode:${NC}"
 echo -e "   porua_server \"Hello world!\""
 echo ""
 echo -e "${YELLOW}2. Start HTTP server:${NC}"
+echo -e "   # IMPORTANT: Run from install directory for voice samples to work"
+echo -e "   cd $INSTALL_DIR"
 echo -e "   porua_server --server --port 3000"
 echo ""
 echo -e "${YELLOW}3. Test API:${NC}"
@@ -352,11 +367,15 @@ echo -e "     -H \"Content-Type: application/json\" \\"
 echo -e "     -d '{\"text\": \"Hello!\", \"voice\": \"bf_lily\"}' \\"
 echo -e "     --output test.wav"
 echo ""
-echo -e "${YELLOW}4. Advanced usage (override .env):${NC}"
+echo -e "${YELLOW}4. Test voice samples:${NC}"
+echo -e "   # Voice sample previews are available at:"
+echo -e "   curl http://localhost:3000/samples/bf_lily.wav --output bf_lily.wav"
+echo ""
+echo -e "${YELLOW}5. Advanced usage (override .env):${NC}"
 echo -e "   # Override environment settings:"
 echo -e "   TTS_MODEL_DIR=/custom/path porua_server \"Hello!\""
 echo ""
-echo -e "${YELLOW}5. Full documentation:${NC}"
+echo -e "${YELLOW}6. Full documentation:${NC}"
 echo -e "   See INSTALL.md and docs/README.md"
 echo ""
 
