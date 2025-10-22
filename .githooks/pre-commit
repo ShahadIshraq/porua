@@ -5,9 +5,10 @@
 
 set -e
 
-# Check if plugin files are staged for commit
+# Check if plugin or server files are staged for commit
 PLUGIN_MANIFEST_FILES_CHANGED=$(git diff --cached --name-only | grep -E '^plugin/(manifest\.json|manifest\.firefox\.json|package\.json)$' || true)
 PLUGIN_SOURCE_FILES_CHANGED=$(git diff --cached --name-only | grep -E '^plugin/(src|tests)/.*\.(js|json)$' || true)
+SERVER_FILES_CHANGED=$(git diff --cached --name-only | grep -E '^server/' || true)
 
 # Validate plugin version consistency if manifest files changed
 if [ -n "$PLUGIN_MANIFEST_FILES_CHANGED" ]; then
@@ -60,40 +61,45 @@ if [ -n "$PLUGIN_SOURCE_FILES_CHANGED" ]; then
     echo ""
 fi
 
-echo "Checking server code formatting..."
-echo ""
+# Check server formatting and tests if server files changed
+if [ -n "$SERVER_FILES_CHANGED" ]; then
+    echo "Checking server code formatting..."
+    echo ""
 
-# Check cargo format for the server
-if ! cargo fmt --manifest-path server/Cargo.toml --check; then
+    # Check cargo format for the server
+    if ! cargo fmt --manifest-path server/Cargo.toml --check; then
+        echo ""
+        echo "✗ Code formatting check failed!"
+        echo ""
+        echo "To fix formatting, run:"
+        echo "  cargo fmt --manifest-path server/Cargo.toml"
+        echo ""
+        echo "To skip this hook (not recommended):"
+        echo "  git commit --no-verify"
+        exit 1
+    fi
+
+    echo "✓ Code formatting is correct!"
     echo ""
-    echo "✗ Code formatting check failed!"
+    echo "Running server tests..."
     echo ""
-    echo "To fix formatting, run:"
-    echo "  cargo fmt --manifest-path server/Cargo.toml"
+
+    # Run cargo test for the server
+    if ! cargo test --manifest-path server/Cargo.toml --quiet; then
+        echo ""
+        echo "✗ Tests failed! Please fix the failing tests before committing."
+        echo ""
+        echo "To run tests manually:"
+        echo "  cargo test --manifest-path server/Cargo.toml"
+        echo ""
+        echo "To skip this hook (not recommended):"
+        echo "  git commit --no-verify"
+        exit 1
+    fi
+
     echo ""
-    echo "To skip this hook (not recommended):"
-    echo "  git commit --no-verify"
-    exit 1
+    echo "✓ Server tests passed!"
+    echo ""
 fi
 
-echo "✓ Code formatting is correct!"
-echo ""
-echo "Running server tests..."
-echo ""
-
-# Run cargo test for the server
-if cargo test --manifest-path server/Cargo.toml --quiet; then
-    echo ""
-    echo "✓ All tests passed! Proceeding with commit."
-    exit 0
-else
-    echo ""
-    echo "✗ Tests failed! Please fix the failing tests before committing."
-    echo ""
-    echo "To run tests manually:"
-    echo "  cargo test --manifest-path server/Cargo.toml"
-    echo ""
-    echo "To skip this hook (not recommended):"
-    echo "  git commit --no-verify"
-    exit 1
-fi
+echo "✓ All checks passed! Proceeding with commit."
