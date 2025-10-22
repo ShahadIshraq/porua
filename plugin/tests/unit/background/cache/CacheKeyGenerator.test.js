@@ -1,5 +1,25 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CacheKeyGenerator } from '../../../../src/background/cache/CacheKeyGenerator.js';
+
+// Mock crypto.subtle for Node.js test environment
+beforeEach(() => {
+  global.crypto = {
+    subtle: {
+      digest: vi.fn().mockImplementation(async (algorithm, data) => {
+        // Simple mock hash - just use the data length and first few bytes
+        const hash = new Uint8Array(32);
+        for (let i = 0; i < Math.min(32, data.length); i++) {
+          hash[i] = data[i];
+        }
+        // Fill rest with deterministic pattern based on data length
+        for (let i = data.length; i < 32; i++) {
+          hash[i] = (data.length + i) % 256;
+        }
+        return hash.buffer;
+      }),
+    },
+  };
+});
 
 describe('CacheKeyGenerator', () => {
   describe('generate', () => {
