@@ -8,6 +8,8 @@ use axum::{
 use std::time::Instant;
 use uuid::Uuid;
 
+use crate::utils::header_utils::extract_client_ip;
+
 /// Request ID wrapper for tracking requests through the system
 #[derive(Clone, Debug)]
 pub struct RequestId(pub String);
@@ -56,7 +58,9 @@ pub async fn access_log_middleware(req: Request, next: Next) -> Response {
         .unwrap_or_else(|| "unknown".to_string());
 
     // Extract client information
-    let client_ip = extract_client_ip(&req);
+    let client_ip = extract_client_ip(&req)
+        .map(|ip| ip.to_string())
+        .unwrap_or_else(|_| "unknown".to_string());
     let user_agent = req
         .headers()
         .get("user-agent")
@@ -143,31 +147,6 @@ pub async fn access_log_middleware(req: Request, next: Next) -> Response {
     response
 }
 
-/// Extract client IP from request, checking X-Forwarded-For and X-Real-IP headers
-fn extract_client_ip(req: &Request) -> String {
-    // Check X-Forwarded-For header first (for proxy/load balancer setups)
-    if let Some(forwarded) = req.headers().get("x-forwarded-for") {
-        if let Ok(forwarded_str) = forwarded.to_str() {
-            // Take the first IP in the comma-separated list
-            if let Some(first_ip) = forwarded_str.split(',').next() {
-                return first_ip.trim().to_string();
-            }
-        }
-    }
-
-    // Check X-Real-IP header (used by some proxies)
-    if let Some(real_ip) = req.headers().get("x-real-ip") {
-        if let Ok(ip_str) = real_ip.to_str() {
-            return ip_str.to_string();
-        }
-    }
-
-    // Fallback to connection remote address if available
-    // Note: In Axum 0.7, this would need to be extracted via ConnectInfo extension
-    // For now, return unknown since we don't have direct access to socket addr
-    "unknown".to_string()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -189,5 +168,58 @@ mod tests {
             .collect::<String>();
         assert_eq!(hash.len(), 8, "Hash should be truncated to 8 chars");
         assert_ne!(hash, key, "Hash should not be the original key");
+    }
+
+    #[test]
+    fn test_api_key_hashing_consistency() {
+        let key = "test-key";
+        let hash1 = format!("{:x}", md5::compute(key.as_bytes()))
+            .chars()
+            .take(8)
+            .collect::<String>();
+        let hash2 = format!("{:x}", md5::compute(key.as_bytes()))
+            .chars()
+            .take(8)
+            .collect::<String>();
+        assert_eq!(
+            hash1, hash2,
+            "Same key should produce same hash consistently"
+        );
+    }
+
+    #[test]
+    fn test_api_key_hashing_different_keys() {
+        let key1 = "key-one";
+        let key2 = "key-two";
+        let hash1 = format!("{:x}", md5::compute(key1.as_bytes()))
+            .chars()
+            .take(8)
+            .collect::<String>();
+        let hash2 = format!("{:x}", md5::compute(key2.as_bytes()))
+            .chars()
+            .take(8)
+            .collect::<String>();
+        assert_ne!(
+            hash1, hash2,
+            "Different keys should produce different hashes"
+        );
+    }
+
+    #[test]
+    fn test_request_id_wrapper() {
+        let id = RequestId("test-id-123".to_string());
+        assert_eq!(id.0, "test-id-123");
+
+        // Test Clone
+        let id_clone = id.clone();
+        assert_eq!(id_clone.0, "test-id-123");
+    }
+
+    #[test]
+    fn test_request_id_format() {
+        let uuid_str = Uuid::new_v4().to_string();
+        // UUID format: 8-4-4-4-12 (36 chars total including hyphens)
+        assert_eq!(uuid_str.len(), 36);
+        assert_eq!(uuid_str.matches('-').count(), 4);
     }
 }

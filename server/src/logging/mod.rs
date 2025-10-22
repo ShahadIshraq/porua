@@ -3,6 +3,9 @@ pub mod middleware;
 pub mod paths;
 pub mod cleanup;
 
+#[cfg(test)]
+mod integration_tests;
+
 use std::io;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
 
