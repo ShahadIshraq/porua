@@ -113,8 +113,6 @@ export class BackgroundTTSClient {
             break;
 
           case 'STREAM_COMPLETE':
-            port.disconnect();
-
             // Create multipart-like response for compatibility
             // Convert to format expected by parseMultipartStream
             const responseData = {
@@ -134,6 +132,9 @@ export class BackgroundTTSClient {
               // Add custom properties for parseMultipartStream compatibility
               __backgroundClientData: responseData,
             };
+
+            // Disconnect port after receiving all data
+            port.disconnect();
 
             resolve(customResponse);
             break;

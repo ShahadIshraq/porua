@@ -90,8 +90,8 @@ export async function handleStreamRequest(message, port) {
       type: 'STREAM_COMPLETE',
     });
 
-    // Close port after successful completion
-    port.disconnect();
+    // Note: Client will disconnect the port after processing the complete message
+    // Don't disconnect here to avoid race condition
   } catch (error) {
     // Determine error type
     let errorType = ERROR_TYPES.STREAM_ERROR;
