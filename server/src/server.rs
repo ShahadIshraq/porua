@@ -238,7 +238,19 @@ pub fn create_router(state: AppState) -> Router<()> {
         .route("/stats", get(pool_stats))
         .nest_service("/samples", samples_service);
 
-    // Apply rate limiting only if API keys are enabled
+    // Apply middleware layers (order matters - first added = outermost/first executed)
+
+    // 1. Request ID generation (outermost - runs first)
+    router = router.layer(middleware::from_fn(
+        crate::logging::middleware::request_id_middleware,
+    ));
+
+    // 2. Access logging (logs all requests with IDs)
+    router = router.layer(middleware::from_fn(
+        crate::logging::middleware::access_log_middleware,
+    ));
+
+    // 3. Rate limiting (if enabled)
     if let Some(rate_limiter) = state.rate_limiter.clone() {
         router = router.layer(middleware::from_fn_with_state(
             rate_limiter,
@@ -246,13 +258,14 @@ pub fn create_router(state: AppState) -> Router<()> {
         ));
     }
 
-    // Apply authentication middleware
+    // 4. Authentication
     router = router.layer(middleware::from_fn_with_state(
         api_keys_for_middleware,
         crate::auth::auth_middleware,
     ));
 
-    // Apply timeout layer to prevent long-running requests from exhausting resources
+    // 5. Timeout layer (prevent long-running requests)
+    // 6. CORS (allow cross-origin requests)
     router
         .with_state(state)
         .layer(cors)

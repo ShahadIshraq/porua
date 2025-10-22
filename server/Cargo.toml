@@ -18,8 +18,11 @@ serde_json = "1.0"
 uuid = { version = "1.0", features = ["v4"] }
 bytes = "1.0"
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2"
 futures = "0.3"
+flate2 = "1.0"
+chrono = "0.4"
 tokio-stream = "0.1"
 hound = "3.5"
 deadpool = "0.12"
@@ -32,6 +35,7 @@ dotenvy = "0.15"
 num2words = "0.3"
 regex = "1.10"
 lazy_static = "1.4"
+md5 = "0.7"
 
 # Platform-specific OpenSSL configuration
 # Use vendored OpenSSL only for ARM64 Linux cross-compilation
@@ -45,3 +49,4 @@ openssl = "0.10"
 
 [dev-dependencies]
 tempfile = "3.8"
+filetime = "0.2"
