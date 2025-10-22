@@ -5,6 +5,7 @@ mod cli;
 mod config;
 mod error;
 mod kokoro;
+mod logging;
 mod models;
 mod rate_limit;
 mod server;
@@ -78,19 +79,30 @@ async fn async_main(args: Vec<String>) -> error::Result<()> {
         dotenvy::dotenv()
     };
 
-    // Initialize tracing for logging with environment variable support
-    // Default log level is INFO for tts_server, WARN for dependencies
-    // This hides noisy voice listings and ONNX logs by default
-    // Override with RUST_LOG env var: RUST_LOG=debug for verbose, RUST_LOG=warn for quiet
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                tracing_subscriber::EnvFilter::new("tts_server=info,ort=warn,kokoros=warn")
-            }),
-        )
-        .with_target(false) // Hide module path for cleaner output
-        .compact() // Use compact formatting
-        .init();
+    // Initialize dual-stream logging system (console + file-based)
+    // Logs are written to:
+    // - Console: for immediate visibility
+    // - access.log: HTTP request/response tracking (JSON)
+    // - application.log: server events and errors (JSON)
+    // Auto-rotates daily or at 50MB, with 30-day retention
+    let log_config = logging::LogConfig::from_env();
+    if let Err(e) = logging::init_logging(&log_config) {
+        eprintln!("Failed to initialize logging: {}", e);
+        eprintln!("Falling back to console-only logging");
+        // Fallback to simple console logging
+        tracing_subscriber::fmt()
+            .with_env_filter(
+                tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                    tracing_subscriber::EnvFilter::new("porua_server=info,ort=warn,kokoros=warn")
+                }),
+            )
+            .with_target(false)
+            .compact()
+            .init();
+    }
+
+    // Log platform information for diagnostics
+    logging::log_platform_info();
 
     // Check if we should run in server mode
     let server_mode = args.contains(&"--server".to_string());
