@@ -11,13 +11,14 @@
 
 import { MessageRouter } from './messages/MessageRouter.js';
 import { PORT_NAMES } from './messages/protocol.js';
-import { registerTTSHandlers } from './messages/handlers/index.js';
+import { registerTTSHandlers, registerCacheHandlers } from './messages/handlers/index.js';
 
 // Initialize message router
 const router = new MessageRouter();
 
-// Register all TTS operation handlers
+// Register all operation handlers
 registerTTSHandlers(router);
+registerCacheHandlers(router);
 
 /**
  * Handle one-time messages (simple requests)

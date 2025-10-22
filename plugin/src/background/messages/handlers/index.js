@@ -6,6 +6,7 @@
 
 import { MESSAGE_TYPES } from '../protocol.js';
 import { TTSHandlers } from './TTSHandlers.js';
+import { registerCacheHandlers } from './CacheHandlers.js';
 
 /**
  * Register all TTS-related message handlers
@@ -38,3 +39,5 @@ export function registerTTSHandlers(router) {
   // Note: TTS_SYNTHESIZE_STREAM uses port-based communication
   // handled separately in service-worker.js
 }
+
+export { registerCacheHandlers };
