@@ -113,12 +113,25 @@ export class BackgroundTTSClient {
             break;
 
           case 'STREAM_COMPLETE':
+            console.log('[BackgroundTTSClient] Stream complete, chunks:', chunks.length, 'metadata:', metadata.length);
+
+            // Debug: Check first chunk
+            if (chunks.length > 0) {
+              console.log('[BackgroundTTSClient] First chunk:', {
+                audioDataType: chunks[0].audioData?.constructor?.name,
+                audioDataSize: chunks[0].audioData?.byteLength,
+                contentType: chunks[0].contentType
+              });
+            }
+
             // Create multipart-like response for compatibility
             // Convert to format expected by parseMultipartStream
             const responseData = {
-              audioBlobs: chunks.map((chunk) =>
-                new Blob([chunk.audioData], { type: chunk.contentType })
-              ),
+              audioBlobs: chunks.map((chunk) => {
+                const blob = new Blob([chunk.audioData], { type: chunk.contentType });
+                console.log('[BackgroundTTSClient] Created blob:', blob.size, blob.type);
+                return blob;
+              }),
               metadataArray: metadata,
             };
 

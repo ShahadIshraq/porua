@@ -68,11 +68,18 @@ export async function handleStreamRequest(message, port) {
           },
         });
       } else if (part.type === 'audio') {
-        // Convert audio data to ArrayBuffer for transfer
+        // Convert Uint8Array to ArrayBuffer for transfer
+        // Use slice to create a new ArrayBuffer with just this part's data
         const arrayBuffer = part.audioData.buffer.slice(
           part.audioData.byteOffset,
           part.audioData.byteOffset + part.audioData.byteLength
         );
+
+        console.log('[StreamHandler] Sending audio chunk:', {
+          originalSize: part.audioData.byteLength,
+          arrayBufferSize: arrayBuffer.byteLength,
+          type: 'audio/wav'
+        });
 
         // Send audio part with content type
         port.postMessage({
