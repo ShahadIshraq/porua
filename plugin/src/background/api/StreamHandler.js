@@ -68,25 +68,17 @@ export async function handleStreamRequest(message, port) {
           },
         });
       } else if (part.type === 'audio') {
-        // Convert Uint8Array to ArrayBuffer for transfer
-        // Use slice to create a new ArrayBuffer with just this part's data
-        const arrayBuffer = part.audioData.buffer.slice(
-          part.audioData.byteOffset,
-          part.audioData.byteOffset + part.audioData.byteLength
-        );
-
-        console.log('[StreamHandler] Sending audio chunk:', {
-          originalSize: part.audioData.byteLength,
-          arrayBufferSize: arrayBuffer.byteLength,
-          type: 'audio/wav'
-        });
+        // Convert Uint8Array to regular Array for transfer
+        // Chrome extension ports don't support ArrayBuffer/Uint8Array transfer
+        // Must convert to plain Array which gets JSON-serialized
+        const audioArray = Array.from(part.audioData);
 
         // Send audio part with content type
         port.postMessage({
           type: 'STREAM_AUDIO',
           data: {
-            audioData: arrayBuffer,
-            contentType: 'audio/wav', // Default for TTS audio
+            audioData: audioArray, // Send as regular Array
+            contentType: 'audio/wav',
           },
         });
       }

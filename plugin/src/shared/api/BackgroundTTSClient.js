@@ -106,32 +106,22 @@ export class BackgroundTTSClient {
             break;
 
           case 'STREAM_AUDIO':
+            // Convert Array back to Uint8Array
+            // Chrome extension ports serialize ArrayBuffers as Arrays
+            const uint8Array = new Uint8Array(message.data.audioData);
             chunks.push({
-              audioData: message.data.audioData,
+              audioData: uint8Array,
               contentType: message.data.contentType || audioContentType,
             });
             break;
 
           case 'STREAM_COMPLETE':
-            console.log('[BackgroundTTSClient] Stream complete, chunks:', chunks.length, 'metadata:', metadata.length);
-
-            // Debug: Check first chunk
-            if (chunks.length > 0) {
-              console.log('[BackgroundTTSClient] First chunk:', {
-                audioDataType: chunks[0].audioData?.constructor?.name,
-                audioDataSize: chunks[0].audioData?.byteLength,
-                contentType: chunks[0].contentType
-              });
-            }
-
             // Create multipart-like response for compatibility
             // Convert to format expected by parseMultipartStream
             const responseData = {
-              audioBlobs: chunks.map((chunk) => {
-                const blob = new Blob([chunk.audioData], { type: chunk.contentType });
-                console.log('[BackgroundTTSClient] Created blob:', blob.size, blob.type);
-                return blob;
-              }),
+              audioBlobs: chunks.map((chunk) =>
+                new Blob([chunk.audioData], { type: chunk.contentType })
+              ),
               metadataArray: metadata,
             };
 
