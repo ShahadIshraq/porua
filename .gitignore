@@ -26,3 +26,7 @@ plugin/packages/
 plugin/.packaging-temp/
 plugin/*.zip
 plugin/*.xpi
+
+# Plan files (should not be committed)
+*_PLAN.md
+*_SUMMARY.md
