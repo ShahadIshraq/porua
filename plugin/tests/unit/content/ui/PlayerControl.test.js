@@ -14,6 +14,10 @@ describe('PlayerControl', () => {
       subscribe: vi.fn((callback) => {
         mockState._stateCallback = callback;
         return vi.fn(); // Return unsubscribe function
+      }),
+      subscribeToSkipState: vi.fn((callback) => {
+        mockState._skipStateCallback = callback;
+        return vi.fn(); // Return unsubscribe function
       })
     };
 
@@ -23,8 +27,10 @@ describe('PlayerControl', () => {
       off: vi.fn()
     };
 
-    // Mock callback
+    // Mock callbacks
     mockOnButtonClick = vi.fn();
+    const mockOnSkipForward = vi.fn();
+    const mockOnSkipBackward = vi.fn();
 
     // Mock document.body
     document.body.appendChild = vi.fn();
@@ -41,7 +47,13 @@ describe('PlayerControl', () => {
       value: 1200
     });
 
-    playerControl = new PlayerControl(mockState, mockEventManager, mockOnButtonClick);
+    playerControl = new PlayerControl(
+      mockState,
+      mockEventManager,
+      mockOnButtonClick,
+      mockOnSkipForward,
+      mockOnSkipBackward
+    );
   });
 
   describe('constructor', () => {
@@ -104,8 +116,9 @@ describe('PlayerControl', () => {
     it('should call onButtonClick when button clicked', () => {
       playerControl.create();
 
+      // Find the click handler for the tts-player-button specifically
       const clickHandler = mockEventManager.on.mock.calls.find(
-        call => call[1] === 'click'
+        call => call[0] === playerControl.button && call[1] === 'click'
       )[2];
 
       const event = { stopPropagation: vi.fn() };
@@ -133,7 +146,9 @@ describe('PlayerControl', () => {
     it('should center vertically', () => {
       const control = playerControl.create();
 
-      const expectedTop = (window.innerHeight / 2 - 25) + 'px';
+      // Widget is now 122px tall (50px play + 2x28px skip + 2x8px gaps)
+      // So we center by subtracting half: 122/2 = 61
+      const expectedTop = (window.innerHeight / 2 - 61) + 'px';
       expect(control.style.top).toBe(expectedTop);
     });
 
