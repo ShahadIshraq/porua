@@ -8,6 +8,9 @@ export class PlaybackState {
     this.highlightedPhrase = null;
     this.phraseTimeline = [];
     this.isContinuousModeEnabled = false;
+    this.canSkipForward = false;
+    this.canSkipBackward = false;
+    this.skipListeners = new Set();
   }
 
   setState(newState) {
@@ -62,12 +65,43 @@ export class PlaybackState {
     return this.isContinuousModeEnabled;
   }
 
+  setSkipStates(canSkipForward, canSkipBackward) {
+    if (this.canSkipForward !== canSkipForward ||
+        this.canSkipBackward !== canSkipBackward) {
+      this.canSkipForward = canSkipForward;
+      this.canSkipBackward = canSkipBackward;
+      this.notifySkipStateChange();
+    }
+  }
+
+  getCanSkipForward() {
+    return this.canSkipForward;
+  }
+
+  getCanSkipBackward() {
+    return this.canSkipBackward;
+  }
+
+  subscribeToSkipState(listener) {
+    this.skipListeners.add(listener);
+    return () => this.skipListeners.delete(listener);
+  }
+
+  notifySkipStateChange() {
+    this.skipListeners.forEach(listener => listener({
+      canSkipForward: this.canSkipForward,
+      canSkipBackward: this.canSkipBackward
+    }));
+  }
+
   reset() {
     this.state = PLAYER_STATES.IDLE;
     this.playingParagraph = null;
     this.highlightedPhrase = null;
     this.phraseTimeline = [];
     this.isContinuousModeEnabled = false;
+    this.canSkipForward = false;
+    this.canSkipBackward = false;
     this.notify();
   }
 }
