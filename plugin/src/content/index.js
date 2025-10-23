@@ -63,6 +63,10 @@ class TTSContentScript {
       this.state.setContinuousMode(false);
     });
 
+    this.continuousController.onParagraphTransition(() => {
+      this.updateSkipButtonStates();
+    });
+
     // Wire up progress updates from audio queue to player control
     this.audioQueue.setOnProgress((currentTime, duration) => {
       this.playerControl.updateProgress(currentTime, duration);
