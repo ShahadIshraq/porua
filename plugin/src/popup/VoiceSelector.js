@@ -1,6 +1,7 @@
 import { ttsService } from '../shared/services/TTSService.js';
 import { SettingsStore } from '../shared/storage/SettingsStore.js';
 import { AudioPreview } from './AudioPreview.js';
+import { withTimeout, TimeoutError } from '../shared/utils/timeout.js';
 
 /**
  * Voice selector component with audio preview
@@ -376,12 +377,30 @@ export class VoiceSelector {
 
     // Start new playback - fetch audio with authentication via TTSService
     try {
-      const audioBlob = await ttsService.fetchVoiceSample(voiceId);
+      // Wrap fetchVoiceSample with 60 second timeout
+      const audioBlob = await withTimeout(
+        ttsService.fetchVoiceSample(voiceId),
+        60000,
+        'Sample loading timeout (60s)'
+      );
       await this.audioPreview.play(voiceId, audioBlob);
     } catch (error) {
       console.error('[VoiceSelector] Failed to fetch voice sample:', error);
       this.playbackStates[voiceId] = 'error';
-      this.statusMessage.show('Failed to load voice sample', 'error');
+
+      // Categorize error for better user feedback
+      let errorMessage = 'Failed to load voice sample';
+
+      if (error.isTimeout) {
+        errorMessage = error.message;
+      } else if (error.status === 401 || error.status === 403) {
+        errorMessage = 'Authentication failed';
+      } else if (error.message) {
+        // Include specific error details for network/HTTPS errors
+        errorMessage = `Failed to load sample: ${error.message}`;
+      }
+
+      this.statusMessage.show(errorMessage, 'error');
       this.updateVoiceItemUI(voiceId);
     }
   }

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SettingsForm } from '../../../src/popup/SettingsForm.js';
 import { SettingsStore } from '../../../src/shared/storage/SettingsStore.js';
 import { ttsService } from '../../../src/shared/services/TTSService.js';
+import { TimeoutError } from '../../../src/shared/utils/timeout.js';
 
 // Mock dependencies
 vi.mock('../../../src/shared/storage/SettingsStore.js');
@@ -537,6 +538,28 @@ describe('SettingsForm', () => {
       expect(mockConnectionStatus.textContent).toBe('Connection failed: Network error');
       expect(mockConnectionStatus.className).toContain('error');
       expect(mockConnectionIcon.src).toContain('connection-test-fail.png');
+    });
+
+    it('should show timeout error when connection times out', async () => {
+      mockApiUrlInput.value = 'http://test.com';
+      const timeoutError = new TimeoutError('Connection timeout (30s)');
+      ttsService.checkHealth.mockRejectedValue(timeoutError);
+
+      await settingsForm.testConnection();
+
+      expect(mockConnectionStatus.textContent).toBe('Connection timeout (30s)');
+      expect(mockConnectionStatus.className).toContain('error');
+      expect(mockConnectionIcon.src).toContain('connection-test-fail.png');
+    });
+
+    it('should re-enable button after timeout', async () => {
+      mockApiUrlInput.value = 'http://test.com';
+      const timeoutError = new TimeoutError('Connection timeout (30s)');
+      ttsService.checkHealth.mockRejectedValue(timeoutError);
+
+      await settingsForm.testConnection();
+
+      expect(mockTestButton.disabled).toBe(false);
     });
   });
 

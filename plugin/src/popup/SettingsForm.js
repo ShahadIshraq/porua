@@ -3,6 +3,7 @@ import { ttsService } from '../shared/services/TTSService.js';
 import { VoiceSelector } from './VoiceSelector.js';
 import { SpeedControl } from './SpeedControl.js';
 import { AudioPreview } from './AudioPreview.js';
+import { withTimeout, TimeoutError } from '../shared/utils/timeout.js';
 
 export class SettingsForm {
   constructor(formElement, statusMessage) {
@@ -195,7 +196,13 @@ export class SettingsForm {
 
       // Force refresh TTSService with new settings
       ttsService.reset();
-      const data = await ttsService.checkHealth();
+
+      // Wrap checkHealth with 30 second timeout
+      const data = await withTimeout(
+        ttsService.checkHealth(),
+        30000,
+        'Connection timeout (30s)'
+      );
 
       if (data.status === 'ok') {
         this.showConnectionStatus('Connection successful', 'success');
@@ -203,7 +210,10 @@ export class SettingsForm {
         this.showConnectionStatus('Unexpected response from server', 'error');
       }
     } catch (error) {
-      if (error.status === 401 || error.status === 403) {
+      // Handle specific error types
+      if (error.isTimeout) {
+        this.showConnectionStatus(error.message, 'error');
+      } else if (error.status === 401 || error.status === 403) {
         this.showConnectionStatus('Authentication failed', 'error');
       } else {
         this.showConnectionStatus('Connection failed: ' + error.message, 'error');

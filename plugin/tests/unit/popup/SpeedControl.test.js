@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SpeedControl } from '../../../src/popup/SpeedControl.js';
+import { TimeoutError } from '../../../src/shared/utils/timeout.js';
 
 describe('SpeedControl', () => {
   let speedControl;
@@ -570,6 +571,33 @@ describe('SpeedControl', () => {
           'Authentication failed. Check your API key.',
           'error'
         );
+      });
+
+      it('should handle timeout error', async () => {
+        speedControl.init(1.0);
+        const timeoutError = new TimeoutError('Speed test timeout (60s)');
+        mockDependencies.ttsService.synthesize.mockRejectedValue(timeoutError);
+
+        await speedControl.handleTestClick();
+
+        expect(speedControl.isTestingSpeed).toBe(false);
+        expect(mockDependencies.statusMessage.show).toHaveBeenCalledWith(
+          'Speed test timeout (60s)',
+          'error'
+        );
+      });
+
+      it('should reset button state after timeout', async () => {
+        speedControl.init(1.0);
+        const timeoutError = new TimeoutError('Speed test timeout (60s)');
+        mockDependencies.ttsService.synthesize.mockRejectedValue(timeoutError);
+
+        await speedControl.handleTestClick();
+
+        const icon = mockContainer.querySelector('.test-btn-icon');
+        const text = mockContainer.querySelector('.test-btn-text');
+        expect(icon.textContent).toBe('▶');
+        expect(text.textContent).toBe('Test Speed');
       });
     });
 
