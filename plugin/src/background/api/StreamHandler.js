@@ -14,6 +14,7 @@ import { TTSService } from '../../shared/services/TTSService.js';
 import { StreamParser } from '../../content/audio/StreamParser.js';
 import { validateMultipartResponse, extractMultipartBoundary } from '../../shared/api/ResponseHandler.js';
 import { CacheService } from '../cache/CacheService.js';
+import { SettingsStore } from '../../shared/storage/SettingsStore.js';
 
 // Lazy-initialized cache service
 let cacheService = null;
@@ -42,7 +43,12 @@ export async function handleStreamRequest(message, port) {
     // Validate payload
     validateSynthesizePayload(payload);
 
-    const { text, voice, speed } = payload;
+    // Get settings to apply defaults for voice and speed
+    const settings = await SettingsStore.get();
+
+    const text = payload.text;
+    const voice = payload.voice || settings.selectedVoiceId;
+    const speed = payload.speed !== undefined ? payload.speed : (settings.speed || 1.0);
 
     // ─────────────────────────────────────────────────────────
     // CACHE LAYER: Check cache first
