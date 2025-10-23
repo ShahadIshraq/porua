@@ -2,12 +2,16 @@ import { createElement } from '../utils/dom.js';
 import { PLAYER_STATES, Z_INDEX } from '../../shared/utils/constants.js';
 
 export class PlayerControl {
-  constructor(state, eventManager, onButtonClick) {
+  constructor(state, eventManager, onButtonClick, onSkipForward, onSkipBackward) {
     this.state = state;
     this.eventManager = eventManager;
     this.onButtonClick = onButtonClick;
+    this.onSkipForward = onSkipForward;
+    this.onSkipBackward = onSkipBackward;
     this.element = null;
     this.button = null;
+    this.skipBackwardButton = null;
+    this.skipForwardButton = null;
     this.progressRing = null;
     this.progressArc = null;
     this.circumference = 2 * Math.PI * 27; // 2πr where r=27
@@ -20,6 +24,25 @@ export class PlayerControl {
     this.lastProgressUpdate = 0;
 
     this.state.subscribe((newState) => this.updateUI(newState));
+    this.state.subscribeToSkipState((skipState) => this.updateSkipButtonStates(skipState));
+  }
+
+  createSkipButton(direction) {
+    const button = createElement('button', 'tts-skip-button');
+    button.innerHTML = direction === 'backward' ? '⏮' : '⏭';
+    button.title = direction === 'backward' ? 'Skip Backward' : 'Skip Forward';
+    button.disabled = true; // Start disabled
+
+    this.eventManager.on(button, 'click', (e) => {
+      e.stopPropagation();
+      if (direction === 'backward') {
+        this.onSkipBackward();
+      } else {
+        this.onSkipForward();
+      }
+    });
+
+    return button;
   }
 
   createProgressRing() {
@@ -63,9 +86,16 @@ export class PlayerControl {
   create() {
     const control = createElement('div', 'tts-player-control');
 
+    // Create skip backward button
+    this.skipBackwardButton = this.createSkipButton('backward');
+    control.appendChild(this.skipBackwardButton);
+
+    // Create play button container with progress ring
+    const playButtonContainer = createElement('div', 'tts-play-button-container');
+
     // Add progress ring first (behind button)
     this.progressRing = this.createProgressRing();
-    control.appendChild(this.progressRing);
+    playButtonContainer.appendChild(this.progressRing);
 
     this.button = createElement('button', 'tts-player-button');
     this.button.innerHTML = '▶';
@@ -75,21 +105,28 @@ export class PlayerControl {
       this.onButtonClick();
     });
 
-    this.eventManager.on(control, 'mousedown', (e) => this.startDrag(e));
+    playButtonContainer.appendChild(this.button);
+    control.appendChild(playButtonContainer);
 
-    control.appendChild(this.button);
+    // Create skip forward button
+    this.skipForwardButton = this.createSkipButton('forward');
+    control.appendChild(this.skipForwardButton);
+
+    this.eventManager.on(control, 'mousedown', (e) => this.startDrag(e));
 
     const viewportHeight = window.innerHeight;
     control.style.position = 'fixed';
     control.style.right = '20px';
-    control.style.top = (viewportHeight / 2 - 25) + 'px';
+    control.style.top = (viewportHeight / 2 - 61) + 'px'; // Adjusted for taller widget
     control.style.zIndex = Z_INDEX.PLAYER_CONTROL;
 
     return control;
   }
 
   startDrag(e) {
-    if (e.target.classList.contains('tts-player-button')) {
+    // Don't drag when clicking on buttons
+    if (e.target.classList.contains('tts-player-button') ||
+        e.target.classList.contains('tts-skip-button')) {
       return;
     }
 
@@ -175,6 +212,15 @@ export class PlayerControl {
     }
   }
 
+  updateSkipButtonStates(skipState) {
+    if (this.skipBackwardButton) {
+      this.skipBackwardButton.disabled = !skipState.canSkipBackward;
+    }
+    if (this.skipForwardButton) {
+      this.skipForwardButton.disabled = !skipState.canSkipForward;
+    }
+  }
+
   updateUI(state) {
     if (!this.button) return;
 
@@ -231,6 +277,8 @@ export class PlayerControl {
     }
     this.element = null;
     this.button = null;
+    this.skipBackwardButton = null;
+    this.skipForwardButton = null;
     this.progressRing = null;
     this.progressArc = null;
     this.pendingProgress = null;
