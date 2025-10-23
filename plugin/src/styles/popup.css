@@ -1121,3 +1121,65 @@ input[type="password"]:focus {
 .test-btn-text {
   letter-spacing: 0.2px;
 }
+
+/* Cache Statistics Styles */
+
+.cache-stats-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 2px solid #fce7f3;
+}
+
+.cache-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.cache-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #4a5568;
+  letter-spacing: 0.3px;
+}
+
+.cache-size {
+  font-size: 13px;
+  font-weight: 600;
+  background: linear-gradient(135deg, #ec4899 0%, #fb7185 50%, #fb923c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.btn-clear-cache {
+  width: 100%;
+  padding: 10px 18px;
+  background: white;
+  color: #ec4899;
+  border: 2px solid #fce7f3;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  letter-spacing: 0.2px;
+}
+
+.btn-clear-cache:hover:not(:disabled) {
+  background: #fef1f7;
+  border-color: #ec4899;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(236, 72, 153, 0.2);
+}
+
+.btn-clear-cache:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-clear-cache:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
