@@ -15,6 +15,7 @@ export class ContinuousPlaybackController {
 
     this.streamCompleteCallback = null;
     this.queueCompleteCallbacks = [];
+    this.paragraphTransitionCallbacks = [];
   }
 
   /**
@@ -144,6 +145,9 @@ export class ContinuousPlaybackController {
         }
       }
     }
+
+    // Notify listeners of paragraph transition
+    this.paragraphTransitionCallbacks.forEach(cb => cb());
   }
 
   /**
@@ -235,6 +239,13 @@ export class ContinuousPlaybackController {
    */
   onQueueComplete(callback) {
     this.queueCompleteCallbacks.push(callback);
+  }
+
+  /**
+   * Register callback for when transitioning to a new paragraph
+   */
+  onParagraphTransition(callback) {
+    this.paragraphTransitionCallbacks.push(callback);
   }
 
   /**
