@@ -86,6 +86,43 @@ export class AudioQueue {
     }
   }
 
+  /**
+   * Get current playback time in milliseconds (paragraph-relative)
+   * @returns {number} Current time in ms
+   */
+  getCurrentPlaybackTime() {
+    if (!this.currentAudio || !this.currentMetadata) return 0;
+
+    const startOffsetMs = this.currentMetadata.start_offset_ms || 0;
+    return startOffsetMs + (this.currentAudio.currentTime * 1000);
+  }
+
+  /**
+   * Seek to a specific time within the current audio
+   * Note: With background cache, audio is often a single combined blob,
+   * so seeking is straightforward.
+   * @param {number} targetTimeMs - Target time in milliseconds (paragraph-relative)
+   */
+  seekToTime(targetTimeMs) {
+    if (!this.currentAudio || !this.currentMetadata) {
+      return;
+    }
+
+    const startOffsetMs = this.currentMetadata.start_offset_ms || 0;
+    const offsetWithinAudio = targetTimeMs - startOffsetMs;
+    const targetSeconds = Math.max(0, offsetWithinAudio / 1000);
+
+    // Clamp to audio duration
+    if (this.currentAudio.duration > 0) {
+      this.currentAudio.currentTime = Math.min(targetSeconds, this.currentAudio.duration);
+    } else {
+      this.currentAudio.currentTime = targetSeconds;
+    }
+
+    // Update highlight immediately
+    this.highlightManager.updateHighlight(targetTimeMs);
+  }
+
   setupAudioEvents(audioUrl) {
     this.currentAudio.onended = () => {
       URL.revokeObjectURL(audioUrl);

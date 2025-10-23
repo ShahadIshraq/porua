@@ -71,11 +71,49 @@ export class ParagraphQueue {
   }
 
   /**
+   * Skip to next paragraph and return it
+   * @returns {HTMLElement|null} Next paragraph or null if at end
+   */
+  skipForward() {
+    if (!this.hasNext()) return null;
+    return this.advance();
+  }
+
+  /**
+   * Skip to previous paragraph and return it
+   * @returns {HTMLElement|null} Previous paragraph or null if at start
+   */
+  skipBackward() {
+    if (!this.hasPrevious()) return null;
+    this.currentIndex--;
+    return this.getCurrentParagraph();
+  }
+
+  /**
+   * Get previous paragraph without moving cursor
+   * @returns {HTMLElement|null}
+   */
+  getPreviousParagraph() {
+    if (this.currentIndex > 0) {
+      return this.paragraphs[this.currentIndex - 1];
+    }
+    return null;
+  }
+
+  /**
    * Check if there are more paragraphs after the current one
    * @returns {boolean}
    */
   hasNext() {
     return this.currentIndex + 1 < this.paragraphs.length;
+  }
+
+  /**
+   * Check if there's a previous paragraph
+   * @returns {boolean}
+   */
+  hasPrevious() {
+    return this.currentIndex > 0;
   }
 
   /**
