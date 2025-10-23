@@ -33,3 +33,14 @@ export const CACHE_CONFIG = {
 export const AUDIO_PROGRESS = {
   VIRTUAL_DURATION: 100
 };
+
+export const SKIP_DIRECTION = {
+  FORWARD: 'forward',
+  BACKWARD: 'backward'
+};
+
+export const SKIP_CONFIG = {
+  PHRASE_SKIP_INTERVAL_MS: 8000, // 8 seconds
+  BOUNDARY_THRESHOLD_MS: 500, // Switch to paragraph skip if within 500ms of boundary
+  DEBOUNCE_MS: 300 // Prevent rapid skip clicks
+};
