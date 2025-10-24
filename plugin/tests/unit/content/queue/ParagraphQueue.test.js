@@ -358,6 +358,217 @@ describe('ParagraphQueue', () => {
     });
   });
 
+  describe('Skip Navigation', () => {
+    describe('skipForward', () => {
+      it('should skip to next paragraph and return it', () => {
+        queue.enqueueMultiple([p1, p2, p3]);
+        queue.advance(); // at p1
+
+        const result = queue.skipForward();
+
+        expect(result).toBe(p2);
+        expect(queue.getCurrentParagraph()).toBe(p2);
+        expect(queue.getCurrentIndex()).toBe(1);
+      });
+
+      it('should return null when at end', () => {
+        queue.enqueueMultiple([p1, p2]);
+        queue.advance(); // at p1
+        queue.advance(); // at p2
+
+        const result = queue.skipForward();
+
+        expect(result).toBeNull();
+        expect(queue.getCurrentIndex()).toBe(1); // Still at p2
+      });
+
+      it('should return null when queue is empty', () => {
+        const result = queue.skipForward();
+
+        expect(result).toBeNull();
+      });
+
+      it('should skip multiple paragraphs consecutively', () => {
+        queue.enqueueMultiple([p1, p2, p3, p4]);
+        queue.advance(); // at p1
+
+        expect(queue.skipForward()).toBe(p2);
+        expect(queue.skipForward()).toBe(p3);
+        expect(queue.skipForward()).toBe(p4);
+        expect(queue.skipForward()).toBeNull();
+      });
+    });
+
+    describe('skipBackward', () => {
+      it('should skip to previous paragraph and return it', () => {
+        queue.enqueueMultiple([p1, p2, p3]);
+        queue.advance(); // at p1
+        queue.advance(); // at p2
+        queue.advance(); // at p3
+
+        const result = queue.skipBackward();
+
+        expect(result).toBe(p2);
+        expect(queue.getCurrentParagraph()).toBe(p2);
+        expect(queue.getCurrentIndex()).toBe(1);
+      });
+
+      it('should return null when at start', () => {
+        queue.enqueue(p1);
+        queue.advance(); // at p1
+
+        const result = queue.skipBackward();
+
+        expect(result).toBeNull();
+        expect(queue.getCurrentIndex()).toBe(0); // Still at p1
+      });
+
+      it('should return null when not yet advanced', () => {
+        queue.enqueue(p1);
+
+        const result = queue.skipBackward();
+
+        expect(result).toBeNull();
+      });
+
+      it('should skip multiple paragraphs consecutively', () => {
+        queue.enqueueMultiple([p1, p2, p3, p4]);
+        queue.advance(); // at p1
+        queue.advance(); // at p2
+        queue.advance(); // at p3
+        queue.advance(); // at p4
+
+        expect(queue.skipBackward()).toBe(p3);
+        expect(queue.skipBackward()).toBe(p2);
+        expect(queue.skipBackward()).toBe(p1);
+        expect(queue.skipBackward()).toBeNull();
+      });
+    });
+
+    describe('getPreviousParagraph', () => {
+      it('should return previous paragraph without moving cursor', () => {
+        queue.enqueueMultiple([p1, p2, p3]);
+        queue.advance(); // at p1
+        queue.advance(); // at p2
+
+        const result = queue.getPreviousParagraph();
+
+        expect(result).toBe(p1);
+        expect(queue.getCurrentParagraph()).toBe(p2); // Still at p2
+        expect(queue.getCurrentIndex()).toBe(1);
+      });
+
+      it('should return null when at start', () => {
+        queue.enqueue(p1);
+        queue.advance(); // at p1
+
+        const result = queue.getPreviousParagraph();
+
+        expect(result).toBeNull();
+      });
+
+      it('should return null when not yet advanced', () => {
+        queue.enqueueMultiple([p1, p2]);
+
+        const result = queue.getPreviousParagraph();
+
+        expect(result).toBeNull();
+      });
+
+      it('should not advance cursor on repeated calls', () => {
+        queue.enqueueMultiple([p1, p2, p3]);
+        queue.advance();
+        queue.advance(); // at p2
+
+        queue.getPreviousParagraph();
+        queue.getPreviousParagraph();
+        const result = queue.getPreviousParagraph();
+
+        expect(result).toBe(p1);
+        expect(queue.getCurrentIndex()).toBe(1); // Still at p2
+      });
+    });
+
+    describe('hasPrevious', () => {
+      it('should return true when there is a previous paragraph', () => {
+        queue.enqueueMultiple([p1, p2]);
+        queue.advance(); // at p1
+        queue.advance(); // at p2
+
+        expect(queue.hasPrevious()).toBe(true);
+      });
+
+      it('should return false when at start', () => {
+        queue.enqueue(p1);
+        queue.advance(); // at p1
+
+        expect(queue.hasPrevious()).toBe(false);
+      });
+
+      it('should return false when not yet advanced', () => {
+        queue.enqueueMultiple([p1, p2]);
+
+        expect(queue.hasPrevious()).toBe(false);
+      });
+
+      it('should return true after skipping forward from start', () => {
+        queue.enqueueMultiple([p1, p2, p3]);
+        queue.advance(); // at p1
+        queue.skipForward(); // at p2
+
+        expect(queue.hasPrevious()).toBe(true);
+      });
+
+      it('should return false after skipping backward to start', () => {
+        queue.enqueueMultiple([p1, p2]);
+        queue.advance(); // at p1
+        queue.advance(); // at p2
+        queue.skipBackward(); // at p1
+
+        expect(queue.hasPrevious()).toBe(false);
+      });
+    });
+
+    describe('skip integration', () => {
+      it('should support bidirectional navigation', () => {
+        queue.enqueueMultiple([p1, p2, p3]);
+        queue.advance(); // at p1
+
+        // Skip forward
+        expect(queue.skipForward()).toBe(p2);
+        expect(queue.skipForward()).toBe(p3);
+
+        // Skip backward
+        expect(queue.skipBackward()).toBe(p2);
+        expect(queue.skipBackward()).toBe(p1);
+
+        // Can't skip backward from start
+        expect(queue.skipBackward()).toBeNull();
+      });
+
+      it('should maintain correct state during skip operations', () => {
+        queue.enqueueMultiple([p1, p2, p3, p4]);
+        queue.advance(); // at p1
+
+        queue.skipForward(); // at p2
+        expect(queue.hasNext()).toBe(true);
+        expect(queue.hasPrevious()).toBe(true);
+
+        queue.skipForward(); // at p3
+        expect(queue.hasNext()).toBe(true);
+        expect(queue.hasPrevious()).toBe(true);
+
+        queue.skipBackward(); // at p2
+        expect(queue.hasNext()).toBe(true);
+        expect(queue.hasPrevious()).toBe(true);
+
+        queue.skipBackward(); // at p1
+        expect(queue.hasNext()).toBe(true);
+        expect(queue.hasPrevious()).toBe(false);
+      });
+    });
+  });
+
   describe('integration scenarios', () => {
     it('should handle complete playback cycle', () => {
       // Setup
