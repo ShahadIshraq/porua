@@ -484,6 +484,193 @@ describe('AudioQueue', () => {
     });
   });
 
+  describe('setOnProgress', () => {
+    it('should set progress callback', () => {
+      const callback = vi.fn();
+
+      audioQueue.setOnProgress(callback);
+
+      expect(audioQueue.onProgressCallback).toBe(callback);
+    });
+
+    it('should allow updating callback', () => {
+      const callback1 = vi.fn();
+      const callback2 = vi.fn();
+
+      audioQueue.setOnProgress(callback1);
+      audioQueue.setOnProgress(callback2);
+
+      expect(audioQueue.onProgressCallback).toBe(callback2);
+    });
+  });
+
+  describe('skip functionality', () => {
+    describe('getCurrentPlaybackTime', () => {
+      it('should return current playback time in milliseconds', async () => {
+        const startOffset = 1000;
+        audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: startOffset });
+        await audioQueue.play();
+
+        mockAudio.currentTime = 2.5; // 2.5 seconds
+
+        const currentTime = audioQueue.getCurrentPlaybackTime();
+
+        // Expected: startOffset + (currentTime in seconds * 1000)
+        expect(currentTime).toBe(1000 + 2500); // 3500ms
+      });
+
+      it('should return 0 when no audio is loaded', () => {
+        const currentTime = audioQueue.getCurrentPlaybackTime();
+
+        expect(currentTime).toBe(0);
+      });
+
+      it('should return 0 when no metadata is available', async () => {
+        audioQueue.enqueue(new Blob(['audio']), null);
+        await audioQueue.play();
+
+        const currentTime = audioQueue.getCurrentPlaybackTime();
+
+        expect(currentTime).toBe(0);
+      });
+
+      it('should handle zero start offset', async () => {
+        audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: 0 });
+        await audioQueue.play();
+
+        mockAudio.currentTime = 3.0;
+
+        const currentTime = audioQueue.getCurrentPlaybackTime();
+
+        expect(currentTime).toBe(3000); // 3 seconds in ms
+      });
+
+      it('should calculate time correctly at different positions', async () => {
+        const startOffset = 5000;
+        audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: startOffset });
+        await audioQueue.play();
+
+        // Test various positions
+        mockAudio.currentTime = 0;
+        expect(audioQueue.getCurrentPlaybackTime()).toBe(5000);
+
+        mockAudio.currentTime = 1.5;
+        expect(audioQueue.getCurrentPlaybackTime()).toBe(6500);
+
+        mockAudio.currentTime = 10;
+        expect(audioQueue.getCurrentPlaybackTime()).toBe(15000);
+      });
+    });
+
+    describe('seekToTime', () => {
+      it('should seek to target time within current audio', async () => {
+        const startOffset = 2000;
+        audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: startOffset });
+        await audioQueue.play();
+
+        mockAudio.duration = 10; // 10 seconds
+
+        audioQueue.seekToTime(5000); // Seek to 5000ms total
+
+        // Expected audio.currentTime = (5000 - 2000) / 1000 = 3 seconds
+        expect(mockAudio.currentTime).toBe(3);
+      });
+
+      it('should update highlight manager when seeking', async () => {
+        audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: 1000 });
+        await audioQueue.play();
+
+        mockAudio.duration = 10;
+        mockHighlightManager.updateHighlight.mockClear();
+
+        audioQueue.seekToTime(4000);
+
+        expect(mockHighlightManager.updateHighlight).toHaveBeenCalledWith(4000);
+      });
+
+      it('should clamp to duration when seeking beyond end', async () => {
+        const startOffset = 1000;
+        audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: startOffset });
+        await audioQueue.play();
+
+        mockAudio.duration = 5; // 5 seconds duration
+
+        audioQueue.seekToTime(10000); // Try to seek to 10 seconds total
+
+        // Expected: clamp to duration (5 seconds)
+        expect(mockAudio.currentTime).toBe(5);
+      });
+
+      it('should clamp to 0 when seeking before start', async () => {
+        const startOffset = 5000;
+        audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: startOffset });
+        await audioQueue.play();
+
+        mockAudio.duration = 10;
+
+        audioQueue.seekToTime(3000); // Before start offset
+
+        // Expected: clamp to 0 (max(0, 3000 - 5000) / 1000)
+        expect(mockAudio.currentTime).toBe(0);
+      });
+
+      it('should handle seeking when duration is not yet loaded', async () => {
+        audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: 1000 });
+        await audioQueue.play();
+
+        mockAudio.duration = 0; // Not loaded yet
+
+        audioQueue.seekToTime(3000);
+
+        // Should set currentTime without clamping to duration
+        expect(mockAudio.currentTime).toBe(2); // (3000 - 1000) / 1000
+      });
+
+      it('should do nothing when no audio is loaded', () => {
+        expect(() => {
+          audioQueue.seekToTime(5000);
+        }).not.toThrow();
+
+        // No audio to seek
+      });
+
+      it('should do nothing when no metadata is available', async () => {
+        audioQueue.enqueue(new Blob(['audio']), null);
+        await audioQueue.play();
+        audioQueue.currentMetadata = null;
+
+        expect(() => {
+          audioQueue.seekToTime(5000);
+        }).not.toThrow();
+      });
+
+      it('should handle seeking to exact start offset', async () => {
+        const startOffset = 2000;
+        audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: startOffset });
+        await audioQueue.play();
+
+        mockAudio.duration = 10;
+
+        audioQueue.seekToTime(2000); // Seek to exact start
+
+        expect(mockAudio.currentTime).toBe(0);
+      });
+
+      it('should handle fractional second seeks', async () => {
+        const startOffset = 1000;
+        audioQueue.enqueue(new Blob(['audio']), { start_offset_ms: startOffset });
+        await audioQueue.play();
+
+        mockAudio.duration = 10;
+
+        audioQueue.seekToTime(2500); // 2.5 seconds total
+
+        // Expected: (2500 - 1000) / 1000 = 1.5 seconds
+        expect(mockAudio.currentTime).toBe(1.5);
+      });
+    });
+  });
+
   describe('finish', () => {
     it('should set isPlaying to false', () => {
       audioQueue.isPlaying = true;

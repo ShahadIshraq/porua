@@ -476,6 +476,290 @@ describe('PlayerControl', () => {
     });
   });
 
+  describe('skip button integration', () => {
+    let mockOnSkipForward;
+    let mockOnSkipBackward;
+
+    beforeEach(() => {
+      mockOnSkipForward = vi.fn();
+      mockOnSkipBackward = vi.fn();
+
+      // Recreate playerControl with skip callbacks
+      playerControl = new PlayerControl(
+        mockState,
+        mockEventManager,
+        mockOnButtonClick,
+        mockOnSkipForward,
+        mockOnSkipBackward
+      );
+    });
+
+    describe('skip button creation', () => {
+      it('should create skip backward button', () => {
+        playerControl.create();
+
+        expect(playerControl.skipBackwardButton).not.toBeNull();
+        expect(playerControl.skipBackwardButton.className).toContain('tts-skip-button');
+        expect(playerControl.skipBackwardButton.title).toContain('Backward');
+      });
+
+      it('should create skip forward button', () => {
+        playerControl.create();
+
+        expect(playerControl.skipForwardButton).not.toBeNull();
+        expect(playerControl.skipForwardButton.className).toContain('tts-skip-button');
+        expect(playerControl.skipForwardButton.title).toContain('Forward');
+      });
+
+      it('should add skip buttons to control element', () => {
+        const control = playerControl.create();
+
+        expect(control.contains(playerControl.skipBackwardButton)).toBe(true);
+        expect(control.contains(playerControl.skipForwardButton)).toBe(true);
+      });
+
+      it('should initialize skip buttons as disabled', () => {
+        playerControl.create();
+
+        expect(playerControl.skipBackwardButton.disabled).toBe(true);
+        expect(playerControl.skipForwardButton.disabled).toBe(true);
+      });
+
+      it('should place skip backward button before play button', () => {
+        const control = playerControl.create();
+
+        const buttons = Array.from(control.querySelectorAll('button, .tts-play-button-container'));
+        const backwardIndex = buttons.findIndex(el => el === playerControl.skipBackwardButton);
+        const playIndex = buttons.findIndex(el => el.contains(playerControl.button));
+
+        expect(backwardIndex).toBeLessThan(playIndex);
+      });
+
+      it('should place skip forward button after play button', () => {
+        const control = playerControl.create();
+
+        const buttons = Array.from(control.querySelectorAll('button, .tts-play-button-container'));
+        const forwardIndex = buttons.findIndex(el => el === playerControl.skipForwardButton);
+        const playIndex = buttons.findIndex(el => el.contains(playerControl.button));
+
+        expect(forwardIndex).toBeGreaterThan(playIndex);
+      });
+    });
+
+    describe('skip button click handlers', () => {
+      beforeEach(() => {
+        playerControl.create();
+      });
+
+      it('should add click listener to skip backward button', () => {
+        const calls = mockEventManager.on.mock.calls;
+        const backwardClickCall = calls.find(
+          call => call[0] === playerControl.skipBackwardButton && call[1] === 'click'
+        );
+        expect(backwardClickCall).toBeDefined();
+      });
+
+      it('should add click listener to skip forward button', () => {
+        const calls = mockEventManager.on.mock.calls;
+        const forwardClickCall = calls.find(
+          call => call[0] === playerControl.skipForwardButton && call[1] === 'click'
+        );
+        expect(forwardClickCall).toBeDefined();
+      });
+
+      it('should call onSkipBackward when skip backward button clicked', () => {
+        const clickHandler = mockEventManager.on.mock.calls.find(
+          call => call[0] === playerControl.skipBackwardButton && call[1] === 'click'
+        )[2];
+
+        const event = { stopPropagation: vi.fn() };
+        clickHandler(event);
+
+        expect(event.stopPropagation).toHaveBeenCalled();
+        expect(mockOnSkipBackward).toHaveBeenCalled();
+      });
+
+      it('should call onSkipForward when skip forward button clicked', () => {
+        const clickHandler = mockEventManager.on.mock.calls.find(
+          call => call[0] === playerControl.skipForwardButton && call[1] === 'click'
+        )[2];
+
+        const event = { stopPropagation: vi.fn() };
+        clickHandler(event);
+
+        expect(event.stopPropagation).toHaveBeenCalled();
+        expect(mockOnSkipForward).toHaveBeenCalled();
+      });
+
+      it('should not start drag when clicking skip backward button', () => {
+        playerControl.element = document.createElement('div');
+        playerControl.element.getBoundingClientRect = vi.fn(() => ({
+          left: 100,
+          top: 200,
+          width: 50,
+          height: 122
+        }));
+
+        const event = {
+          target: playerControl.skipBackwardButton,
+          clientX: 150,
+          clientY: 250,
+          preventDefault: vi.fn()
+        };
+
+        playerControl.startDrag(event);
+
+        expect(playerControl.isDragging).toBe(false);
+      });
+
+      it('should not start drag when clicking skip forward button', () => {
+        playerControl.element = document.createElement('div');
+        playerControl.element.getBoundingClientRect = vi.fn(() => ({
+          left: 100,
+          top: 200,
+          width: 50,
+          height: 122
+        }));
+
+        const event = {
+          target: playerControl.skipForwardButton,
+          clientX: 150,
+          clientY: 250,
+          preventDefault: vi.fn()
+        };
+
+        playerControl.startDrag(event);
+
+        expect(playerControl.isDragging).toBe(false);
+      });
+    });
+
+    describe('skip state subscription', () => {
+      it('should subscribe to skip state changes on construction', () => {
+        expect(mockState.subscribeToSkipState).toHaveBeenCalled();
+      });
+
+      it('should call updateSkipButtonStates when skip state changes', () => {
+        playerControl.create();
+
+        // Get the callback that was registered (last call since playerControl was recreated)
+        const calls = mockState.subscribeToSkipState.mock.calls;
+        const callback = calls[calls.length - 1][0];
+
+        // Directly test that calling the callback updates the buttons
+        callback({ canSkipForward: true, canSkipBackward: false });
+
+        // Verify buttons were updated correctly
+        expect(playerControl.skipForwardButton.disabled).toBe(false);
+        expect(playerControl.skipBackwardButton.disabled).toBe(true);
+      });
+    });
+
+    describe('updateSkipButtonStates', () => {
+      beforeEach(() => {
+        playerControl.create();
+      });
+
+      it('should enable skip forward button when canSkipForward is true', () => {
+        playerControl.updateSkipButtonStates({
+          canSkipForward: true,
+          canSkipBackward: false
+        });
+
+        expect(playerControl.skipForwardButton.disabled).toBe(false);
+      });
+
+      it('should disable skip forward button when canSkipForward is false', () => {
+        playerControl.updateSkipButtonStates({
+          canSkipForward: false,
+          canSkipBackward: true
+        });
+
+        expect(playerControl.skipForwardButton.disabled).toBe(true);
+      });
+
+      it('should enable skip backward button when canSkipBackward is true', () => {
+        playerControl.updateSkipButtonStates({
+          canSkipForward: false,
+          canSkipBackward: true
+        });
+
+        expect(playerControl.skipBackwardButton.disabled).toBe(false);
+      });
+
+      it('should disable skip backward button when canSkipBackward is false', () => {
+        playerControl.updateSkipButtonStates({
+          canSkipForward: true,
+          canSkipBackward: false
+        });
+
+        expect(playerControl.skipBackwardButton.disabled).toBe(true);
+      });
+
+      it('should enable both buttons when both can skip', () => {
+        playerControl.updateSkipButtonStates({
+          canSkipForward: true,
+          canSkipBackward: true
+        });
+
+        expect(playerControl.skipForwardButton.disabled).toBe(false);
+        expect(playerControl.skipBackwardButton.disabled).toBe(false);
+      });
+
+      it('should disable both buttons when neither can skip', () => {
+        playerControl.updateSkipButtonStates({
+          canSkipForward: false,
+          canSkipBackward: false
+        });
+
+        expect(playerControl.skipForwardButton.disabled).toBe(true);
+        expect(playerControl.skipBackwardButton.disabled).toBe(true);
+      });
+
+      it('should not throw if skip buttons do not exist', () => {
+        playerControl.skipForwardButton = null;
+        playerControl.skipBackwardButton = null;
+
+        expect(() => {
+          playerControl.updateSkipButtonStates({
+            canSkipForward: true,
+            canSkipBackward: true
+          });
+        }).not.toThrow();
+      });
+    });
+
+    describe('skip button integration with progress', () => {
+      beforeEach(() => {
+        playerControl.create();
+      });
+
+      it('should maintain skip button states when progress updates', () => {
+        playerControl.updateSkipButtonStates({
+          canSkipForward: true,
+          canSkipBackward: false
+        });
+
+        playerControl.updateProgress(1000, 5000);
+
+        expect(playerControl.skipForwardButton.disabled).toBe(false);
+        expect(playerControl.skipBackwardButton.disabled).toBe(true);
+      });
+
+      it('should maintain skip button states when resetting progress', () => {
+        playerControl.updateSkipButtonStates({
+          canSkipForward: false,
+          canSkipBackward: true
+        });
+
+        playerControl.resetProgress();
+
+        expect(playerControl.skipForwardButton.disabled).toBe(true);
+        expect(playerControl.skipBackwardButton.disabled).toBe(false);
+      });
+    });
+  });
+
   describe('cleanup', () => {
     it('should remove element from DOM', () => {
       playerControl.element = document.createElement('div');

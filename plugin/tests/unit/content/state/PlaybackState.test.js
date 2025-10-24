@@ -233,6 +233,194 @@ describe('PlaybackState', () => {
     });
   });
 
+  describe('skip state management', () => {
+    describe('initial state', () => {
+      it('should initialize with skip states as false', () => {
+        expect(playbackState.getCanSkipForward()).toBe(false);
+        expect(playbackState.getCanSkipBackward()).toBe(false);
+      });
+
+      it('should initialize with empty skip listeners set', () => {
+        expect(playbackState.skipListeners.size).toBe(0);
+      });
+    });
+
+    describe('setSkipStates', () => {
+      it('should update skip states', () => {
+        playbackState.setSkipStates(true, false);
+
+        expect(playbackState.getCanSkipForward()).toBe(true);
+        expect(playbackState.getCanSkipBackward()).toBe(false);
+      });
+
+      it('should update both skip states', () => {
+        playbackState.setSkipStates(true, true);
+
+        expect(playbackState.getCanSkipForward()).toBe(true);
+        expect(playbackState.getCanSkipBackward()).toBe(true);
+      });
+
+      it('should notify listeners when skip states change', () => {
+        const listener = vi.fn();
+        playbackState.subscribeToSkipState(listener);
+
+        playbackState.setSkipStates(true, false);
+
+        expect(listener).toHaveBeenCalledWith({
+          canSkipForward: true,
+          canSkipBackward: false
+        });
+        expect(listener).toHaveBeenCalledTimes(1);
+      });
+
+      it('should not notify listeners if skip states unchanged', () => {
+        const listener = vi.fn();
+        playbackState.subscribeToSkipState(listener);
+
+        playbackState.setSkipStates(false, false);
+
+        expect(listener).not.toHaveBeenCalled();
+      });
+
+      it('should notify only when forward state changes', () => {
+        const listener = vi.fn();
+        playbackState.setSkipStates(false, false);
+        playbackState.subscribeToSkipState(listener);
+
+        playbackState.setSkipStates(true, false);
+
+        expect(listener).toHaveBeenCalledWith({
+          canSkipForward: true,
+          canSkipBackward: false
+        });
+      });
+
+      it('should notify only when backward state changes', () => {
+        const listener = vi.fn();
+        playbackState.setSkipStates(false, false);
+        playbackState.subscribeToSkipState(listener);
+
+        playbackState.setSkipStates(false, true);
+
+        expect(listener).toHaveBeenCalledWith({
+          canSkipForward: false,
+          canSkipBackward: true
+        });
+      });
+    });
+
+    describe('subscribeToSkipState', () => {
+      it('should return unsubscribe function', () => {
+        const listener = vi.fn();
+        const unsubscribe = playbackState.subscribeToSkipState(listener);
+
+        expect(typeof unsubscribe).toBe('function');
+      });
+
+      it('should add listener to skip listeners set', () => {
+        const listener = vi.fn();
+        playbackState.subscribeToSkipState(listener);
+
+        expect(playbackState.skipListeners.size).toBe(1);
+      });
+
+      it('should support multiple subscribers', () => {
+        const listener1 = vi.fn();
+        const listener2 = vi.fn();
+        const listener3 = vi.fn();
+
+        playbackState.subscribeToSkipState(listener1);
+        playbackState.subscribeToSkipState(listener2);
+        playbackState.subscribeToSkipState(listener3);
+
+        playbackState.setSkipStates(true, true);
+
+        expect(listener1).toHaveBeenCalledWith({
+          canSkipForward: true,
+          canSkipBackward: true
+        });
+        expect(listener2).toHaveBeenCalledWith({
+          canSkipForward: true,
+          canSkipBackward: true
+        });
+        expect(listener3).toHaveBeenCalledWith({
+          canSkipForward: true,
+          canSkipBackward: true
+        });
+      });
+
+      it('should notify all subscribers when skip states change', () => {
+        const listener1 = vi.fn();
+        const listener2 = vi.fn();
+
+        playbackState.subscribeToSkipState(listener1);
+        playbackState.subscribeToSkipState(listener2);
+
+        playbackState.setSkipStates(true, false);
+
+        expect(listener1).toHaveBeenCalledTimes(1);
+        expect(listener2).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe('unsubscribe from skip state', () => {
+      it('should remove listener when unsubscribe is called', () => {
+        const listener = vi.fn();
+        const unsubscribe = playbackState.subscribeToSkipState(listener);
+
+        unsubscribe();
+
+        playbackState.setSkipStates(true, true);
+
+        expect(listener).not.toHaveBeenCalled();
+        expect(playbackState.skipListeners.size).toBe(0);
+      });
+
+      it('should only remove specific listener', () => {
+        const listener1 = vi.fn();
+        const listener2 = vi.fn();
+
+        const unsubscribe1 = playbackState.subscribeToSkipState(listener1);
+        playbackState.subscribeToSkipState(listener2);
+
+        unsubscribe1();
+
+        playbackState.setSkipStates(true, false);
+
+        expect(listener1).not.toHaveBeenCalled();
+        expect(listener2).toHaveBeenCalledWith({
+          canSkipForward: true,
+          canSkipBackward: false
+        });
+      });
+    });
+
+    describe('integration with reset', () => {
+      it('should reset skip states to false', () => {
+        playbackState.setSkipStates(true, true);
+
+        playbackState.reset();
+
+        expect(playbackState.getCanSkipForward()).toBe(false);
+        expect(playbackState.getCanSkipBackward()).toBe(false);
+      });
+
+      it('should notify skip listeners when reset clears skip states', () => {
+        const skipListener = vi.fn();
+        playbackState.setSkipStates(true, true);
+        playbackState.subscribeToSkipState(skipListener);
+        skipListener.mockClear();
+
+        playbackState.reset();
+
+        expect(skipListener).toHaveBeenCalledWith({
+          canSkipForward: false,
+          canSkipBackward: false
+        });
+      });
+    });
+  });
+
   describe('reset', () => {
     it('should clear all state', () => {
       const paragraph = document.createElement('p');

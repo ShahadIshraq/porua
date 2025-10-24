@@ -100,8 +100,16 @@ export class PlaybackState {
     this.highlightedPhrase = null;
     this.phraseTimeline = [];
     this.isContinuousModeEnabled = false;
+
+    // Reset skip states and notify if they were set
+    const skipStatesChanged = this.canSkipForward || this.canSkipBackward;
     this.canSkipForward = false;
     this.canSkipBackward = false;
+
     this.notify();
+
+    if (skipStatesChanged) {
+      this.notifySkipStateChange();
+    }
   }
 }
