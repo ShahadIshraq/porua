@@ -21,6 +21,11 @@ export class SettingsForm {
     this.isApiKeyModified = false;
     this.hasStoredKey = false;
 
+    // Advanced settings visibility
+    this.showAdvancedSettings = false;
+    this.advancedSettingsSection = formElement.querySelector('#advanced-settings-section');
+    this.cacheStatsWrapper = document.querySelector('#cache-stats-container');
+
     // Dirty state tracking
     this.originalValues = {
       apiUrl: '',
@@ -126,6 +131,10 @@ export class SettingsForm {
       this.changeButton.style.display = 'none';
     }
 
+    // Determine if advanced settings should be shown
+    this.showAdvancedSettings = this.shouldShowAdvancedSettings(settings.isConfigured);
+    this.updateAdvancedSettingsVisibility();
+
     // Initialize speed control with saved speed
     this.speedControl.init(settings.speed);
   }
@@ -138,7 +147,7 @@ export class SettingsForm {
     const speed = this.speedControl.getSpeed();
 
     try {
-      await SettingsStore.set({ apiUrl, speed });
+      await SettingsStore.set({ apiUrl, speed, isConfigured: true });
 
       if (this.isApiKeyModified || apiKey) {
         await SettingsStore.set({ apiKey });
@@ -150,6 +159,13 @@ export class SettingsForm {
         this.hasStoredKey = true;
         this.toggleButton.style.display = 'none';
         this.changeButton.style.display = 'block';
+      }
+
+      // Update advanced settings visibility after save
+      const previousState = this.showAdvancedSettings;
+      this.showAdvancedSettings = this.shouldShowAdvancedSettings(true);
+      if (previousState !== this.showAdvancedSettings) {
+        this.updateAdvancedSettingsVisibility();
       }
 
       // Update original values after successful save
@@ -377,6 +393,38 @@ export class SettingsForm {
     this.updateDirtyUI();
 
     this.statusMessage.show('Changes discarded', 'info');
+  }
+
+  /**
+   * Determine if advanced settings should be shown
+   * @param {boolean} isConfigured - Whether user has saved settings before
+   * @returns {boolean}
+   */
+  shouldShowAdvancedSettings(isConfigured) {
+    return isConfigured;
+  }
+
+  /**
+   * Update visibility of advanced settings sections
+   */
+  updateAdvancedSettingsVisibility() {
+    const hidden = !this.showAdvancedSettings;
+
+    if (this.advancedSettingsSection) {
+      if (hidden) {
+        this.advancedSettingsSection.classList.add('hidden');
+      } else {
+        this.advancedSettingsSection.classList.remove('hidden');
+      }
+    }
+
+    if (this.cacheStatsWrapper) {
+      if (hidden) {
+        this.cacheStatsWrapper.classList.add('hidden');
+      } else {
+        this.cacheStatsWrapper.classList.remove('hidden');
+      }
+    }
   }
 
   cleanup() {
