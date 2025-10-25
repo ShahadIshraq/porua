@@ -222,13 +222,16 @@ export class SettingsForm {
       if (data.status === 'ok') {
         this.showConnectionStatus('Connection successful', 'success');
         this.connectionTestPassed = true;
+        this.updateFirstUseHelpVisibility(); // Hide help text after successful test
         this.checkDirty(); // Update dirty UI to enable save button if needed
       } else {
         this.showConnectionStatus('Unexpected response from server', 'error');
         this.connectionTestPassed = false;
+        this.updateFirstUseHelpVisibility(); // Update help text visibility
       }
     } catch (error) {
       this.connectionTestPassed = false;
+      this.updateFirstUseHelpVisibility(); // Update help text visibility
       if (error.status === 401 || error.status === 403) {
         this.showConnectionStatus('Authentication failed', 'error');
       } else {
@@ -344,11 +347,23 @@ export class SettingsForm {
    * Update UI based on dirty state
    */
   updateDirtyUI() {
-    if (this.isDirty) {
-      // For first-time users, require connection test before allowing save
-      const canSave = this.showAdvancedSettings || this.connectionTestPassed;
-
+    // On first use, enable save based solely on connection test
+    if (!this.showAdvancedSettings) {
+      const canSave = this.connectionTestPassed;
       this.saveButton.disabled = !canSave;
+      this.saveButton.classList.remove('has-changes');
+      this.saveButton.textContent = 'Save Settings';
+
+      // No reset button on first use
+      if (this.resetButton) {
+        this.resetButton.hidden = true;
+      }
+      return;
+    }
+
+    // Normal case: require dirty state
+    if (this.isDirty) {
+      this.saveButton.disabled = false;
       this.saveButton.classList.add('has-changes');
       this.saveButton.innerHTML = 'Save Changes <span class="changes-indicator">●</span>';
 
@@ -444,12 +459,11 @@ export class SettingsForm {
    */
   updateFirstUseHelpVisibility() {
     if (this.firstUseHelp) {
-      if (this.showAdvancedSettings) {
-        // Already configured, hide help text
-        this.firstUseHelp.classList.add('hidden');
-      } else {
-        // First use, show help text
+      // Show help only when: not configured AND connection not tested
+      if (!this.showAdvancedSettings && !this.connectionTestPassed) {
         this.firstUseHelp.classList.remove('hidden');
+      } else {
+        this.firstUseHelp.classList.add('hidden');
       }
     }
   }
