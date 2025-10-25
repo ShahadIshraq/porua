@@ -64,18 +64,9 @@ export async function handleStreamRequest(message, port) {
         // ═════════════════════════════════════════════════════
         console.log(`[Cache] HIT - ${voice} ${speed} ${text.substring(0, 50)}...`);
 
-        // Combine all audio chunks into one blob
-        const combinedAudioBlob = new Blob(cached.audioBlobs, {
-          type: cached.audioBlobs[0]?.type || 'audio/wav',
-        });
-
-        // Aggregate metadata (single chunk)
-        const aggregatedMetadata = {
-          chunk_index: 0,
-          phrases: cached.metadataArray.flatMap((m) => m.phrases),
-          start_offset_ms: 0,
-          duration_ms: cached.metadataArray.reduce((sum, m) => sum + m.duration_ms, 0),
-        };
+        // Cache stores single combined blob and metadata
+        const combinedAudioBlob = cached.audioBlobs[0];
+        const combinedMetadata = cached.metadataArray[0];
 
         // Send as single-chunk stream
         port.postMessage({
@@ -86,11 +77,11 @@ export async function handleStreamRequest(message, port) {
           },
         });
 
-        // Send aggregated metadata
+        // Send combined metadata
         port.postMessage({
           type: 'STREAM_METADATA',
           data: {
-            metadata: aggregatedMetadata,
+            metadata: combinedMetadata,
           },
         });
 
@@ -147,20 +138,20 @@ export async function handleStreamRequest(message, port) {
     const sortedParts = sortChunksByIndex(parts);
 
     // Separate audio and metadata parts
-    const audioBlobs = [];
+    const audioDataChunks = [];
     const metadataArray = [];
 
     for (const part of sortedParts) {
       if (part.type === 'metadata') {
         metadataArray.push(part.metadata);
       } else if (part.type === 'audio') {
-        const audioBlob = new Blob([part.audioData], { type: 'audio/wav' });
-        audioBlobs.push(audioBlob);
+        // Store raw audioData (Uint8Array) for concatenation
+        audioDataChunks.push(part.audioData);
       }
     }
 
     // Concatenate all audio chunks into single blob
-    const combinedAudioBlob = new Blob(audioBlobs, { type: 'audio/wav' });
+    const combinedAudioBlob = new Blob(audioDataChunks, { type: 'audio/wav' });
 
     // Build combined metadata with all phrases
     const combinedMetadata = {
