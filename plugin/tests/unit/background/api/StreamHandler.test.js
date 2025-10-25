@@ -378,6 +378,229 @@ describe('StreamHandler', () => {
         type: 'STREAM_COMPLETE',
       });
     });
+
+    it('should handle out-of-order chunks and fix phrase timings', async () => {
+      mockCache.get.mockResolvedValue(null);
+
+      const mockResponse = {
+        headers: {
+          get: vi.fn((key) => {
+            if (key === 'Content-Type') return 'multipart/mixed; boundary=boundary';
+            return null;
+          }),
+        },
+        body: {
+          getReader: vi.fn(() => ({ read: vi.fn().mockResolvedValue({ done: true }) })),
+        },
+      };
+
+      mockTTSService.synthesizeStream.mockResolvedValue(mockResponse);
+      extractMultipartBoundary.mockReturnValue('boundary');
+
+      // Simulate chunks arriving OUT OF ORDER: 2, 0, 1
+      const mockParts = [
+        // Chunk 2 arrives first
+        {
+          type: 'metadata',
+          metadata: {
+            chunk_index: 2,
+            phrases: [
+              { text: 'third', start_ms: 0, duration_ms: 100 }
+            ],
+            start_offset_ms: 200,
+            duration_ms: 100
+          }
+        },
+        { type: 'audio', audioData: new Uint8Array([5, 6]) },
+
+        // Chunk 0 arrives second
+        {
+          type: 'metadata',
+          metadata: {
+            chunk_index: 0,
+            phrases: [
+              { text: 'first', start_ms: 0, duration_ms: 100 }
+            ],
+            start_offset_ms: 0,
+            duration_ms: 100
+          }
+        },
+        { type: 'audio', audioData: new Uint8Array([1, 2]) },
+
+        // Chunk 1 arrives third
+        {
+          type: 'metadata',
+          metadata: {
+            chunk_index: 1,
+            phrases: [
+              { text: 'second', start_ms: 0, duration_ms: 100 }
+            ],
+            start_offset_ms: 100,
+            duration_ms: 100
+          }
+        },
+        { type: 'audio', audioData: new Uint8Array([3, 4]) },
+      ];
+
+      StreamParser.parseMultipartStream.mockResolvedValue(mockParts);
+
+      await handleStreamRequest(
+        {
+          type: 'TTS_SYNTHESIZE_STREAM',
+          payload: { text: 'Test', voice: 'v1', speed: 1.0 },
+        },
+        mockPort
+      );
+
+      // Verify combined metadata has phrases in correct order with adjusted timings
+      const metadataCall = mockPort.postMessage.mock.calls.find(
+        call => call[0].type === 'STREAM_METADATA'
+      );
+
+      expect(metadataCall[0].data.metadata.phrases).toHaveLength(3);
+
+      // First phrase should start at 0
+      expect(metadataCall[0].data.metadata.phrases[0].text).toBe('first');
+      expect(metadataCall[0].data.metadata.phrases[0].start_ms).toBe(0);
+
+      // Second phrase should start at 100 (after first chunk)
+      expect(metadataCall[0].data.metadata.phrases[1].text).toBe('second');
+      expect(metadataCall[0].data.metadata.phrases[1].start_ms).toBe(100);
+
+      // Third phrase should start at 200 (after first two chunks)
+      expect(metadataCall[0].data.metadata.phrases[2].text).toBe('third');
+      expect(metadataCall[0].data.metadata.phrases[2].start_ms).toBe(200);
+    });
+
+    it('should handle WAV files with non-standard header sizes', async () => {
+      mockCache.get.mockResolvedValue(null);
+
+      const mockResponse = {
+        headers: {
+          get: vi.fn((key) => {
+            if (key === 'Content-Type') return 'multipart/mixed; boundary=boundary';
+            return null;
+          }),
+        },
+        body: {
+          getReader: vi.fn(() => ({ read: vi.fn().mockResolvedValue({ done: true }) })),
+        },
+      };
+
+      mockTTSService.synthesizeStream.mockResolvedValue(mockResponse);
+      extractMultipartBoundary.mockReturnValue('boundary');
+
+      // Create a WAV file with 68-byte header (non-standard)
+      // RIFF header (12 bytes) + fmt chunk (24 bytes) + extra chunk (24 bytes) + data chunk header (8 bytes)
+      const wavHeader = new Uint8Array(68);
+
+      // RIFF header
+      wavHeader.set([0x52, 0x49, 0x46, 0x46], 0); // "RIFF"
+      wavHeader.set([0x00, 0x00, 0x00, 0x00], 4); // file size (will be updated)
+      wavHeader.set([0x57, 0x41, 0x56, 0x45], 8); // "WAVE"
+
+      // fmt chunk (24 bytes total: 8 header + 16 data)
+      wavHeader.set([0x66, 0x6D, 0x74, 0x20], 12); // "fmt "
+      new DataView(wavHeader.buffer).setUint32(16, 16, true); // chunk size = 16
+
+      // Extra chunk (24 bytes total: 8 header + 16 data)
+      wavHeader.set([0x65, 0x78, 0x74, 0x72], 36); // "extr"
+      new DataView(wavHeader.buffer).setUint32(40, 16, true); // chunk size = 16
+
+      // data chunk header (8 bytes)
+      wavHeader.set([0x64, 0x61, 0x74, 0x61], 60); // "data"
+      new DataView(wavHeader.buffer).setUint32(64, 4, true); // data size = 4
+
+      // PCM data (4 bytes)
+      const pcmData = new Uint8Array([0x01, 0x02, 0x03, 0x04]);
+
+      // Combine header and data
+      const chunk1 = new Uint8Array(72);
+      chunk1.set(wavHeader, 0);
+      chunk1.set(pcmData, 68);
+
+      // Second chunk with same header structure
+      const chunk2 = new Uint8Array(72);
+      chunk2.set(wavHeader, 0);
+      chunk2.set([0x05, 0x06, 0x07, 0x08], 68);
+
+      const mockParts = [
+        { type: 'metadata', metadata: { chunk_index: 0, phrases: [], start_offset_ms: 0, duration_ms: 100 } },
+        { type: 'audio', audioData: chunk1 },
+        { type: 'metadata', metadata: { chunk_index: 1, phrases: [], start_offset_ms: 100, duration_ms: 100 } },
+        { type: 'audio', audioData: chunk2 },
+      ];
+
+      StreamParser.parseMultipartStream.mockResolvedValue(mockParts);
+
+      await handleStreamRequest(
+        {
+          type: 'TTS_SYNTHESIZE_STREAM',
+          payload: { text: 'Test', voice: 'v1', speed: 1.0 },
+        },
+        mockPort
+      );
+
+      // Verify audio was properly concatenated (header from first chunk + PCM from both)
+      const audioCall = mockPort.postMessage.mock.calls.find(
+        call => call[0].type === 'STREAM_AUDIO'
+      );
+
+      // Should be: 68 bytes (header) + 4 bytes (chunk1 PCM) + 4 bytes (chunk2 PCM) = 76 bytes
+      expect(audioCall[0].data.audioData).toHaveLength(76);
+
+      // Verify header is preserved from first chunk
+      expect(audioCall[0].data.audioData.slice(0, 4)).toEqual([0x52, 0x49, 0x46, 0x46]); // "RIFF"
+
+      // Verify PCM data from both chunks is concatenated after header
+      expect(audioCall[0].data.audioData.slice(68, 72)).toEqual([0x01, 0x02, 0x03, 0x04]); // chunk1 PCM
+      expect(audioCall[0].data.audioData.slice(72, 76)).toEqual([0x05, 0x06, 0x07, 0x08]); // chunk2 PCM
+    });
+
+    it('should handle empty audio chunks gracefully', async () => {
+      mockCache.get.mockResolvedValue(null);
+
+      const mockResponse = {
+        headers: {
+          get: vi.fn((key) => {
+            if (key === 'Content-Type') return 'multipart/mixed; boundary=boundary';
+            return null;
+          }),
+        },
+        body: {
+          getReader: vi.fn(() => ({ read: vi.fn().mockResolvedValue({ done: true }) })),
+        },
+      };
+
+      mockTTSService.synthesizeStream.mockResolvedValue(mockResponse);
+      extractMultipartBoundary.mockReturnValue('boundary');
+
+      // No audio chunks
+      const mockParts = [];
+
+      StreamParser.parseMultipartStream.mockResolvedValue(mockParts);
+
+      await handleStreamRequest(
+        {
+          type: 'TTS_SYNTHESIZE_STREAM',
+          payload: { text: 'Test', voice: 'v1', speed: 1.0 },
+        },
+        mockPort
+      );
+
+      // Should send empty stream
+      expect(mockPort.postMessage).toHaveBeenCalledWith({
+        type: 'STREAM_START',
+        data: {
+          chunkCount: 0,
+          contentType: 'audio/wav',
+        },
+      });
+
+      expect(mockPort.postMessage).toHaveBeenCalledWith({
+        type: 'STREAM_COMPLETE',
+      });
+    });
   });
 
   describe('error handling', () => {

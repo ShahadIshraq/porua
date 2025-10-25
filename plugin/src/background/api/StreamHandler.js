@@ -62,7 +62,6 @@ export async function handleStreamRequest(message, port) {
         // ═════════════════════════════════════════════════════
         // CACHE HIT: Return entire audio as single chunk
         // ═════════════════════════════════════════════════════
-        console.log(`[Cache] HIT - ${voice} ${speed} ${text.substring(0, 50)}...`);
 
         // Cache stores single combined blob and metadata
         const combinedAudioBlob = cached.audioBlobs[0];
@@ -106,7 +105,6 @@ export async function handleStreamRequest(message, port) {
       }
 
       // Cache miss - continue to server request
-      console.log(`[Cache] MISS - ${voice} ${speed} ${text.substring(0, 50)}...`);
     }
 
     // ═════════════════════════════════════════════════════

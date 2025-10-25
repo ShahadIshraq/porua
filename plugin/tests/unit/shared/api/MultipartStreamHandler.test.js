@@ -386,5 +386,97 @@ describe('MultipartStreamHandler', () => {
       expect(result.phraseTimeline[1].startTime).toBe(500);
       expect(result.phraseTimeline[1].endTime).toBe(500);
     });
+
+    it('should handle single combined metadata without accumulation', async () => {
+      // Test the special case where chunk_index=0, start_offset_ms=0
+      // and phrases are already in absolute time (from background script)
+      const mockParts = [
+        {
+          type: 'metadata',
+          metadata: {
+            chunk_index: 0,
+            start_offset_ms: 0,
+            duration_ms: 5000,
+            phrases: [
+              { text: 'Hello', start_ms: 0, duration_ms: 1000 },
+              { text: 'world', start_ms: 1000, duration_ms: 1000 },
+              { text: 'test', start_ms: 2000, duration_ms: 1000 }
+            ]
+          }
+        },
+        {
+          type: 'audio',
+          audioData: new Uint8Array([1, 2, 3, 4])
+        }
+      ];
+
+      StreamParser.parseMultipartStream.mockResolvedValue(mockParts);
+
+      const mockReader = {
+        read: vi.fn()
+      };
+
+      const response = {
+        status: 200,
+        headers: new Headers({ 'Content-Type': 'multipart/form-data; boundary=test' }),
+        body: {
+          getReader: vi.fn().mockReturnValue(mockReader)
+        }
+      };
+
+      const result = await parseMultipartStream(response);
+
+      // Verify phrases use absolute times without accumulation
+      expect(result.phraseTimeline).toHaveLength(3);
+      expect(result.phraseTimeline[0]).toEqual({
+        text: 'Hello',
+        startTime: 0,
+        endTime: 1000,
+        chunkIndex: 0
+      });
+      expect(result.phraseTimeline[1]).toEqual({
+        text: 'world',
+        startTime: 1000,
+        endTime: 2000,
+        chunkIndex: 1
+      });
+      expect(result.phraseTimeline[2]).toEqual({
+        text: 'test',
+        startTime: 2000,
+        endTime: 3000,
+        chunkIndex: 2
+      });
+    });
+
+    it('should handle BackgroundTTSClient response format', async () => {
+      // Test the special case where response comes from BackgroundTTSClient
+      const audioBlob = new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'audio/wav' });
+      const metadata = {
+        chunk_index: 0,
+        start_offset_ms: 0,
+        duration_ms: 2000,
+        phrases: [
+          { text: 'Hello', start_ms: 0, duration_ms: 1000 },
+          { text: 'world', start_ms: 1000, duration_ms: 1000 }
+        ]
+      };
+
+      const response = {
+        __backgroundClientData: {
+          audioBlobs: [audioBlob],
+          metadataArray: [metadata]
+        }
+      };
+
+      const result = await parseMultipartStream(response);
+
+      expect(result.audioBlobs).toHaveLength(1);
+      expect(result.audioBlobs[0]).toBe(audioBlob);
+      expect(result.metadataArray).toHaveLength(1);
+      expect(result.metadataArray[0]).toBe(metadata);
+      expect(result.phraseTimeline).toHaveLength(2);
+      expect(result.phraseTimeline[0].startTime).toBe(0);
+      expect(result.phraseTimeline[1].startTime).toBe(1000);
+    });
   });
 });

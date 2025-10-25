@@ -14,7 +14,7 @@ export class PlayerControl {
     this.skipForwardButton = null;
     this.progressRing = null;
     this.progressArc = null;
-    this.circumference = 2 * Math.PI * 27; // 2πr where r=27
+    this.circumference = 2 * Math.PI * 24; // 2πr where r=24
     this.isDragging = false;
     this.dragOffset = { x: 0, y: 0 };
 
@@ -48,16 +48,16 @@ export class PlayerControl {
   createProgressRing() {
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('class', 'tts-progress-ring');
-    svg.setAttribute('viewBox', '0 0 60 60');
-    svg.setAttribute('width', '60');
-    svg.setAttribute('height', '60');
+    svg.setAttribute('viewBox', '0 0 54 54');
+    svg.setAttribute('width', '54');
+    svg.setAttribute('height', '54');
 
     // Background track (subtle gray circle)
     const track = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     track.setAttribute('class', 'tts-progress-track');
-    track.setAttribute('cx', '30');
-    track.setAttribute('cy', '30');
-    track.setAttribute('r', '27');
+    track.setAttribute('cx', '27');
+    track.setAttribute('cy', '27');
+    track.setAttribute('r', '24');
     track.setAttribute('fill', 'none');
     track.setAttribute('stroke', 'rgba(255, 255, 255, 0.15)');
     track.setAttribute('stroke-width', '3');
@@ -65,9 +65,9 @@ export class PlayerControl {
     // Progress arc (white circle that fills)
     const progress = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     progress.setAttribute('class', 'tts-progress-arc');
-    progress.setAttribute('cx', '30');
-    progress.setAttribute('cy', '30');
-    progress.setAttribute('r', '27');
+    progress.setAttribute('cx', '27');
+    progress.setAttribute('cy', '27');
+    progress.setAttribute('r', '24');
     progress.setAttribute('fill', 'none');
     progress.setAttribute('stroke', 'rgba(255, 255, 255, 0.95)');
     progress.setAttribute('stroke-width', '3');

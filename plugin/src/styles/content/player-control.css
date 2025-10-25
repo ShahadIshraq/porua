@@ -92,10 +92,10 @@
 /* SVG Progress Ring Container */
 .tts-progress-ring {
   position: absolute;
-  width: 60px;
-  height: 60px;
-  top: -5px;
-  left: -5px;
+  width: 54px;
+  height: 54px;
+  top: -6px;
+  left: -2px;
   pointer-events: none;
   transform: rotate(-90deg); /* Start progress from top (12 o'clock) */
 }
