@@ -102,6 +102,17 @@ describe('SettingsForm', () => {
     mockSpeedControlContainer.id = 'speed-control-container';
     mockFormElement.appendChild(mockSpeedControlContainer);
 
+    // Create advanced settings section
+    const mockAdvancedSettingsSection = document.createElement('div');
+    mockAdvancedSettingsSection.id = 'advanced-settings-section';
+    mockFormElement.appendChild(mockAdvancedSettingsSection);
+
+    // Create cache stats wrapper (in document, not in form)
+    const mockCacheStatsWrapper = document.createElement('div');
+    mockCacheStatsWrapper.id = 'cache-stats-container';
+    mockCacheStatsWrapper.classList.add('cache-stats-wrapper');
+    document.body.appendChild(mockCacheStatsWrapper);
+
     mockFormElement.querySelector = vi.fn((selector) => {
       switch (selector) {
         case '#api-url':
@@ -126,6 +137,8 @@ describe('SettingsForm', () => {
           return mockVoiceSelectorContainer;
         case '#speed-control-container':
           return mockSpeedControlContainer;
+        case '#advanced-settings-section':
+          return mockAdvancedSettingsSection;
         default:
           return null;
       }
@@ -179,6 +192,12 @@ describe('SettingsForm', () => {
     it('should initialize flags', () => {
       expect(settingsForm.isApiKeyModified).toBe(false);
       expect(settingsForm.hasStoredKey).toBe(false);
+    });
+
+    it('should initialize advanced settings visibility state', () => {
+      expect(settingsForm.showAdvancedSettings).toBe(false);
+      expect(settingsForm.advancedSettingsSection).toBeTruthy();
+      expect(settingsForm.cacheStatsWrapper).toBeTruthy();
     });
   });
 
@@ -307,12 +326,49 @@ describe('SettingsForm', () => {
       SettingsStore.get.mockResolvedValue({
         apiUrl: 'http://example.com',
         apiKey: '',
-        speed: 1.5
+        speed: 1.5,
+        isConfigured: false
       });
 
       await settingsForm.loadSettings();
 
       expect(settingsForm.speedControl.init).toHaveBeenCalledWith(1.5);
+    });
+
+    it('should check visibility when isConfigured is false', async () => {
+      SettingsStore.get.mockResolvedValue({
+        apiUrl: 'http://example.com',
+        apiKey: '',
+        speed: 1.0,
+        isConfigured: false
+      });
+
+      const shouldShowSpy = vi.spyOn(settingsForm, 'shouldShowAdvancedSettings');
+      const updateVisibilitySpy = vi.spyOn(settingsForm, 'updateAdvancedSettingsVisibility');
+
+      await settingsForm.loadSettings();
+
+      expect(shouldShowSpy).toHaveBeenCalledWith(false);
+      expect(settingsForm.showAdvancedSettings).toBe(false);
+      expect(updateVisibilitySpy).toHaveBeenCalled();
+    });
+
+    it('should check visibility when isConfigured is true', async () => {
+      SettingsStore.get.mockResolvedValue({
+        apiUrl: 'http://example.com',
+        apiKey: '',
+        speed: 1.0,
+        isConfigured: true
+      });
+
+      const shouldShowSpy = vi.spyOn(settingsForm, 'shouldShowAdvancedSettings');
+      const updateVisibilitySpy = vi.spyOn(settingsForm, 'updateAdvancedSettingsVisibility');
+
+      await settingsForm.loadSettings();
+
+      expect(shouldShowSpy).toHaveBeenCalledWith(true);
+      expect(settingsForm.showAdvancedSettings).toBe(true);
+      expect(updateVisibilitySpy).toHaveBeenCalled();
     });
   });
 
@@ -328,7 +384,7 @@ describe('SettingsForm', () => {
       expect(event.preventDefault).toHaveBeenCalled();
     });
 
-    it('should save API URL and speed', async () => {
+    it('should save API URL and speed with isConfigured flag', async () => {
       mockApiUrlInput.value = 'http://test.com';
       settingsForm.speedControl.getSpeed.mockReturnValue(1.25);
       SettingsStore.set.mockResolvedValue(undefined);
@@ -337,7 +393,8 @@ describe('SettingsForm', () => {
 
       expect(SettingsStore.set).toHaveBeenCalledWith({
         apiUrl: 'http://test.com',
-        speed: 1.25
+        speed: 1.25,
+        isConfigured: true
       });
     });
 
@@ -350,7 +407,8 @@ describe('SettingsForm', () => {
 
       expect(SettingsStore.set).toHaveBeenCalledWith({
         apiUrl: 'http://test.com',
-        speed: 1.0
+        speed: 1.0,
+        isConfigured: true
       });
     });
 
@@ -387,7 +445,8 @@ describe('SettingsForm', () => {
       expect(SettingsStore.set).toHaveBeenCalledTimes(1);
       expect(SettingsStore.set).toHaveBeenCalledWith({
         apiUrl: 'http://test.com',
-        speed: 1.0
+        speed: 1.0,
+        isConfigured: true
       });
     });
 
@@ -652,6 +711,83 @@ describe('SettingsForm', () => {
       settingsForm.handleChangeKey();
 
       expect(mockChangeButton.style.display).toBe('none');
+    });
+  });
+
+  describe('shouldShowAdvancedSettings', () => {
+    it('should return false when isConfigured is false', () => {
+      expect(settingsForm.shouldShowAdvancedSettings(false)).toBe(false);
+    });
+
+    it('should return true when isConfigured is true', () => {
+      expect(settingsForm.shouldShowAdvancedSettings(true)).toBe(true);
+    });
+  });
+
+  describe('updateAdvancedSettingsVisibility', () => {
+    it('should add hidden class when showAdvancedSettings is false', () => {
+      settingsForm.showAdvancedSettings = false;
+
+      settingsForm.updateAdvancedSettingsVisibility();
+
+      expect(settingsForm.advancedSettingsSection.classList.contains('hidden')).toBe(true);
+      expect(settingsForm.cacheStatsWrapper.classList.contains('hidden')).toBe(true);
+    });
+
+    it('should remove hidden class when showAdvancedSettings is true', () => {
+      settingsForm.showAdvancedSettings = true;
+      // Add hidden class first
+      settingsForm.advancedSettingsSection.classList.add('hidden');
+      settingsForm.cacheStatsWrapper.classList.add('hidden');
+
+      settingsForm.updateAdvancedSettingsVisibility();
+
+      expect(settingsForm.advancedSettingsSection.classList.contains('hidden')).toBe(false);
+      expect(settingsForm.cacheStatsWrapper.classList.contains('hidden')).toBe(false);
+    });
+
+    it('should handle missing advancedSettingsSection gracefully', () => {
+      settingsForm.advancedSettingsSection = null;
+      settingsForm.showAdvancedSettings = false;
+
+      expect(() => settingsForm.updateAdvancedSettingsVisibility()).not.toThrow();
+    });
+
+    it('should handle missing cacheStatsWrapper gracefully', () => {
+      settingsForm.cacheStatsWrapper = null;
+      settingsForm.showAdvancedSettings = false;
+
+      expect(() => settingsForm.updateAdvancedSettingsVisibility()).not.toThrow();
+    });
+  });
+
+  describe('handleSubmit - visibility updates', () => {
+    it('should update visibility when settings become configured', async () => {
+      mockApiUrlInput.value = 'http://test.com';
+      settingsForm.speedControl.getSpeed.mockReturnValue(1.0);
+      settingsForm.showAdvancedSettings = false;
+      SettingsStore.set.mockResolvedValue(undefined);
+
+      const updateVisibilitySpy = vi.spyOn(settingsForm, 'updateAdvancedSettingsVisibility');
+
+      await settingsForm.handleSubmit({ preventDefault: vi.fn() });
+
+      expect(settingsForm.showAdvancedSettings).toBe(true);
+      expect(updateVisibilitySpy).toHaveBeenCalled();
+    });
+
+    it('should not update visibility if already configured', async () => {
+      mockApiUrlInput.value = 'http://test.com';
+      settingsForm.speedControl.getSpeed.mockReturnValue(1.0);
+      settingsForm.showAdvancedSettings = true;
+      SettingsStore.set.mockResolvedValue(undefined);
+
+      const updateVisibilitySpy = vi.spyOn(settingsForm, 'updateAdvancedSettingsVisibility');
+
+      await settingsForm.handleSubmit({ preventDefault: vi.fn() });
+
+      expect(settingsForm.showAdvancedSettings).toBe(true);
+      expect(updateVisibilitySpy).not.toHaveBeenCalled();
     });
   });
 });

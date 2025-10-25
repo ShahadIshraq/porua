@@ -28,7 +28,8 @@ describe('SettingsStore', () => {
         apiUrl: DEFAULT_SETTINGS.apiUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
         selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
-        speed: DEFAULT_SETTINGS.speed
+        speed: DEFAULT_SETTINGS.speed,
+        isConfigured: false
       });
       chrome.storage.local.get.mockResolvedValue({
         encryptedApiKey: ''
@@ -41,6 +42,7 @@ describe('SettingsStore', () => {
       expect(settings.selectedVoiceId).toBe(DEFAULT_SETTINGS.selectedVoiceId);
       expect(settings.selectedVoiceName).toBe(DEFAULT_SETTINGS.selectedVoiceName);
       expect(settings.speed).toBe(DEFAULT_SETTINGS.speed);
+      expect(settings.isConfigured).toBe(false);
     });
 
     it('should retrieve apiUrl from sync storage', async () => {
@@ -85,12 +87,28 @@ describe('SettingsStore', () => {
       expect(settings.apiKey).toBe('');
     });
 
+    it('should retrieve isConfigured flag from sync storage', async () => {
+      chrome.storage.sync.get.mockResolvedValue({
+        apiUrl: DEFAULT_SETTINGS.apiUrl,
+        selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
+        selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
+        speed: DEFAULT_SETTINGS.speed,
+        isConfigured: true
+      });
+      chrome.storage.local.get.mockResolvedValue({ encryptedApiKey: '' });
+
+      const settings = await SettingsStore.get();
+
+      expect(settings.isConfigured).toBe(true);
+    });
+
     it('should request correct default values from sync storage', async () => {
       chrome.storage.sync.get.mockResolvedValue({
         apiUrl: DEFAULT_SETTINGS.apiUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
         selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
-        speed: DEFAULT_SETTINGS.speed
+        speed: DEFAULT_SETTINGS.speed,
+        isConfigured: false
       });
       chrome.storage.local.get.mockResolvedValue({ encryptedApiKey: '' });
 
@@ -100,7 +118,8 @@ describe('SettingsStore', () => {
         apiUrl: DEFAULT_SETTINGS.apiUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
         selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
-        speed: DEFAULT_SETTINGS.speed
+        speed: DEFAULT_SETTINGS.speed,
+        isConfigured: false
       });
     });
 
@@ -249,6 +268,42 @@ describe('SettingsStore', () => {
 
       expect(chrome.storage.sync.set).toHaveBeenCalled();
       expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    });
+
+    it('should store isConfigured flag in sync storage', async () => {
+      chrome.storage.sync.set.mockResolvedValue(undefined);
+
+      await SettingsStore.set({ isConfigured: true });
+
+      expect(chrome.storage.sync.set).toHaveBeenCalledWith({
+        isConfigured: true
+      });
+    });
+
+    it('should store isConfigured with other settings', async () => {
+      const apiUrl = 'http://test.com';
+      chrome.storage.sync.set.mockResolvedValue(undefined);
+
+      await SettingsStore.set({ apiUrl, isConfigured: true });
+
+      expect(chrome.storage.sync.set).toHaveBeenCalledWith({
+        apiUrl,
+        isConfigured: true
+      });
+    });
+
+    it('should not store isConfigured when undefined', async () => {
+      const apiUrl = 'http://test.com';
+      chrome.storage.sync.set.mockResolvedValue(undefined);
+
+      await SettingsStore.set({ apiUrl });
+
+      expect(chrome.storage.sync.set).toHaveBeenCalledWith({
+        apiUrl
+      });
+      expect(chrome.storage.sync.set).not.toHaveBeenCalledWith(
+        expect.objectContaining({ isConfigured: expect.anything() })
+      );
     });
   });
 
@@ -475,14 +530,15 @@ describe('SettingsStore', () => {
       chrome.storage.local.set.mockResolvedValue(undefined);
       Encryption.encrypt.mockResolvedValue(encryptedTestKey);
 
-      await SettingsStore.set({ apiUrl: testUrl, apiKey: testKey });
+      await SettingsStore.set({ apiUrl: testUrl, apiKey: testKey, isConfigured: true });
 
       // Mock get
       chrome.storage.sync.get.mockResolvedValue({
         apiUrl: testUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
         selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
-        speed: DEFAULT_SETTINGS.speed
+        speed: DEFAULT_SETTINGS.speed,
+        isConfigured: true
       });
       chrome.storage.local.get.mockResolvedValue({
         encryptedApiKey: encryptedTestKey
@@ -493,6 +549,7 @@ describe('SettingsStore', () => {
 
       expect(settings.apiUrl).toBe(testUrl);
       expect(settings.apiKey).toBe(testKey);
+      expect(settings.isConfigured).toBe(true);
     });
 
     it('should handle clearing API key', async () => {
@@ -515,7 +572,8 @@ describe('SettingsStore', () => {
         apiUrl: DEFAULT_SETTINGS.apiUrl,
         selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
         selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
-        speed: DEFAULT_SETTINGS.speed
+        speed: DEFAULT_SETTINGS.speed,
+        isConfigured: false
       });
       chrome.storage.local.get.mockResolvedValue({ encryptedApiKey: '' });
 
@@ -542,7 +600,8 @@ describe('SettingsStore', () => {
         apiKey: testKey,
         selectedVoiceId: voiceId,
         selectedVoiceName: voiceName,
-        speed: testSpeed
+        speed: testSpeed,
+        isConfigured: true
       });
 
       // Retrieve everything
@@ -550,7 +609,8 @@ describe('SettingsStore', () => {
         apiUrl: testUrl,
         selectedVoiceId: voiceId,
         selectedVoiceName: voiceName,
-        speed: testSpeed
+        speed: testSpeed,
+        isConfigured: true
       });
       chrome.storage.local.get.mockResolvedValue({
         encryptedApiKey: encryptedTestKey
@@ -564,6 +624,7 @@ describe('SettingsStore', () => {
       expect(settings.selectedVoiceId).toBe(voiceId);
       expect(settings.selectedVoiceName).toBe(voiceName);
       expect(settings.speed).toBe(testSpeed);
+      expect(settings.isConfigured).toBe(true);
     });
   });
 });
