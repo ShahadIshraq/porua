@@ -164,14 +164,16 @@ pub async fn generate_tts_stream(state: AppState, req: TTSRequest) -> Result<Res
             temp_offset += (chunk_text.len() as f64) * 80.0;
         }
 
-        // Spawn ALL chunks in parallel
+        // Spawn ALL chunks in parallel and collect their join handles
+        let mut handles = Vec::new();
+
         for (chunk_index, chunk_text, start_offset) in chunk_offsets {
             let state = state_clone.clone();
             let voice = voice_clone.clone();
             let tx_clone = tx.clone();
 
             // Each chunk sends itself as soon as ready
-            tokio::spawn(async move {
+            let handle = tokio::spawn(async move {
                 match generate_chunk_with_metadata(
                     &state,
                     &chunk_text,
@@ -203,12 +205,14 @@ pub async fn generate_tts_stream(state: AppState, req: TTSRequest) -> Result<Res
                     }
                 }
             });
+
+            handles.push(handle);
         }
 
-        // Wait for all chunks to finish (rough estimate based on chunk count and pool size)
-        // Assume ~200ms per chunk with 2 engines in pool
-        let estimated_total_ms = (chunks.len() as u64 * 200) / 2 + 500; // +500ms buffer
-        tokio::time::sleep(tokio::time::Duration::from_millis(estimated_total_ms)).await;
+        // Wait for ALL spawned chunks to actually complete
+        for handle in handles {
+            let _ = handle.await;
+        }
 
         // Send final boundary
         let _ = tx.send(Ok(Bytes::from(create_boundary_end()))).await;
