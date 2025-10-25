@@ -38,6 +38,52 @@ vi.mock('../../../../src/shared/storage/SettingsStore.js', () => ({
   },
 }));
 
+// Mock Blob with arrayBuffer() method for tests
+global.Blob = class Blob {
+  constructor(parts, options) {
+    this.parts = parts || [];
+    this.type = options?.type || '';
+  }
+
+  async arrayBuffer() {
+    // Concatenate all parts into a single ArrayBuffer
+    // Handle both Uint8Array and ArrayBuffer parts
+    let totalLength = 0;
+    const normalizedParts = [];
+
+    for (const part of this.parts) {
+      if (part instanceof Uint8Array) {
+        normalizedParts.push(part);
+        totalLength += part.length;
+      } else if (part instanceof ArrayBuffer) {
+        const uint8 = new Uint8Array(part);
+        normalizedParts.push(uint8);
+        totalLength += uint8.length;
+      } else if (part instanceof Blob) {
+        // Handle nested Blob
+        const buffer = await part.arrayBuffer();
+        const uint8 = new Uint8Array(buffer);
+        normalizedParts.push(uint8);
+        totalLength += uint8.length;
+      } else if (typeof part === 'object' && part.buffer) {
+        // Handle TypedArray-like objects
+        const uint8 = new Uint8Array(part.buffer, part.byteOffset, part.byteLength);
+        normalizedParts.push(uint8);
+        totalLength += uint8.length;
+      }
+    }
+
+    const buffer = new ArrayBuffer(totalLength);
+    const view = new Uint8Array(buffer);
+    let offset = 0;
+    for (const part of normalizedParts) {
+      view.set(part, offset);
+      offset += part.length;
+    }
+    return buffer;
+  }
+};
+
 describe('StreamHandler', () => {
   let mockPort;
   let mockCache;
@@ -226,22 +272,29 @@ describe('StreamHandler', () => {
       expect(validateMultipartResponse).toHaveBeenCalledWith(mockResponse);
       expect(extractMultipartBoundary).toHaveBeenCalledWith(mockResponse);
 
-      // Verify parts were processed
+      // Verify parts were processed and combined
       expect(mockPort.postMessage).toHaveBeenCalledWith({
         type: 'STREAM_START',
         data: {
-          chunkCount: 1, // 1 audio part
-          contentType: 'multipart/mixed; boundary=test-boundary',
+          chunkCount: 1, // Combined into single chunk
+          contentType: 'audio/wav',
         },
       });
 
+      // Should send combined metadata (not individual chunk metadata)
       expect(mockPort.postMessage).toHaveBeenCalledWith({
         type: 'STREAM_METADATA',
         data: {
-          metadata: mockParts[0].metadata,
+          metadata: {
+            chunk_index: 0,
+            phrases: [{ text: 'Hello', start_ms: 0, duration_ms: 500 }],
+            start_offset_ms: 0,
+            duration_ms: 500,
+          },
         },
       });
 
+      // Should send combined audio
       expect(mockPort.postMessage).toHaveBeenCalledWith({
         type: 'STREAM_AUDIO',
         data: {
@@ -290,22 +343,40 @@ describe('StreamHandler', () => {
         mockPort
       );
 
-      // Verify 2 audio chunks reported
+      // Verify chunks combined into single chunk
       expect(mockPort.postMessage).toHaveBeenCalledWith({
         type: 'STREAM_START',
         data: {
-          chunkCount: 2,
-          contentType: 'multipart/mixed; boundary=boundary',
+          chunkCount: 1, // Chunks combined into one
+          contentType: 'audio/wav',
         },
       });
 
-      // Verify both metadata and audio sent
-      expect(mockPort.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'STREAM_METADATA' })
-      );
-      expect(mockPort.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'STREAM_AUDIO' })
-      );
+      // Verify combined metadata sent (all phrases merged)
+      expect(mockPort.postMessage).toHaveBeenCalledWith({
+        type: 'STREAM_METADATA',
+        data: {
+          metadata: {
+            chunk_index: 0,
+            phrases: [], // Empty from both chunks
+            start_offset_ms: 0,
+            duration_ms: 200, // 100 + 100
+          },
+        },
+      });
+
+      // Verify combined audio sent (all audio concatenated)
+      expect(mockPort.postMessage).toHaveBeenCalledWith({
+        type: 'STREAM_AUDIO',
+        data: {
+          audioData: [1, 2, 3, 4], // Concatenated from [1,2] and [3,4]
+          contentType: 'audio/wav',
+        },
+      });
+
+      expect(mockPort.postMessage).toHaveBeenCalledWith({
+        type: 'STREAM_COMPLETE',
+      });
     });
   });
 

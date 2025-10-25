@@ -137,58 +137,67 @@ export async function handleStreamRequest(message, port) {
     // Extract boundary from headers
     const boundary = extractMultipartBoundary(response);
 
-    // Get content type for audio blobs
-    const contentType = response.headers.get('Content-Type') || 'multipart/mixed';
-
     // Get stream reader
     const reader = response.body.getReader();
 
     // Parse multipart stream
     const parts = await StreamParser.parseMultipartStream(reader, boundary);
 
-    // Separate audio and metadata parts for caching
+    // Sort chunks by chunk_index (server sends out of order for parallel processing)
+    const sortedParts = sortChunksByIndex(parts);
+
+    // Separate audio and metadata parts
     const audioBlobs = [];
     const metadataArray = [];
 
-    // Send stream start notification
+    for (const part of sortedParts) {
+      if (part.type === 'metadata') {
+        metadataArray.push(part.metadata);
+      } else if (part.type === 'audio') {
+        const audioBlob = new Blob([part.audioData], { type: 'audio/wav' });
+        audioBlobs.push(audioBlob);
+      }
+    }
+
+    // Concatenate all audio chunks into single blob
+    const combinedAudioBlob = new Blob(audioBlobs, { type: 'audio/wav' });
+
+    // Build combined metadata with all phrases
+    const combinedMetadata = {
+      chunk_index: 0,
+      phrases: metadataArray.flatMap((m) => m.phrases),
+      start_offset_ms: 0,
+      duration_ms: metadataArray.reduce((sum, m) => sum + m.duration_ms, 0),
+    };
+
+    // Send as single-chunk stream
     port.postMessage({
       type: 'STREAM_START',
       data: {
-        chunkCount: parts.filter((p) => p.type === 'audio').length,
-        contentType,
+        chunkCount: 1,
+        contentType: combinedAudioBlob.type,
       },
     });
 
-    // Process and send each part
-    for (const part of parts) {
-      if (part.type === 'metadata') {
-        metadataArray.push(part.metadata);
+    // Send combined metadata
+    port.postMessage({
+      type: 'STREAM_METADATA',
+      data: {
+        metadata: combinedMetadata,
+      },
+    });
 
-        // Send metadata part
-        port.postMessage({
-          type: 'STREAM_METADATA',
-          data: {
-            metadata: part.metadata,
-          },
-        });
-      } else if (part.type === 'audio') {
-        // Store as blob for caching
-        const audioBlob = new Blob([part.audioData], { type: 'audio/wav' });
-        audioBlobs.push(audioBlob);
+    // Convert Blob to Array for transfer
+    const arrayBuffer = await combinedAudioBlob.arrayBuffer();
+    const audioArray = Array.from(new Uint8Array(arrayBuffer));
 
-        // Convert Uint8Array to regular Array for transfer
-        const audioArray = Array.from(part.audioData);
-
-        // Send audio part with content type
-        port.postMessage({
-          type: 'STREAM_AUDIO',
-          data: {
-            audioData: audioArray,
-            contentType: 'audio/wav',
-          },
-        });
-      }
-    }
+    port.postMessage({
+      type: 'STREAM_AUDIO',
+      data: {
+        audioData: audioArray,
+        contentType: combinedAudioBlob.type,
+      },
+    });
 
     // Send stream complete notification
     port.postMessage({
@@ -198,14 +207,14 @@ export async function handleStreamRequest(message, port) {
     // ─────────────────────────────────────────────────────────
     // STORE IN CACHE (fire-and-forget, don't block)
     // ─────────────────────────────────────────────────────────
-    if (cache && audioBlobs.length > 0 && metadataArray.length > 0) {
-      // Build phrase timeline
-      const phraseTimeline = buildPhraseTimeline(metadataArray);
+    if (cache && combinedAudioBlob && combinedMetadata) {
+      // Build phrase timeline from combined metadata
+      const phraseTimeline = buildPhraseTimeline([combinedMetadata]);
 
       cache
         .set(text, voice, speed, {
-          audioBlobs,
-          metadataArray,
+          audioBlobs: [combinedAudioBlob],
+          metadataArray: [combinedMetadata],
           phraseTimeline,
         })
         .catch((err) => {
@@ -245,6 +254,55 @@ export async function handleStreamRequest(message, port) {
     // Close port on error
     port.disconnect();
   }
+}
+
+/**
+ * Sort multipart stream chunks by chunk_index
+ * Server sends chunks as they complete (out of order for parallel processing)
+ * We must reorder them before concatenating for playback
+ *
+ * @param {Array} parts - Array of {type: 'audio'|'metadata', ...}
+ * @returns {Array} Sorted parts in correct playback order
+ */
+function sortChunksByIndex(parts) {
+  // Pair metadata with audio chunks
+  const chunks = [];
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i].type === 'metadata') {
+      const metadata = parts[i];
+      const audio = parts[i + 1]; // Audio follows metadata
+
+      chunks.push({
+        chunkIndex: metadata.metadata.chunk_index,
+        metadata,
+        audio,
+      });
+
+      i++; // Skip audio part (already processed)
+    }
+  }
+
+  // Sort by chunk_index
+  chunks.sort((a, b) => a.chunkIndex - b.chunkIndex);
+
+  // Fix phrase timings - recalculate offsets based on sorted order
+  let cumulativeOffset = 0;
+  chunks.forEach((chunk) => {
+    const metadata = chunk.metadata.metadata;
+
+    // Update start_offset_ms
+    metadata.start_offset_ms = cumulativeOffset;
+
+    // Fix phrase timings to be relative to start of combined audio
+    metadata.phrases.forEach((phrase) => {
+      phrase.start_ms = cumulativeOffset + (phrase.start_ms - metadata.start_offset_ms);
+    });
+
+    cumulativeOffset += metadata.duration_ms;
+  });
+
+  // Flatten back to parts array
+  return chunks.flatMap((c) => [c.metadata, c.audio]);
 }
 
 /**
