@@ -17,9 +17,11 @@ export class SettingsForm {
     this.changeButton = formElement.querySelector('#change-key');
     this.saveButton = formElement.querySelector('button[type="submit"]');
     this.resetButton = formElement.querySelector('#reset-changes');
+    this.firstUseHelp = formElement.querySelector('#first-use-help');
 
     this.isApiKeyModified = false;
     this.hasStoredKey = false;
+    this.connectionTestPassed = false;
 
     // Advanced settings visibility
     this.showAdvancedSettings = false;
@@ -135,6 +137,9 @@ export class SettingsForm {
     this.showAdvancedSettings = this.shouldShowAdvancedSettings(settings.isConfigured);
     this.updateAdvancedSettingsVisibility();
 
+    // Show/hide first-use help text
+    this.updateFirstUseHelpVisibility();
+
     // Initialize speed control with saved speed
     this.speedControl.init(settings.speed);
   }
@@ -166,6 +171,7 @@ export class SettingsForm {
       this.showAdvancedSettings = this.shouldShowAdvancedSettings(true);
       if (previousState !== this.showAdvancedSettings) {
         this.updateAdvancedSettingsVisibility();
+        this.updateFirstUseHelpVisibility();
       }
 
       // Update original values after successful save
@@ -215,10 +221,14 @@ export class SettingsForm {
 
       if (data.status === 'ok') {
         this.showConnectionStatus('Connection successful', 'success');
+        this.connectionTestPassed = true;
+        this.checkDirty(); // Update dirty UI to enable save button if needed
       } else {
         this.showConnectionStatus('Unexpected response from server', 'error');
+        this.connectionTestPassed = false;
       }
     } catch (error) {
+      this.connectionTestPassed = false;
       if (error.status === 401 || error.status === 403) {
         this.showConnectionStatus('Authentication failed', 'error');
       } else {
@@ -335,8 +345,10 @@ export class SettingsForm {
    */
   updateDirtyUI() {
     if (this.isDirty) {
-      // Enable and highlight save button
-      this.saveButton.disabled = false;
+      // For first-time users, require connection test before allowing save
+      const canSave = this.showAdvancedSettings || this.connectionTestPassed;
+
+      this.saveButton.disabled = !canSave;
       this.saveButton.classList.add('has-changes');
       this.saveButton.innerHTML = 'Save Changes <span class="changes-indicator">●</span>';
 
@@ -423,6 +435,21 @@ export class SettingsForm {
         this.cacheStatsWrapper.classList.add('hidden');
       } else {
         this.cacheStatsWrapper.classList.remove('hidden');
+      }
+    }
+  }
+
+  /**
+   * Update visibility of first-use help text
+   */
+  updateFirstUseHelpVisibility() {
+    if (this.firstUseHelp) {
+      if (this.showAdvancedSettings) {
+        // Already configured, hide help text
+        this.firstUseHelp.classList.add('hidden');
+      } else {
+        // First use, show help text
+        this.firstUseHelp.classList.remove('hidden');
       }
     }
   }
