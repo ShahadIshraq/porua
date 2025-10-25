@@ -145,13 +145,82 @@ export async function handleStreamRequest(message, port) {
       if (part.type === 'metadata') {
         metadataArray.push(part.metadata);
       } else if (part.type === 'audio') {
-        // Store raw audioData (Uint8Array) for concatenation
         audioDataChunks.push(part.audioData);
       }
     }
 
-    // Concatenate all audio chunks into single blob
-    const combinedAudioBlob = new Blob(audioDataChunks, { type: 'audio/wav' });
+    // Find actual data chunk position in each WAV file
+    function findDataChunkOffset(wavBytes) {
+      // Check if this looks like a real WAV file
+      if (wavBytes.length < 44) {
+        return 0; // Too small, treat as raw audio
+      }
+
+      try {
+        // WAV format: RIFF header (12 bytes) + fmt chunk + data chunk
+        const view = new DataView(wavBytes.buffer, wavBytes.byteOffset);
+
+        let offset = 12; // Skip RIFF header
+
+        while (offset < wavBytes.length - 8) {
+          const chunkId = String.fromCharCode(
+            wavBytes[offset], wavBytes[offset+1], wavBytes[offset+2], wavBytes[offset+3]
+          );
+          const chunkSize = view.getUint32(offset + 4, true);
+
+          if (chunkId === 'data') {
+            return offset + 8; // Return position after 'data' + size (8 bytes)
+          }
+
+          offset += 8 + chunkSize;
+        }
+      } catch (e) {
+        // If parsing fails, treat as raw audio
+        return 0;
+      }
+
+      return 44; // Fallback to standard header size
+    }
+
+    // Handle empty audio chunks
+    if (audioDataChunks.length === 0) {
+      // Send empty stream
+      port.postMessage({
+        type: 'STREAM_START',
+        data: { chunkCount: 0, contentType: 'audio/wav' },
+      });
+      port.postMessage({ type: 'STREAM_COMPLETE' });
+      return;
+    }
+
+    // Extract PCM data from each chunk
+    const pcmDataChunks = audioDataChunks.map((chunk) => {
+      const dataOffset = findDataChunkOffset(chunk);
+      return chunk.slice(dataOffset);
+    });
+
+    // Use first chunk's header up to data chunk
+    const firstDataOffset = findDataChunkOffset(audioDataChunks[0]);
+
+    let combinedAudioBlob;
+    if (firstDataOffset > 0) {
+      // Has WAV header - fix it for concatenated audio
+      const headerBytes = new Uint8Array(audioDataChunks[0].slice(0, firstDataOffset));
+
+      // Calculate total PCM data size
+      const totalDataSize = pcmDataChunks.reduce((sum, chunk) => sum + chunk.length, 0);
+
+      // Update header sizes
+      const view = new DataView(headerBytes.buffer, headerBytes.byteOffset);
+      view.setUint32(4, totalDataSize + firstDataOffset - 8, true); // RIFF chunk size
+      view.setUint32(firstDataOffset - 4, totalDataSize, true); // data chunk size
+
+      // Build combined audio
+      combinedAudioBlob = new Blob([headerBytes, ...pcmDataChunks], { type: 'audio/wav' });
+    } else {
+      // No header (test data) - just concatenate
+      combinedAudioBlob = new Blob(pcmDataChunks, { type: 'audio/wav' });
+    }
 
     // Build combined metadata with all phrases
     const combinedMetadata = {
@@ -281,13 +350,14 @@ function sortChunksByIndex(parts) {
   chunks.forEach((chunk) => {
     const metadata = chunk.metadata.metadata;
 
-    // Update start_offset_ms
-    metadata.start_offset_ms = cumulativeOffset;
-
     // Fix phrase timings to be relative to start of combined audio
+    // Server sends phrase.start_ms relative to chunk (0-based within chunk)
     metadata.phrases.forEach((phrase) => {
-      phrase.start_ms = cumulativeOffset + (phrase.start_ms - metadata.start_offset_ms);
+      phrase.start_ms = cumulativeOffset + phrase.start_ms;
     });
+
+    // Update start_offset_ms to new position
+    metadata.start_offset_ms = cumulativeOffset;
 
     cumulativeOffset += metadata.duration_ms;
   });

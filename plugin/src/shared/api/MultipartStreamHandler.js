@@ -93,6 +93,32 @@ export async function parseMultipartStream(response) {
  */
 function buildPhraseTimeline(metadataArray) {
   const timeline = [];
+
+  // Check if this is a single combined metadata (from background script)
+  // Combined metadata has chunk_index: 0 and start_offset_ms: 0 with all phrases already adjusted
+  if (metadataArray.length === 1 &&
+      metadataArray[0].chunk_index === 0 &&
+      metadataArray[0].start_offset_ms === 0) {
+    // Phrases are already in absolute time, no accumulation needed
+    const metadata = metadataArray[0];
+    if (metadata.phrases && Array.isArray(metadata.phrases)) {
+      for (const phrase of metadata.phrases) {
+        const startMs = phrase.start_ms || 0;
+        const durationMs = phrase.duration_ms || 0;
+        const endMs = startMs + durationMs;
+
+        timeline.push({
+          text: phrase.text,
+          startTime: startMs,  // Already absolute, no accumulation
+          endTime: endMs,
+          chunkIndex: timeline.length
+        });
+      }
+    }
+    return timeline;
+  }
+
+  // Original logic for multiple chunks
   let accumulatedDuration = 0;
 
   for (const metadata of metadataArray) {
