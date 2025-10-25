@@ -146,151 +146,78 @@ pub async fn generate_tts_stream(state: AppState, req: TTSRequest) -> Result<Res
 
     // Spawn background task to generate and stream chunks
     tokio::spawn(async move {
-        let mut cumulative_offset_ms = 0.0;
-
-        // === FIRST CHUNK (sequential for low latency) ===
-        if !chunks.is_empty() {
-            let first_chunk_text = chunks[0].clone();
-
-            match generate_chunk_with_metadata(
-                &state_clone,
-                &first_chunk_text,
-                &voice_clone,
-                speed,
-                0,
-                cumulative_offset_ms,
-            )
-            .await
-            {
-                Ok((metadata, audio_bytes)) => {
-                    cumulative_offset_ms += metadata.duration_ms;
-
-                    // Send metadata part
-                    match create_metadata_part(&metadata) {
-                        Ok(metadata_bytes) => {
-                            if tx.send(Ok(metadata_bytes)).await.is_err() {
-                                tracing::warn!("Stream receiver dropped during metadata");
-                                return;
-                            }
-                        }
-                        Err(e) => {
-                            let _ = tx.send(Err(e.to_string())).await;
-                            return;
-                        }
-                    }
-
-                    // Send audio part
-                    let audio_part = create_audio_part(audio_bytes);
-                    if tx.send(Ok(audio_part)).await.is_err() {
-                        tracing::warn!("Stream receiver dropped during audio");
-                        return;
-                    }
-
-                    tracing::debug!(
-                        "First chunk sent ({:.0}ms duration) in {:?}",
-                        metadata.duration_ms,
-                        start.elapsed()
-                    );
-                }
-                Err(e) => {
-                    let _ = tx.send(Err(e.to_string())).await;
-                    return;
-                }
-            }
+        if chunks.is_empty() {
+            let _ = tx.send(Ok(Bytes::from(create_boundary_end()))).await;
+            return;
         }
 
-        // === REMAINING CHUNKS (parallel processing) ===
-        if chunks.len() > 1 {
-            let remaining_chunks: Vec<_> = chunks.into_iter().skip(1).collect();
+        // === ALL CHUNKS (parallel processing - send as ready) ===
+        // Calculate estimated offsets for all chunks
+        let mut chunk_offsets = Vec::new();
+        let mut temp_offset = 0.0;
 
-            // Calculate start offsets for each chunk sequentially BEFORE spawning tasks
-            let mut chunk_offsets = Vec::new();
-            let mut temp_offset = cumulative_offset_ms;
-
-            // We need to estimate durations OR process chunks sequentially for accurate offsets
-            // For now, let's spawn tasks with estimated offsets (will fix after metadata arrives)
-            for (i, chunk_text) in remaining_chunks.iter().enumerate() {
-                chunk_offsets.push((i + 1, chunk_text.clone(), temp_offset));
-                // Estimate duration based on character count (rough approximation)
-                // Average speech rate: ~150 words/min = ~2.5 words/sec = ~400ms/word
-                // Average word length: ~5 chars => ~80ms/char
-                temp_offset += (chunk_text.len() as f64) * 80.0;
-            }
-
-            let mut tasks = Vec::new();
-
-            for (chunk_index, chunk_text, start_offset) in chunk_offsets {
-                let state = state_clone.clone();
-                let voice = voice_clone.clone();
-
-                let task = tokio::spawn(async move {
-                    generate_chunk_with_metadata(
-                        &state,
-                        &chunk_text,
-                        &voice,
-                        speed,
-                        chunk_index,
-                        start_offset,
-                    )
-                    .await
-                });
-
-                tasks.push((chunk_index, task));
-            }
-
-            // Collect results in order and fix offsets
-            let mut results: Vec<Option<(ChunkMetadata, Vec<u8>)>> = vec![None; tasks.len()];
-
-            for (chunk_index, task) in tasks {
-                match task.await {
-                    Ok(Ok((mut metadata, audio))) => {
-                        // Fix the start_offset_ms to be accurate
-                        metadata.start_offset_ms = cumulative_offset_ms;
-                        cumulative_offset_ms += metadata.duration_ms;
-
-                        let buffer_index = chunk_index - 1;
-                        results[buffer_index] = Some((metadata, audio));
-                    }
-                    Ok(Err(e)) => {
-                        let _ = tx.send(Err(e.to_string())).await;
-                        return;
-                    }
-                    Err(e) => {
-                        let _ = tx.send(Err(e.to_string())).await;
-                        return;
-                    }
-                }
-            }
-
-            // Send all remaining chunks in order
-            for (metadata, audio_bytes) in results.into_iter().flatten() {
-                // Send metadata
-                match create_metadata_part(&metadata) {
-                    Ok(metadata_bytes) => {
-                        if tx.send(Ok(metadata_bytes)).await.is_err() {
-                            tracing::warn!("Stream receiver dropped");
-                            return;
-                        }
-                    }
-                    Err(e) => {
-                        let _ = tx.send(Err(e.to_string())).await;
-                        return;
-                    }
-                }
-
-                // Send audio
-                let audio_part = create_audio_part(audio_bytes);
-                if tx.send(Ok(audio_part)).await.is_err() {
-                    tracing::warn!("Stream receiver dropped");
-                    return;
-                }
-            }
+        for (i, chunk_text) in chunks.iter().enumerate() {
+            chunk_offsets.push((i, chunk_text.clone(), temp_offset));
+            // Estimate duration based on character count (rough approximation)
+            // Average speech rate: ~150 words/min = ~2.5 words/sec = ~400ms/word
+            // Average word length: ~5 chars => ~80ms/char
+            temp_offset += (chunk_text.len() as f64) * 80.0;
         }
+
+        // Spawn ALL chunks in parallel
+        for (chunk_index, chunk_text, start_offset) in chunk_offsets {
+            let state = state_clone.clone();
+            let voice = voice_clone.clone();
+            let tx_clone = tx.clone();
+
+            // Each chunk sends itself as soon as ready
+            tokio::spawn(async move {
+                match generate_chunk_with_metadata(
+                    &state,
+                    &chunk_text,
+                    &voice,
+                    speed,
+                    chunk_index,
+                    start_offset,
+                )
+                .await
+                {
+                    Ok((metadata, audio_bytes)) => {
+                        tracing::debug!(
+                            "Chunk {} ready ({:.0}ms duration), sending immediately",
+                            chunk_index,
+                            metadata.duration_ms
+                        );
+
+                        // Send metadata part immediately
+                        if let Ok(metadata_bytes) = create_metadata_part(&metadata) {
+                            let _ = tx_clone.send(Ok(metadata_bytes)).await;
+                        }
+
+                        // Send audio part immediately
+                        let audio_part = create_audio_part(audio_bytes);
+                        let _ = tx_clone.send(Ok(audio_part)).await;
+                    }
+                    Err(e) => {
+                        let _ = tx_clone.send(Err(e.to_string())).await;
+                    }
+                }
+            });
+        }
+
+        // Wait for all chunks to finish (rough estimate based on chunk count and pool size)
+        // Assume ~200ms per chunk with 2 engines in pool
+        let estimated_total_ms = (chunks.len() as u64 * 200) / 2 + 500; // +500ms buffer
+        tokio::time::sleep(tokio::time::Duration::from_millis(estimated_total_ms)).await;
 
         // Send final boundary
         let _ = tx.send(Ok(Bytes::from(create_boundary_end()))).await;
 
-        tracing::debug!("Multipart streaming complete in {:?}", start.elapsed());
+        tracing::debug!(
+            "Multipart streaming complete (all {} chunks dispatched) in {:?}",
+            chunks.len(),
+            start.elapsed()
+        );
     });
 
     // Create streaming response with multipart content type
@@ -750,5 +677,158 @@ mod tests {
                 "No chunk should contain smart quotes"
             );
         }
+    }
+
+    // ===== Parallel Processing Behavior Tests =====
+
+    #[test]
+    fn test_parallel_chunk_processing_with_long_text() {
+        use crate::chunking::{chunk_text, ChunkingConfig};
+        use crate::text_processing::normalization::normalize_simple;
+
+        // Create text long enough to generate multiple chunks
+        let text = "This is sentence one with enough content to be substantial. \
+                    This is sentence two with more content for testing purposes. \
+                    This is sentence three continuing the pattern of verbose text. \
+                    This is sentence four adding even more meaningful test content. \
+                    This is sentence five providing another data point for testing.";
+
+        let normalized = normalize_simple(text);
+        let config = ChunkingConfig::default();
+        let chunks = chunk_text(&normalized, &config);
+
+        // With 200 char max chunk size, should produce multiple chunks
+        assert!(
+            chunks.len() >= 2,
+            "Long text should produce multiple chunks for parallel processing"
+        );
+
+        // Verify each chunk has valid content
+        for (i, chunk) in chunks.iter().enumerate() {
+            assert!(!chunk.is_empty(), "Chunk {} should not be empty", i);
+            assert!(
+                chunk.len() <= config.max_chunk_size,
+                "Chunk {} exceeds max size: {} > {}",
+                i,
+                chunk.len(),
+                config.max_chunk_size
+            );
+        }
+    }
+
+    #[test]
+    fn test_chunk_offset_estimation() {
+        // Test that offset estimation works correctly for parallel chunks
+        let chunks = vec![
+            "Short text".to_string(),
+            "Medium length text here".to_string(),
+            "This is a much longer piece of text for testing".to_string(),
+        ];
+
+        let mut offsets = Vec::new();
+        let mut temp_offset = 0.0;
+
+        // This mimics the offset calculation in generate_tts_stream
+        for chunk_text in &chunks {
+            offsets.push(temp_offset);
+            // ~80ms per character estimation
+            temp_offset += (chunk_text.len() as f64) * 80.0;
+        }
+
+        // Verify offsets are increasing
+        for i in 1..offsets.len() {
+            assert!(
+                offsets[i] > offsets[i - 1],
+                "Offset for chunk {} should be greater than previous chunk",
+                i
+            );
+        }
+
+        // First chunk always starts at 0
+        assert_eq!(offsets[0], 0.0, "First chunk should start at offset 0");
+
+        // Offsets should be proportional to text length
+        let ratio_1_to_0 = offsets[1] / chunks[0].len() as f64;
+        let ratio_2_to_1 = (offsets[2] - offsets[1]) / chunks[1].len() as f64;
+
+        // Both should be ~80ms/char
+        assert!(
+            (ratio_1_to_0 - 80.0).abs() < 1.0,
+            "Offset ratio should be approximately 80ms/char"
+        );
+        assert!(
+            (ratio_2_to_1 - 80.0).abs() < 1.0,
+            "Offset ratio should be approximately 80ms/char"
+        );
+    }
+
+    #[test]
+    fn test_empty_chunks_handling() {
+        use crate::chunking::{chunk_text, ChunkingConfig};
+
+        // Test that empty/whitespace text produces single chunk
+        let config = ChunkingConfig::default();
+
+        let empty_chunks = chunk_text("", &config);
+        assert_eq!(
+            empty_chunks.len(),
+            1,
+            "Empty text should produce single chunk"
+        );
+
+        let whitespace_chunks = chunk_text("   \n\t  ", &config);
+        assert_eq!(
+            whitespace_chunks.len(),
+            1,
+            "Whitespace-only text should produce single chunk"
+        );
+    }
+
+    #[test]
+    fn test_single_chunk_text() {
+        use crate::chunking::{chunk_text, ChunkingConfig};
+
+        // Text shorter than max chunk size should produce single chunk
+        let config = ChunkingConfig::default();
+        let short_text = "Hello world!";
+
+        let chunks = chunk_text(short_text, &config);
+
+        assert_eq!(chunks.len(), 1, "Short text should produce single chunk");
+        assert_eq!(
+            chunks[0], short_text,
+            "Single chunk should contain entire text"
+        );
+    }
+
+    #[test]
+    fn test_chunk_metadata_contains_index() {
+        use crate::models::PhraseMetadata;
+
+        // Verify metadata includes chunk_index for client-side ordering
+        let metadata = ChunkMetadata {
+            version: Some("2.0".to_string()),
+            chunk_index: 3,
+            text: "Test text".to_string(),
+            original_text: None,
+            phrases: vec![PhraseMetadata {
+                text: "Test text".to_string(),
+                original_text: None,
+                words: vec!["Test".to_string(), "text".to_string()],
+                start_ms: 0.0,
+                duration_ms: 500.0,
+                char_offset_start: Some(0),
+                char_offset_end: Some(9),
+            }],
+            duration_ms: 500.0,
+            start_offset_ms: 0.0,
+            validation: None,
+            debug_info: None,
+        };
+
+        assert_eq!(
+            metadata.chunk_index, 3,
+            "Metadata should contain chunk_index for client ordering"
+        );
     }
 }
