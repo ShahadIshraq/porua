@@ -44,6 +44,7 @@ describe('SettingsForm', () => {
   let mockResetButton;
   let mockConnectionStatus;
   let mockConnectionIcon;
+  let mockFirstUseHelp;
 
   beforeEach(() => {
     // Create mock form elements
@@ -82,6 +83,10 @@ describe('SettingsForm', () => {
     mockResetButton.id = 'reset-changes';
     mockResetButton.hidden = true;
 
+    mockFirstUseHelp = document.createElement('small');
+    mockFirstUseHelp.id = 'first-use-help';
+    mockFirstUseHelp.classList.add('first-use-help', 'hidden');
+
     mockFormElement = document.createElement('form');
     mockFormElement.appendChild(mockApiUrlInput);
     mockFormElement.appendChild(mockApiKeyInput);
@@ -91,6 +96,7 @@ describe('SettingsForm', () => {
     mockFormElement.appendChild(mockChangeButton);
     mockFormElement.appendChild(mockSaveButton);
     mockFormElement.appendChild(mockResetButton);
+    mockFormElement.appendChild(mockFirstUseHelp);
 
     // Create voice selector container
     const mockVoiceSelectorContainer = document.createElement('div');
@@ -139,6 +145,8 @@ describe('SettingsForm', () => {
           return mockSpeedControlContainer;
         case '#advanced-settings-section':
           return mockAdvancedSettingsSection;
+        case '#first-use-help':
+          return mockFirstUseHelp;
         default:
           return null;
       }
@@ -198,6 +206,11 @@ describe('SettingsForm', () => {
       expect(settingsForm.showAdvancedSettings).toBe(false);
       expect(settingsForm.advancedSettingsSection).toBeTruthy();
       expect(settingsForm.cacheStatsWrapper).toBeTruthy();
+    });
+
+    it('should initialize connection test state', () => {
+      expect(settingsForm.connectionTestPassed).toBe(false);
+      expect(settingsForm.firstUseHelp).toBeTruthy();
     });
   });
 
@@ -550,6 +563,26 @@ describe('SettingsForm', () => {
       expect(mockConnectionIcon.src).toContain('connection-test-success.png');
     });
 
+    it('should set connectionTestPassed to true on successful connection', async () => {
+      mockApiUrlInput.value = 'http://test.com';
+      ttsService.checkHealth.mockResolvedValue({ status: 'ok' });
+      settingsForm.connectionTestPassed = false;
+
+      await settingsForm.testConnection();
+
+      expect(settingsForm.connectionTestPassed).toBe(true);
+    });
+
+    it('should set connectionTestPassed to false on failed connection', async () => {
+      mockApiUrlInput.value = 'http://test.com';
+      ttsService.checkHealth.mockRejectedValue(new Error('Connection failed'));
+      settingsForm.connectionTestPassed = true;
+
+      await settingsForm.testConnection();
+
+      expect(settingsForm.connectionTestPassed).toBe(false);
+    });
+
     it('should show error for unexpected response', async () => {
       mockApiUrlInput.value = 'http://test.com';
       ttsService.checkHealth.mockResolvedValue({ status: 'error' });
@@ -788,6 +821,75 @@ describe('SettingsForm', () => {
 
       expect(settingsForm.showAdvancedSettings).toBe(true);
       expect(updateVisibilitySpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('updateFirstUseHelpVisibility', () => {
+    it('should show help text when not configured', () => {
+      settingsForm.showAdvancedSettings = false;
+      mockFirstUseHelp.classList.add('hidden');
+
+      settingsForm.updateFirstUseHelpVisibility();
+
+      expect(mockFirstUseHelp.classList.contains('hidden')).toBe(false);
+    });
+
+    it('should hide help text when configured', () => {
+      settingsForm.showAdvancedSettings = true;
+      mockFirstUseHelp.classList.remove('hidden');
+
+      settingsForm.updateFirstUseHelpVisibility();
+
+      expect(mockFirstUseHelp.classList.contains('hidden')).toBe(true);
+    });
+
+    it('should handle missing firstUseHelp gracefully', () => {
+      settingsForm.firstUseHelp = null;
+      settingsForm.showAdvancedSettings = false;
+
+      expect(() => settingsForm.updateFirstUseHelpVisibility()).not.toThrow();
+    });
+  });
+
+  describe('updateDirtyUI - connection test requirement', () => {
+    it('should disable save button when not configured and connection not tested', () => {
+      settingsForm.isDirty = true;
+      settingsForm.showAdvancedSettings = false;
+      settingsForm.connectionTestPassed = false;
+
+      settingsForm.updateDirtyUI();
+
+      expect(mockSaveButton.disabled).toBe(true);
+    });
+
+    it('should enable save button when not configured but connection tested', () => {
+      settingsForm.isDirty = true;
+      settingsForm.showAdvancedSettings = false;
+      settingsForm.connectionTestPassed = true;
+
+      settingsForm.updateDirtyUI();
+
+      expect(mockSaveButton.disabled).toBe(false);
+    });
+
+    it('should enable save button when configured regardless of connection test', () => {
+      settingsForm.isDirty = true;
+      settingsForm.showAdvancedSettings = true;
+      settingsForm.connectionTestPassed = false;
+
+      settingsForm.updateDirtyUI();
+
+      expect(mockSaveButton.disabled).toBe(false);
+    });
+
+    it('should disable save button when not dirty', () => {
+      settingsForm.isDirty = false;
+      settingsForm.showAdvancedSettings = false;
+      settingsForm.connectionTestPassed = true;
+
+      settingsForm.updateDirtyUI();
+
+      expect(mockSaveButton.disabled).toBe(true);
     });
   });
 });
