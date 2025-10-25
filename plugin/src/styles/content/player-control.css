@@ -123,13 +123,9 @@
   opacity: 0;
 }
 
-/* Loading state: indeterminate spinner */
+/* Loading state: hide progress arc during loading */
 .tts-play-button-container:has(.tts-player-button.loading) .tts-progress-arc {
-  stroke: rgba(255, 255, 255, 0.9);
-  stroke-dasharray: 42.41; /* 90° arc = 25% of circumference (169.65 * 0.25) */
-  stroke-dashoffset: 0;
-  animation: progress-spin 1.2s linear infinite;
-  opacity: 1;
+  opacity: 0;
 }
 
 /* Playing state: show progress with full brightness */
@@ -204,16 +200,6 @@
 .tts-player-control:has(.tts-player-button.playing):hover {
   background: linear-gradient(135deg, #10b981, #059669);
   transform: scale(1.05);
-}
-
-/* Progress ring spinning animation for loading state */
-@keyframes progress-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* Spin animation for spinner */
