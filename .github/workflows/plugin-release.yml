@@ -56,8 +56,6 @@ jobs:
           draft: false
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           body: |
-            # Porua Browser Extension v${{ steps.version.outputs.version }}
-
             Text-to-speech reader for web pages powered by Kokoro TTS.
 
             ## 📦 What's Included

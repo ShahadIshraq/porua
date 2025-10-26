@@ -56,8 +56,6 @@ jobs:
           draft: false
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           body: |
-            # Porua TTS Server v${{ steps.version.outputs.version }}
-
             High-performance Text-to-Speech HTTP server with Kokoro TTS engine.
 
             ## 📦 What's Included
