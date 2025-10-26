@@ -13,6 +13,13 @@ https://github.com/user-attachments/assets/9b16c19b-1334-4e83-b6ef-d4c4ddf920b4
 
 ## Components
 
+### [Wrapper Application](wrapper/README.md) NEW!
+Lightweight menu bar/system tray application:
+- One-click server control (Start/Stop)
+- Automatic installation and model downloads
+- Real-time status monitoring
+- Built with Rust + Tauri (~60MB installer)
+
 ### [Browser Extension](plugin/README.md)
 Modular Chrome/Firefox extension with:
 - Paragraph-level playback with floating controls
@@ -46,11 +53,37 @@ The server automatically downloads model files from the official source during i
 
 ## Quick Start
 
+### Option A: Using the Wrapper Application (Easiest)
+
+**Coming Soon:** Pre-built installers for macOS and Windows.
+
+For now, build from source:
+
+```bash
+# 1. Build the server first
+cd server
+cargo build --release
+
+# 2. Build and run the wrapper
+cd ../wrapper
+npm install
+npm run dev
+```
+
+The wrapper will:
+- Automatically install the server and download models (~337 MB, first run only)
+- Start the server on port 3000
+- Show a menu bar icon for server control
+
+Then install the browser extension (see Option B, step 2-3).
+
+### Option B: Manual Setup
+
 **1. Start the server:**
 ```bash
 cd server
 cargo build --release
-./target/release/tts_server --server --port 3003
+./target/release/tts_server --server --port 3000
 ```
 
 **2. Build the extension:**
@@ -66,13 +99,19 @@ npm run build
 
 **4. Configure:**
 - Click the extension icon
-- Enter server URL: `http://localhost:3003`
+- Enter server URL: `http://localhost:3000`
 - Select a voice and save
 
 ## Architecture
 
 ```
 porua/
+├── wrapper/         # Desktop wrapper app (Tauri + Rust)
+│   ├── src/         # Minimal frontend (HTML)
+│   ├── src-tauri/   # Rust backend
+│   │   ├── src/     # System tray, installer, server manager
+│   │   └── build.rs # Bundles server binary + resources
+│   └── README.md    # Wrapper documentation
 ├── plugin/          # Browser extension (ES modules + esbuild)
 │   ├── src/         # Modular source code
 │   ├── dist/        # Bundled output

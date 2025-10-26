@@ -1,0 +1,94 @@
+use std::path::PathBuf;
+
+fn main() {
+    // Standard Tauri build
+    tauri_build::build();
+
+    // Copy server binary to resources
+    copy_server_binary();
+
+    // Copy espeak-ng-data
+    copy_directory(
+        "../../server/packaging/espeak-ng-data",
+        "resources/espeak-ng-data",
+    );
+
+    // Copy samples
+    copy_directory("../../server/samples", "resources/samples");
+
+    // Rerun if server binary changes
+    println!("cargo:rerun-if-changed=../../server/target/release/porua_server");
+    println!("cargo:rerun-if-changed=../../server/packaging/espeak-ng-data");
+    println!("cargo:rerun-if-changed=../../server/samples");
+}
+
+fn copy_server_binary() {
+    let server_binary_src = if cfg!(target_os = "windows") {
+        PathBuf::from("../../server/target/release/porua_server.exe")
+    } else {
+        PathBuf::from("../../server/target/release/porua_server")
+    };
+
+    let dest_name = if cfg!(target_os = "windows") {
+        "porua_server.exe"
+    } else {
+        "porua_server"
+    };
+
+    let dest = PathBuf::from("resources").join(dest_name);
+
+    if server_binary_src.exists() {
+        std::fs::create_dir_all("resources").expect("Failed to create resources directory");
+
+        std::fs::copy(&server_binary_src, &dest).expect(&format!(
+            "Failed to copy server binary from {:?} to {:?}",
+            server_binary_src, dest
+        ));
+
+        println!("Copied server binary to {:?}", dest);
+    } else {
+        eprintln!(
+            "Warning: Server binary not found at {:?}. Build the server first with: cd ../../server && cargo build --release",
+            server_binary_src
+        );
+        eprintln!("Continuing build without server binary - installation will fail at runtime.");
+    }
+}
+
+fn copy_directory(src: &str, dst: &str) {
+    let src_path = PathBuf::from(src);
+    let dst_path = PathBuf::from(dst);
+
+    if src_path.exists() {
+        std::fs::create_dir_all(&dst_path).expect(&format!("Failed to create directory {:?}", dst_path));
+
+        copy_dir_recursive(&src_path, &dst_path).expect(&format!(
+            "Failed to copy directory from {:?} to {:?}",
+            src_path, dst_path
+        ));
+
+        println!("Copied directory from {:?} to {:?}", src_path, dst_path);
+    } else {
+        eprintln!("Warning: Source directory {:?} not found. Skipping.", src_path);
+    }
+}
+
+fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) -> std::io::Result<()> {
+    if !dst.exists() {
+        std::fs::create_dir_all(dst)?;
+    }
+
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let path = entry.path();
+        let dest_path = dst.join(entry.file_name());
+
+        if path.is_dir() {
+            copy_dir_recursive(&path, &dest_path)?;
+        } else {
+            std::fs::copy(&path, &dest_path)?;
+        }
+    }
+
+    Ok(())
+}

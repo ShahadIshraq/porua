@@ -1,0 +1,32 @@
+[package]
+name = "porua-wrapper"
+version = "0.1.0"
+description = "Porua TTS Server Wrapper"
+authors = ["Porua Team"]
+license = "MIT"
+repository = "https://github.com/ShahadIshraq/porua"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.5", features = ["system-tray", "notification", "shell-sidecar"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.11", features = ["stream", "json"] }
+futures-util = "0.3"
+dirs = "5.0"
+anyhow = "1.0"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
+tauri = { version = "1.5", features = ["system-tray", "notification", "shell-sidecar"] }

@@ -1,0 +1,10 @@
+NOTE: This directory needs icon.icns and icon.ico files for full platform support.
+
+Generate these files by running:
+    cd wrapper
+    ./scripts/generate-icons.sh
+
+Or see wrapper/src-tauri/icons/README.md for manual generation instructions.
+
+For development, the build will work with just PNG files, but production builds
+should include proper .icns (macOS) and .ico (Windows) files.
