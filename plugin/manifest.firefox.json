@@ -17,6 +17,10 @@
     },
     "default_title": "Porua Settings"
   },
+  "background": {
+    "scripts": ["dist/background.js"],
+    "type": "module"
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
@@ -25,7 +29,7 @@
       "run_at": "document_idle"
     }
   ],
-  "permissions": ["storage"],
+  "permissions": ["storage", "unlimitedStorage"],
   "host_permissions": ["http://localhost/*", "https://*/*"],
   "browser_specific_settings": {
     "gecko": {
