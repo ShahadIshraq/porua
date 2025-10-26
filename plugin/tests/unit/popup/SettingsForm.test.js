@@ -603,6 +603,64 @@ describe('SettingsForm', () => {
       expect(updateHelpSpy).toHaveBeenCalled();
     });
 
+    it('should call updateDirtyUI on successful connection', async () => {
+      mockApiUrlInput.value = 'http://test.com';
+      ttsService.checkHealth.mockResolvedValue({ status: 'ok' });
+      const updateDirtyUISpy = vi.spyOn(settingsForm, 'updateDirtyUI');
+
+      await settingsForm.testConnection();
+
+      expect(updateDirtyUISpy).toHaveBeenCalled();
+    });
+
+    it('should call updateDirtyUI on failed connection', async () => {
+      mockApiUrlInput.value = 'http://test.com';
+      ttsService.checkHealth.mockRejectedValue(new Error('Connection failed'));
+      const updateDirtyUISpy = vi.spyOn(settingsForm, 'updateDirtyUI');
+
+      await settingsForm.testConnection();
+
+      expect(updateDirtyUISpy).toHaveBeenCalled();
+    });
+
+    it('should call updateDirtyUI on unexpected response', async () => {
+      mockApiUrlInput.value = 'http://test.com';
+      ttsService.checkHealth.mockResolvedValue({ status: 'error' });
+      const updateDirtyUISpy = vi.spyOn(settingsForm, 'updateDirtyUI');
+
+      await settingsForm.testConnection();
+
+      expect(updateDirtyUISpy).toHaveBeenCalled();
+    });
+
+    it('should enable save button after successful connection test on first use', async () => {
+      // Setup: first use scenario
+      mockApiUrlInput.value = 'http://test.com';
+      settingsForm.showAdvancedSettings = false;
+      settingsForm.connectionTestPassed = false;
+      mockSaveButton.disabled = true;
+      ttsService.checkHealth.mockResolvedValue({ status: 'ok' });
+
+      await settingsForm.testConnection();
+
+      expect(settingsForm.connectionTestPassed).toBe(true);
+      expect(mockSaveButton.disabled).toBe(false);
+    });
+
+    it('should keep save button disabled after failed connection test on first use', async () => {
+      // Setup: first use scenario
+      mockApiUrlInput.value = 'http://test.com';
+      settingsForm.showAdvancedSettings = false;
+      settingsForm.connectionTestPassed = false;
+      mockSaveButton.disabled = true;
+      ttsService.checkHealth.mockRejectedValue(new Error('Connection failed'));
+
+      await settingsForm.testConnection();
+
+      expect(settingsForm.connectionTestPassed).toBe(false);
+      expect(mockSaveButton.disabled).toBe(true);
+    });
+
     it('should show error for unexpected response', async () => {
       mockApiUrlInput.value = 'http://test.com';
       ttsService.checkHealth.mockResolvedValue({ status: 'error' });
