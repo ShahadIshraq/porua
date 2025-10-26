@@ -21,12 +21,7 @@
     {
       "matches": ["<all_urls>"],
       "js": ["dist/content.js"],
-      "css": [
-        "src/styles/variables.css",
-        "src/styles/content/play-button.css",
-        "src/styles/content/player-control.css",
-        "src/styles/content/highlighting.css"
-      ],
+      "css": ["dist/content.css"],
       "run_at": "document_idle"
     }
   ],
