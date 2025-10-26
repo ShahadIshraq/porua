@@ -28,8 +28,7 @@ const buildFirefox = !args.includes('--chrome');
 const FILES_TO_INCLUDE = [
   'dist',
   'icons',
-  'popup.html',
-  'src/styles'
+  'popup.html'
 ];
 
 /**

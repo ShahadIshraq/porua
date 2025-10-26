@@ -20,7 +20,10 @@ const buildOptions = {
   target: 'chrome96',
   sourcemap: watch ? 'inline' : false,
   minify: !watch,
-  logLevel: 'info'
+  logLevel: 'info',
+  loader: {
+    '.css': 'css'
+  }
 };
 
 if (watch) {
