@@ -1,0 +1,22 @@
+# Node modules
+node_modules/
+
+# Tauri build outputs
+src-tauri/target/
+src-tauri/resources/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
