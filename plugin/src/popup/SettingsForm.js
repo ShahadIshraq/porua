@@ -223,15 +223,17 @@ export class SettingsForm {
         this.showConnectionStatus('Connection successful', 'success');
         this.connectionTestPassed = true;
         this.updateFirstUseHelpVisibility(); // Hide help text after successful test
-        this.checkDirty(); // Update dirty UI to enable save button if needed
+        this.updateDirtyUI(); // Update save button state based on connection test result
       } else {
         this.showConnectionStatus('Unexpected response from server', 'error');
         this.connectionTestPassed = false;
         this.updateFirstUseHelpVisibility(); // Update help text visibility
+        this.updateDirtyUI(); // Update save button state
       }
     } catch (error) {
       this.connectionTestPassed = false;
       this.updateFirstUseHelpVisibility(); // Update help text visibility
+      this.updateDirtyUI(); // Update save button state
       if (error.status === 401 || error.status === 403) {
         this.showConnectionStatus('Authentication failed', 'error');
       } else {
