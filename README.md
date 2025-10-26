@@ -6,6 +6,11 @@
 
 Porua is a browser extension and server stack that converts text to natural-sounding speech with 28 English voices. Built with Rust and modern web technologies.
 
+## Demo
+
+https://github.com/user-attachments/assets/9b16c19b-1334-4e83-b6ef-d4c4ddf920b4
+
+
 ## Components
 
 ### [Browser Extension](plugin/README.md)
