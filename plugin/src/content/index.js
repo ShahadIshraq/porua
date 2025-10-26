@@ -1,3 +1,7 @@
+import '../styles/variables.css';
+import '../styles/content/highlighting.css';
+import '../styles/content/play-button.css';
+import '../styles/content/player-control.css';
 import { PlaybackState } from './state/PlaybackState.js';
 import { EventManager } from './utils/events.js';
 import { PlayButton } from './ui/PlayButton.js';

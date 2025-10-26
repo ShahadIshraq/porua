@@ -1,3 +1,4 @@
+import '../styles/popup.css';
 import { SettingsForm } from './SettingsForm.js';
 import { StatusMessage } from './StatusMessage.js';
 import { CacheStats } from './CacheStats.js';
