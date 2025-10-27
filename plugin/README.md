@@ -6,14 +6,14 @@ A high-quality, privacy-focused text-to-speech browser extension powered by Koko
 
 **Current Version:** 0.1.0
 
-[View Changelog](CHANGELOG.md) | [Release Notes](https://github.com/YOUR_USERNAME/porua/releases)
+[View Changelog](CHANGELOG.md) | [Release Notes](/../../releases)
 
 ## Installation
 
 ### From GitHub Releases (Recommended for Testing)
 
 **Chrome/Edge:**
-1. Download the latest `porua-extension-chrome-v0.1.0.zip` from [Releases](https://github.com/YOUR_USERNAME/porua/releases)
+1. Download the latest `porua-extension-chrome-v0.1.0.zip` from [Releases](/../../releases)
 2. Extract the zip file
 3. Open `chrome://extensions/` in your browser
 4. Enable "Developer mode" (toggle in top right)
@@ -21,7 +21,7 @@ A high-quality, privacy-focused text-to-speech browser extension powered by Koko
 6. Select the extracted folder
 
 **Firefox:**
-1. Download the latest `porua-extension-firefox-v0.1.0.zip` from [Releases](https://github.com/YOUR_USERNAME/porua/releases)
+1. Download the latest `porua-extension-firefox-v0.1.0.zip` from [Releases](/../../releases)
 2. Open `about:debugging#/runtime/this-firefox` in Firefox
 3. Click "Load Temporary Add-on"
 4. Select the downloaded zip file
@@ -38,7 +38,7 @@ This extension requires the Porua TTS Server to be running locally.
 **Quick server setup:**
 ```bash
 # Download server from releases
-# https://github.com/YOUR_USERNAME/porua/releases
+# https://github.com/ShahadIshraq/porua/releases
 
 # Extract and install
 tar -xzf porua_server-v0.1.1-{platform}.tar.gz
@@ -299,8 +299,8 @@ See LICENSE file in the repository root.
 
 ## Support
 
-- GitHub Issues: [Report bugs or request features](https://github.com/YOUR_USERNAME/porua/issues)
-- Documentation: [Full documentation](https://github.com/YOUR_USERNAME/porua)
+- GitHub Issues: [Report bugs or request features](/../../issues)
+- Documentation: [Full documentation](/README.md)
 
 ## Acknowledgments
 
