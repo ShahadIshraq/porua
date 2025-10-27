@@ -30,9 +30,12 @@ impl TTS {
         style: &str,
         speed: f32,
     ) -> Result<(), Box<dyn Error>> {
+        // Get the appropriate language code based on the voice ID
+        let language_code = voice_config::Voice::get_language_code(style);
+
         self.engine.tts(TTSOpts {
             txt: text,
-            lan: "en-us",
+            lan: language_code,
             style_name: style,
             save_path: output_path,
             mono: false,

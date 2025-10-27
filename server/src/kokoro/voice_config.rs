@@ -35,6 +35,19 @@ pub enum Gender {
 pub enum Language {
     AmericanEnglish,
     BritishEnglish,
+    Japanese,
+}
+
+impl Language {
+    /// Get the TTS language code for Kokoro engine
+    /// - English (American/British) -> "en-us"
+    /// - Japanese -> "j"
+    pub const fn tts_code(&self) -> &'static str {
+        match self {
+            Language::AmericanEnglish | Language::BritishEnglish => "en-us",
+            Language::Japanese => "j",
+        }
+    }
 }
 
 /// Voice configuration with metadata
@@ -107,6 +120,15 @@ pub enum Voice {
     BritishMaleFable,
     BritishMaleGeorge,
     BritishMaleLewis,
+
+    // Japanese Female voices
+    JapaneseFemaleAlpha,
+    JapaneseFemaleGongitsune,
+    JapaneseFemaleNezumi,
+    JapaneseFemaleTebukuro,
+
+    // Japanese Male voices
+    JapaneseMaleKumo,
 }
 
 impl Voice {
@@ -316,6 +338,45 @@ impl Voice {
                 Language::BritishEnglish,
                 "British male voice - Lewis",
             ),
+
+            // Japanese Female voices
+            Voice::JapaneseFemaleAlpha => VoiceConfig::new(
+                "jf_alpha",
+                "Alpha",
+                Gender::Female,
+                Language::Japanese,
+                "Japanese female voice - Alpha",
+            ),
+            Voice::JapaneseFemaleGongitsune => VoiceConfig::new(
+                "jf_gongitsune",
+                "Gongitsune",
+                Gender::Female,
+                Language::Japanese,
+                "Japanese female voice - Gongitsune",
+            ),
+            Voice::JapaneseFemaleNezumi => VoiceConfig::new(
+                "jf_nezumi",
+                "Nezumi",
+                Gender::Female,
+                Language::Japanese,
+                "Japanese female voice - Nezumi",
+            ),
+            Voice::JapaneseFemaleTebukuro => VoiceConfig::new(
+                "jf_tebukuro",
+                "Tebukuro",
+                Gender::Female,
+                Language::Japanese,
+                "Japanese female voice - Tebukuro",
+            ),
+
+            // Japanese Male voices
+            Voice::JapaneseMaleKumo => VoiceConfig::new(
+                "jm_kumo",
+                "Kumo",
+                Gender::Male,
+                Language::Japanese,
+                "Japanese male voice - Kumo",
+            ),
         }
     }
 
@@ -325,7 +386,7 @@ impl Voice {
     }
 
     /// Get all available voices as an array
-    pub const fn all() -> [Voice; 28] {
+    pub const fn all() -> [Voice; 33] {
         [
             Voice::AmericanFemaleAlloy,
             Voice::AmericanFemaleAoede,
@@ -355,6 +416,11 @@ impl Voice {
             Voice::BritishMaleFable,
             Voice::BritishMaleGeorge,
             Voice::BritishMaleLewis,
+            Voice::JapaneseFemaleAlpha,
+            Voice::JapaneseFemaleGongitsune,
+            Voice::JapaneseFemaleNezumi,
+            Voice::JapaneseFemaleTebukuro,
+            Voice::JapaneseMaleKumo,
         ]
     }
 
@@ -386,5 +452,18 @@ impl Voice {
                 config.language == language && config.gender == gender
             })
             .collect()
+    }
+
+    /// Get the TTS language code for a given voice ID
+    /// Returns "en-us" for English voices (default) and "j" for Japanese voices
+    pub fn get_language_code(voice_id: &str) -> &'static str {
+        // Find the voice by ID
+        for voice in Self::all() {
+            if voice.config().id == voice_id {
+                return voice.config().language.tts_code();
+            }
+        }
+        // Default to English if voice not found
+        "en-us"
     }
 }

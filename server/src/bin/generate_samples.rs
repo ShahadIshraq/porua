@@ -1,7 +1,16 @@
-use porua_server::kokoro::{voice_config::Voice, TTS};
+use porua_server::kokoro::{voice_config::{Voice, Language}, TTS};
 use std::path::Path;
 
-const SAMPLE_TEXT: &str = "Hello, I'm here to help you read any text on the web. Whether it's an article, a blog post, or a long document, I can read it aloud for you in a natural and clear voice. Just select the text you want to hear, and I'll take care of the rest.";
+const SAMPLE_TEXT_ENGLISH: &str = "Hello, I'm here to help you read any text on the web. Whether it's an article, a blog post, or a long document, I can read it aloud for you in a natural and clear voice. Just select the text you want to hear, and I'll take care of the rest.";
+
+const SAMPLE_TEXT_JAPANESE: &str = "こんにちは、ウェブ上のあらゆるテキストを読み上げるお手伝いをします。記事、ブログ投稿、長い文書など、自然で明瞭な声で読み上げることができます。";
+
+fn get_sample_text(language: Language) -> &'static str {
+    match language {
+        Language::Japanese => SAMPLE_TEXT_JAPANESE,
+        _ => SAMPLE_TEXT_ENGLISH,
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,16 +28,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(samples_dir)?;
 
     println!("\nGenerating {} voice samples...", voices.len());
-    println!("Sample text: \"{}\"", SAMPLE_TEXT);
     println!();
 
     for voice in &voices {
         let voice_id = voice.id();
+        let voice_config = voice.config();
+        let sample_text = get_sample_text(voice_config.language);
         let output_path = samples_dir.join(format!("{}.wav", voice_id));
 
-        print!("Generating: {:<20} ", voice_id);
+        print!("Generating: {:<25} ", voice_id);
 
-        match tts.speak(SAMPLE_TEXT, output_path.to_str().unwrap(), voice_id, 1.0) {
+        match tts.speak(sample_text, output_path.to_str().unwrap(), voice_id, 1.0) {
             Ok(_) => {
                 let size = std::fs::metadata(&output_path)?.len();
                 println!("✓ ({} KB)", size / 1024);
