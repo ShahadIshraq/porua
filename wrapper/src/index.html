@@ -1,38 +1,75 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
+    <title>Porua Setup</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Porua</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: #1a1a1a;
-            color: #ffffff;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-        .container {
-            text-align: center;
-        }
-        h1 {
-            font-size: 24px;
-            margin-bottom: 16px;
-        }
-        p {
-            font-size: 14px;
-            color: #888;
-        }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Porua TTS Server</h1>
-        <p>Use the menu bar to control the server</p>
+    <div id="app">
+        <!-- Welcome Screen -->
+        <div id="welcome-screen" class="screen active">
+            <div class="logo">🎙️</div>
+            <h1>Welcome to Porua</h1>
+            <p class="subtitle">High-quality neural text-to-speech server</p>
+            <div class="info-box">
+                <p class="info-title">Setup will:</p>
+                <ul>
+                    <li>Install TTS server and dependencies</li>
+                    <li>Download AI models (~340 MB)</li>
+                    <li>Configure the application</li>
+                </ul>
+            </div>
+            <button id="start-btn" class="primary-btn">Get Started</button>
+        </div>
+
+        <!-- Progress Screen -->
+        <div id="progress-screen" class="screen">
+            <div class="progress-container">
+                <div class="step-indicator">
+                    <span id="current-step">1</span> / <span id="total-steps">7</span>
+                </div>
+
+                <div class="progress-bar-container">
+                    <div id="progress-bar" class="progress-bar"></div>
+                </div>
+
+                <h2 id="progress-message">Setting up...</h2>
+                <p id="progress-details" class="details"></p>
+
+                <div class="spinner"></div>
+            </div>
+        </div>
+
+        <!-- Success Screen -->
+        <div id="success-screen" class="screen">
+            <div class="success-icon">✓</div>
+            <h1>Ready to Use!</h1>
+            <p class="subtitle">Porua TTS Server is now running</p>
+            <div class="info-box">
+                <p><strong>Server URL:</strong> http://localhost:3000</p>
+                <p><strong>Control:</strong> Use the menu bar icon</p>
+            </div>
+            <button id="done-btn" class="primary-btn">Done</button>
+        </div>
+
+        <!-- Error Screen -->
+        <div id="error-screen" class="screen">
+            <div class="error-icon">✕</div>
+            <h1>Installation Failed</h1>
+            <p id="error-message" class="subtitle"></p>
+            <div class="error-details">
+                <p>Check logs at:</p>
+                <code id="log-path"></code>
+            </div>
+            <div class="button-group">
+                <button id="retry-btn" class="secondary-btn">Retry</button>
+                <button id="quit-btn" class="primary-btn">Quit</button>
+            </div>
+        </div>
     </div>
+
+    <script src="app.js"></script>
 </body>
 </html>
