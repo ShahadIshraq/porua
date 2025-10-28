@@ -29,7 +29,7 @@ body {
 /* Screen Management */
 .screen {
     display: none;
-    padding: 60px 50px;
+    padding: 30px 50px;
     text-align: center;
     animation: fadeIn 0.4s ease-in-out;
 }
@@ -38,8 +38,9 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    min-height: 600px;
+    justify-content: flex-start;
+    min-height: 500px;
+    overflow-y: auto;
 }
 
 @keyframes fadeIn {
@@ -58,20 +59,20 @@ h1 {
     font-size: 32px;
     font-weight: 700;
     color: #2d3748;
-    margin: 20px 0 10px;
+    margin: 10px 0 5px;
 }
 
 h2 {
     font-size: 24px;
     font-weight: 600;
     color: #2d3748;
-    margin: 20px 0;
+    margin: 10px 0;
 }
 
 .subtitle {
     font-size: 16px;
     color: #718096;
-    margin-bottom: 30px;
+    margin-bottom: 15px;
 }
 
 .details {
@@ -86,6 +87,19 @@ h2 {
     font-size: 80px;
     margin-bottom: 10px;
     animation: bounce 2s infinite;
+}
+
+.app-icon {
+    width: 80px;
+    height: 80px;
+    margin-bottom: 10px;
+    animation: bounce 2s infinite;
+}
+
+.app-icon-small {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 20px;
 }
 
 @keyframes bounce {
@@ -150,8 +164,8 @@ h2 {
 .info-box {
     background: #f7fafc;
     border-radius: 12px;
-    padding: 24px;
-    margin: 20px 0 30px;
+    padding: 16px 20px;
+    margin: 10px 0 15px;
     text-align: left;
     width: 100%;
     max-width: 400px;
@@ -170,19 +184,20 @@ h2 {
 }
 
 .info-box li {
-    padding: 8px 0;
-    padding-left: 24px;
+    padding: 4px 0;
+    padding-left: 28px;
     position: relative;
     color: #4a5568;
     font-size: 14px;
 }
 
 .info-box li::before {
-    content: "✓";
+    content: "→";
     position: absolute;
     left: 0;
     color: #667eea;
     font-weight: bold;
+    font-size: 16px;
 }
 
 .info-box p {
@@ -269,6 +284,110 @@ button {
     transition: width 0.3s ease;
 }
 
+/* Tasks List */
+.tasks-list {
+    width: 100%;
+    max-width: 400px;
+    margin-top: 30px;
+    text-align: left;
+}
+
+.task-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid #f7fafc;
+}
+
+.task-item:last-child {
+    border-bottom: none;
+}
+
+.task-checkbox {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #cbd5e0;
+    border-radius: 4px;
+    margin-right: 12px;
+    flex-shrink: 0;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.task-checkbox.pending {
+    background: white;
+    border-color: #cbd5e0;
+}
+
+.task-checkbox.in-progress {
+    background: white;
+    border-color: #667eea;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.task-checkbox.in-progress::after {
+    content: '';
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 10px;
+    height: 10px;
+    margin-top: -7px;
+    margin-left: -7px;
+    border: 2px solid transparent;
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+.task-checkbox.completed {
+    background: #48bb78;
+    border-color: #48bb78;
+}
+
+.task-checkbox.completed::after {
+    content: "✓";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.task-text {
+    flex: 1;
+    font-size: 14px;
+    color: #2d3748;
+    font-weight: 500;
+}
+
+.task-item.in-progress .task-text {
+    color: #667eea;
+}
+
+.task-item.completed .task-text {
+    color: #718096;
+}
+
+.task-details {
+    font-size: 12px;
+    color: #a0aec0;
+    margin-left: 8px;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 4px rgba(102, 126, 234, 0);
+    }
+}
+
 /* Spinner */
 .spinner {
     margin-top: 40px;
@@ -283,6 +402,9 @@ button {
 }
 
 @keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
     to {
         transform: rotate(360deg);
     }
