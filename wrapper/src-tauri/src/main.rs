@@ -209,10 +209,34 @@ fn main() {
         })
         .build(tauri::generate_context!())
         .expect("Error building Tauri application")
-        .run(|_app_handle, event| {
+        .run(|app_handle, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                // Don't prevent exit
+                info!("Exit requested, stopping server before exit");
+
+                // Prevent immediate exit
                 api.prevent_exit();
+
+                // Stop the server before allowing exit
+                if let Some(state) = app_handle.try_state::<AppState>() {
+                    let manager = state.server_manager.clone();
+                    let app_handle_clone = app_handle.clone();
+
+                    tauri::async_runtime::spawn(async move {
+                        info!("Stopping server...");
+                        let mut mgr = manager.lock().await;
+                        if let Err(e) = mgr.stop().await {
+                            error!("Error stopping server: {}", e);
+                        }
+                        info!("Server stopped successfully");
+
+                        // Now exit the app
+                        app_handle_clone.exit(0);
+                    });
+                } else {
+                    // No state, just exit
+                    info!("No state found, exiting immediately");
+                    app_handle.exit(0);
+                }
             }
         });
 }
