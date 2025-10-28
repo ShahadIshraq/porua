@@ -170,14 +170,6 @@ impl ServerManager {
     pub async fn get_status(&self) -> ServerStatus {
         self.status.read().await.clone()
     }
-
-    /// Check if server is running
-    pub async fn is_running(&self) -> bool {
-        matches!(
-            *self.status.read().await,
-            ServerStatus::Running { .. }
-        )
-    }
 }
 
 impl Drop for ServerManager {
