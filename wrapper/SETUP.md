@@ -36,36 +36,13 @@ cd wrapper
 npm install
 ```
 
-### 3. Generate Icons (Optional but Recommended)
+### 3. Generate Icons (One-Time, Optional)
 
-The wrapper includes placeholder PNG icons, but you need to generate `.icns` (macOS) and `.ico` (Windows) for full compatibility.
+The wrapper includes PNG icons (copied from plugin). For polished production builds, you should generate `.icns` (macOS) and `.ico` (Windows) **once**, then commit them.
 
-**Install ImageMagick:**
-```bash
-# macOS
-brew install imagemagick
+**See `GENERATE_ICONS_ONCE.md` for detailed instructions.**
 
-# Linux
-sudo apt-get install imagemagick
-
-# Windows
-# Download from https://imagemagick.org/
-```
-
-**Generate all icon formats:**
-```bash
-cd wrapper
-./scripts/generate-icons.sh
-```
-
-This creates:
-- `32x32.png`, `128x128.png`, `128x128@2x.png`, `icon.png` (already done)
-- `icon.icns` (macOS bundle icon)
-- `icon.ico` (Windows icon)
-
-**Manual icon generation (if script fails):**
-
-macOS .icns:
+**Quick version (macOS):**
 ```bash
 cd wrapper/src-tauri/icons
 mkdir icon.iconset
@@ -75,16 +52,14 @@ sips -z 32 32 128x128.png --out icon.iconset/icon_32x32.png
 sips -z 64 64 128x128.png --out icon.iconset/icon_32x32@2x.png
 sips -z 128 128 128x128.png --out icon.iconset/icon_128x128.png
 sips -z 256 256 128x128.png --out icon.iconset/icon_128x128@2x.png
-iconutil -c icns icon.iconset
+iconutil -c icns icon.iconset -o icon.icns
 rm -rf icon.iconset
+git add icon.icns && git commit -m "Add macOS icon"
 ```
 
-Windows .ico:
-```bash
-# Use an online converter like https://convertio.co/png-ico/
-# Or ImageMagick:
-convert 128x128.png -define icon:auto-resize=256,128,96,64,48,32,16 icon.ico
-```
+**Windows .ico:** Use online converter at https://convertio.co/png-ico/
+
+**Note:** Development builds work fine without these files. Only needed for polished releases.
 
 ## Development
 
