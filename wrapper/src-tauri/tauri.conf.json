@@ -69,7 +69,11 @@
         "exceptionDomain": "",
         "frameworks": [],
         "providerShortName": null,
-        "signingIdentity": null
+        "signingIdentity": null,
+        "minimumSystemVersion": "10.13",
+        "info_plist_additions": {
+          "LSUIElement": true
+        }
       },
       "resources": [
         "resources/*"
@@ -87,23 +91,25 @@
     },
     "systemTray": {
       "iconPath": "icons/icon.png",
-      "iconAsTemplate": true,
-      "menuOnLeftClick": false
+      "iconAsTemplate": false,
+      "menuOnLeftClick": true
     },
     "updater": {
       "active": false
     },
     "windows": [
       {
-        "fullscreen": false,
+        "title": "Porua Setup",
+        "width": 600,
+        "height": 500,
+        "center": true,
         "resizable": false,
-        "title": "Porua",
-        "width": 400,
-        "height": 300,
+        "fullscreen": false,
         "visible": false,
-        "decorations": false,
+        "decorations": true,
         "transparent": false,
-        "alwaysOnTop": false
+        "alwaysOnTop": true,
+        "skipTaskbar": false
       }
     ]
   }
