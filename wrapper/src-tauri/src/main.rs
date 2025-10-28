@@ -25,6 +25,89 @@ struct AppState {
     server_manager: Arc<Mutex<ServerManager>>,
 }
 
+#[tauri::command]
+async fn needs_installation() -> Result<bool, String> {
+    Installer::needs_installation().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn start_installation(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let installer = Installer::new(app_handle.clone());
+
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = installer.install().await {
+            error!("Installation failed: {}", e);
+            let _ = app_handle.emit_all("install-error", e.to_string());
+        }
+    });
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn finish_installation(app_handle: tauri::AppHandle) -> Result<(), String> {
+    // Hide the window
+    if let Some(window) = app_handle.get_window("main") {
+        window.hide().map_err(|e| e.to_string())?;
+    }
+
+    // Load configuration
+    let config = Config::load().map_err(|e| e.to_string())?;
+    info!("Configuration loaded: port={}", config.server.port);
+
+    // Create server manager
+    let server_manager = ServerManager::new(config);
+    let state = AppState {
+        server_manager: Arc::new(Mutex::new(server_manager)),
+    };
+
+    // Store state in app
+    app_handle.manage(state.clone());
+
+    // Start server automatically
+    info!("Starting server automatically");
+    let mut manager = state.server_manager.lock().await;
+    if let Err(e) = manager.start().await {
+        error!("Failed to start server: {}", e);
+        return Err(e.to_string());
+    }
+
+    // Wait for server to be ready and update tray
+    drop(manager); // Release lock
+    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+    let manager = state.server_manager.lock().await;
+    let status = manager.get_status().await;
+    drop(manager);
+
+    update_tray_menu(&app_handle, &status);
+
+    // Start status monitor
+    start_status_monitor(app_handle.clone(), state.server_manager.clone());
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn close_installer_window(app_handle: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app_handle.get_window("main") {
+        window.hide().map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_log_path() -> Result<String, String> {
+    paths::get_logs_dir()
+        .map(|p| p.to_string_lossy().to_string())
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn quit_app() {
+    std::process::exit(0);
+}
+
 fn main() {
     // Initialize logging
     let log_dir = paths::get_logs_dir().expect("Failed to get logs directory");
@@ -55,6 +138,14 @@ fn main() {
                 handle_tray_event(app, &id);
             }
         })
+        .invoke_handler(tauri::generate_handler![
+            needs_installation,
+            start_installation,
+            finish_installation,
+            close_installer_window,
+            get_log_path,
+            quit_app,
+        ])
         .setup(|app| {
             let app_handle = app.handle();
 
@@ -87,13 +178,21 @@ async fn setup_app(app_handle: tauri::AppHandle) -> anyhow::Result<()> {
 
     // Check if installation is needed
     if Installer::needs_installation()? {
-        info!("First run detected, starting installation");
-        let installer = Installer::new(app_handle.clone());
-        installer.install().await?;
-        info!("Installation completed successfully");
-    } else {
-        info!("Application already installed");
+        info!("First run detected - showing installer window");
+
+        // Show the window for installation
+        if let Some(window) = app_handle.get_window("main") {
+            window.show()?;
+            window.center()?;
+            window.set_focus()?;
+        }
+
+        // Wait for user to complete installation via UI
+        return Ok(());
     }
+
+    // Already installed - proceed normally
+    info!("Application already installed");
 
     // Load configuration
     let config = Config::load()?;
@@ -163,11 +262,8 @@ fn update_tray_menu(app_handle: &tauri::AppHandle, status: &ServerStatus) {
     let is_running = matches!(status, ServerStatus::Running { .. });
     let menu = create_tray_menu(is_running);
 
-    if let Some(tray) = app_handle.tray_handle().get_item("main") {
-        let _ = tray.set_menu(menu);
-    } else {
-        let _ = app_handle.tray_handle().set_menu(menu);
-    }
+    // Update the tray menu
+    let _ = app_handle.tray_handle().set_menu(menu);
 
     // Update icon based on status
     #[cfg(target_os = "macos")]
