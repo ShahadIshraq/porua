@@ -128,24 +128,24 @@ Files:
 - `app.log` - Wrapper application logs
 - `server.log` - Server stdout/stderr
 
-## Building Icons
+## Icons
 
-The wrapper requires icon files in multiple formats:
+The wrapper uses icons from the plugin directory:
 
 ```bash
-# Required icons in src-tauri/icons/
-32x32.png          # Windows small icon
-128x128.png        # macOS/Linux icon
-128x128@2x.png     # macOS Retina icon
-icon.icns          # macOS bundle icon
-icon.ico           # Windows icon
-icon.png           # System tray icon
+# Already included (PNG files):
+src-tauri/icons/
+├── 32x32.png          ✅ Copied from plugin
+├── 128x128.png        ✅ Copied from plugin
+├── 128x128@2x.png     ✅ Copied from plugin
+└── icon.png           ✅ Copied from plugin
+
+# Need to be generated once (see GENERATE_ICONS_ONCE.md):
+├── icon.icns          ⚠️ macOS bundle icon (generate once, commit)
+└── icon.ico           ⚠️ Windows icon (generate once, commit)
 ```
 
-You can generate these from a source PNG using tools like:
-- **macOS**: `iconutil`
-- **Windows**: Online converters or ImageMagick
-- **Cross-platform**: `png2icons` npm package
+**Development builds work fine with just PNG files.** For polished production releases, generate `.icns` and `.ico` once, then commit them. See `GENERATE_ICONS_ONCE.md` for instructions.
 
 ## Bundled Resources
 

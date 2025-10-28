@@ -1,94 +1,59 @@
 # Icons
 
-This directory should contain the following icon files for the Tauri application:
+Icon files for the Tauri wrapper application.
 
-## Required Files
+## Current Status
 
-- `32x32.png` - 32x32 PNG (Windows small icon)
-- `128x128.png` - 128x128 PNG (macOS/Linux)
-- `128x128@2x.png` - 256x256 PNG (macOS Retina)
-- `icon.icns` - macOS icon bundle
-- `icon.ico` - Windows icon
-- `icon.png` - System tray icon (for menu bar)
+✅ **PNG files** - Ready to use (copied from plugin/icons/)
+- `32x32.png`
+- `128x128.png`
+- `128x128@2x.png`
+- `icon.png`
 
-## Generating Icons
+⚠️ **Platform-specific formats** - Need to be generated once
+- `icon.icns` - macOS icon bundle (not yet generated)
+- `icon.ico` - Windows icon (not yet generated)
 
-### Option 1: Using existing Porua icon
+## To Complete Icon Setup
 
-Copy from the plugin directory:
+**See `../../../GENERATE_ICONS_ONCE.md` for one-time generation instructions.**
 
-```bash
-# Copy base icon
-cp ../../../plugin/icons/icon-128.png ./128x128.png
+Someone with macOS (for .icns) or ImageMagick (for .ico) should generate these files **once**, then commit them. After that, they're in the repo forever.
 
-# Create other sizes (requires ImageMagick)
-convert 128x128.png -resize 32x32 32x32.png
-convert 128x128.png -resize 256x256 128x128@2x.png
-cp 128x128.png icon.png
-```
-
-### Option 2: Generate all formats
-
-Use `png2icons` tool:
+### Quick Generation (macOS)
 
 ```bash
-npm install -g png2icons
-
-# Generate from a source PNG (at least 512x512 recommended)
-png2icons 128x128.png icon -icns -ico -favicon
-```
-
-### Option 3: Manual creation
-
-**macOS (.icns):**
-```bash
+# From wrapper/src-tauri/icons/
 mkdir icon.iconset
-sips -z 16 16     128x128.png --out icon.iconset/icon_16x16.png
-sips -z 32 32     128x128.png --out icon.iconset/icon_16x16@2x.png
-sips -z 32 32     128x128.png --out icon.iconset/icon_32x32.png
-sips -z 64 64     128x128.png --out icon.iconset/icon_32x32@2x.png
-sips -z 128 128   128x128.png --out icon.iconset/icon_128x128.png
-sips -z 256 256   128x128.png --out icon.iconset/icon_128x128@2x.png
-sips -z 256 256   128x128.png --out icon.iconset/icon_256x256.png
-sips -z 512 512   128x128.png --out icon.iconset/icon_256x256@2x.png
-sips -z 512 512   128x128.png --out icon.iconset/icon_512x512.png
-iconutil -c icns icon.iconset
+sips -z 16 16 128x128.png --out icon.iconset/icon_16x16.png
+sips -z 32 32 128x128.png --out icon.iconset/icon_16x16@2x.png
+sips -z 32 32 128x128.png --out icon.iconset/icon_32x32.png
+sips -z 64 64 128x128.png --out icon.iconset/icon_32x32@2x.png
+sips -z 128 128 128x128.png --out icon.iconset/icon_128x128.png
+sips -z 256 256 128x128.png --out icon.iconset/icon_128x128@2x.png
+iconutil -c icns icon.iconset -o icon.icns
 rm -rf icon.iconset
 ```
 
-**Windows (.ico):**
-Use an online converter or ImageMagick:
-```bash
-convert 128x128.png -define icon:auto-resize=256,128,96,64,48,32,16 icon.ico
-```
+### Quick Generation (Windows .ico)
 
-## Temporary Placeholder
+Use online converter: https://convertio.co/png-ico/
+- Upload `128x128.png`
+- Download as `icon.ico`
 
-If you don't have icons yet, you can use the plugin icon temporarily:
+## Build Status
 
-```bash
-cd wrapper/src-tauri/icons
-cp ../../../../plugin/icons/icon-128.png ./128x128.png
-cp 128x128.png 32x32.png
-cp 128x128.png 128x128@2x.png
-cp 128x128.png icon.png
-
-# For .icns and .ico, you'll need to generate them or use placeholders
-# The build will warn but may still work for development
-```
+- **Development builds**: Work fine with just PNG files
+- **Production builds**: May warn about missing .icns/.ico but still build
+- **Polished releases**: Should have all formats
 
 ## Design Notes
 
-- The icon should be recognizable at small sizes (16x16)
-- Use simple, bold shapes
-- Consider making separate "running" (green) and "stopped" (gray) versions for the tray icon
-- Transparency is supported and recommended
+Icons sourced from plugin directory (`plugin/icons/icon-128.png`).
 
-## Icon Status Variants (Future)
+### Future Enhancements
 
-For Phase 2, consider creating:
+Consider creating status-specific tray icons:
 - `icon-green.png` - Server running
 - `icon-gray.png` - Server stopped
 - `icon-red.png` - Server error
-
-These can be swapped in the system tray to show status at a glance.
