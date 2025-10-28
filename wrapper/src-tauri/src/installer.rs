@@ -3,10 +3,18 @@ use futures_util::StreamExt;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use tauri::{api::notification::Notification, AppHandle};
-use tracing::{info, warn, error};
+use tauri::{api::notification::Notification, AppHandle, Manager};
+use tracing::{info, warn};
 
 use crate::{config::Config, paths};
+
+#[derive(Clone, serde::Serialize)]
+pub struct InstallProgress {
+    pub step: String,
+    pub progress: f32,
+    pub message: String,
+    pub details: Option<String>,
+}
 
 const MODELS: &[(&str, &str, u64)] = &[
     (
@@ -30,6 +38,14 @@ impl Installer {
         Self { app_handle }
     }
 
+    fn emit_progress(&self, progress: InstallProgress) {
+        let _ = self.app_handle.emit_all("install-progress", progress);
+    }
+
+    fn emit_error(&self, error: &str) {
+        let _ = self.app_handle.emit_all("install-error", error);
+    }
+
     /// Check if installation is needed
     pub fn needs_installation() -> Result<bool> {
         let flag_file = paths::get_install_flag_file()?;
@@ -42,47 +58,117 @@ impl Installer {
 
         self.notify("Setting up Porua...");
 
-        // Step 1: Create directories
+        // Step 1: Create directories (10%)
+        self.emit_progress(InstallProgress {
+            step: "CreatingDirectories".to_string(),
+            progress: 0.1,
+            message: "Creating directories...".to_string(),
+            details: None,
+        });
         self.notify("Creating directories...");
-        paths::ensure_directories_exist()
-            .context("Failed to create directories")?;
+        if let Err(e) = paths::ensure_directories_exist()
+            .context("Failed to create directories") {
+            self.emit_error(&e.to_string());
+            return Err(e);
+        }
         info!("Directories created successfully");
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-        // Step 2: Extract bundled resources
+        // Step 2: Extract server binary (20%)
+        self.emit_progress(InstallProgress {
+            step: "ExtractingServer".to_string(),
+            progress: 0.2,
+            message: "Extracting server binary...".to_string(),
+            details: None,
+        });
         self.notify("Extracting server files...");
-        self.extract_server_binary()
-            .context("Failed to extract server binary")?;
+        if let Err(e) = self.extract_server_binary()
+            .context("Failed to extract server binary") {
+            self.emit_error(&e.to_string());
+            return Err(e);
+        }
         info!("Server binary extracted");
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
+        // Step 3: Extract espeak-ng data (30%)
+        self.emit_progress(InstallProgress {
+            step: "ExtractingEspeak".to_string(),
+            progress: 0.3,
+            message: "Extracting espeak-ng data...".to_string(),
+            details: None,
+        });
         self.notify("Extracting espeak-ng data...");
-        self.extract_espeak_data()
-            .context("Failed to extract espeak-ng data")?;
+        if let Err(e) = self.extract_espeak_data()
+            .context("Failed to extract espeak-ng data") {
+            self.emit_error(&e.to_string());
+            return Err(e);
+        }
         info!("espeak-ng data extracted");
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
+        // Step 4: Extract voice samples (40%)
+        self.emit_progress(InstallProgress {
+            step: "ExtractingSamples".to_string(),
+            progress: 0.4,
+            message: "Extracting voice samples...".to_string(),
+            details: None,
+        });
         self.notify("Extracting voice samples...");
-        self.extract_samples()
-            .context("Failed to extract samples")?;
+        if let Err(e) = self.extract_samples()
+            .context("Failed to extract samples") {
+            self.emit_error(&e.to_string());
+            return Err(e);
+        }
         info!("Voice samples extracted");
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-        // Step 3: Download models
+        // Step 5: Download models (50-95%)
+        self.emit_progress(InstallProgress {
+            step: "DownloadingModels".to_string(),
+            progress: 0.5,
+            message: "Downloading TTS models...".to_string(),
+            details: None,
+        });
         self.notify("Downloading TTS models (this may take a few minutes)...");
-        self.download_models()
+        if let Err(e) = self.download_models()
             .await
-            .context("Failed to download models")?;
+            .context("Failed to download models") {
+            self.emit_error(&e.to_string());
+            return Err(e);
+        }
         info!("Models downloaded successfully");
 
-        // Step 4: Create configuration
+        // Step 6: Create configuration (95%)
+        self.emit_progress(InstallProgress {
+            step: "CreatingConfig".to_string(),
+            progress: 0.95,
+            message: "Creating configuration...".to_string(),
+            details: None,
+        });
         self.notify("Creating configuration...");
-        let config = Config::new()?;
-        config.save()?;
+        if let Err(e) = Config::new().and_then(|config| config.save())
+            .context("Failed to create configuration") {
+            self.emit_error(&e.to_string());
+            return Err(e);
+        }
         info!("Configuration created");
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-        // Step 5: Mark installation as complete
+        // Step 7: Mark installation as complete (100%)
         let flag_file = paths::get_install_flag_file()?;
-        std::fs::write(&flag_file, "installed")
-            .context("Failed to create installation flag")?;
+        if let Err(e) = std::fs::write(&flag_file, "installed")
+            .context("Failed to create installation flag") {
+            self.emit_error(&e.to_string());
+            return Err(e);
+        }
         info!("Installation completed successfully");
 
+        self.emit_progress(InstallProgress {
+            step: "Complete".to_string(),
+            progress: 1.0,
+            message: "Installation complete!".to_string(),
+            details: None,
+        });
         self.notify("Setup complete! Starting server...");
 
         Ok(())
@@ -180,23 +266,36 @@ impl Installer {
         let mut file = File::create(dest).context("Failed to create file")?;
         let mut stream = response.bytes_stream();
         let mut downloaded: u64 = 0;
-        let mut last_notified_mb = 0;
+        let mut last_progress_time = std::time::Instant::now();
 
         while let Some(chunk) = stream.next().await {
             let chunk = chunk.context("Failed to read chunk")?;
             file.write_all(&chunk).context("Failed to write to file")?;
             downloaded += chunk.len() as u64;
 
-            // Notify every 50 MB
-            let current_mb = downloaded / (50 * 1024 * 1024);
-            if current_mb > last_notified_mb {
+            // Emit progress every 500ms
+            if last_progress_time.elapsed() >= std::time::Duration::from_millis(500) {
                 let progress_mb = downloaded / (1024 * 1024);
                 let total_mb = expected_size / (1024 * 1024);
+
+                // Calculate overall progress: 0.5 + (downloaded / expected_size) * 0.45
+                let download_progress = downloaded as f32 / expected_size as f32;
+                let overall_progress = 0.5 + (download_progress * 0.45);
+
+                self.emit_progress(InstallProgress {
+                    step: "DownloadingModels".to_string(),
+                    progress: overall_progress,
+                    message: "Downloading TTS models...".to_string(),
+                    details: Some(format!("{} MB / {} MB", progress_mb, total_mb)),
+                });
+
+                // Keep notification as backup
                 self.notify(&format!(
                     "Downloading models... {} MB / {} MB",
                     progress_mb, total_mb
                 ));
-                last_notified_mb = current_mb;
+
+                last_progress_time = std::time::Instant::now();
             }
         }
 
