@@ -4,7 +4,7 @@
     "beforeBuildCommand": "",
     "devPath": "../src",
     "distDir": "../src",
-    "withGlobalTauri": false
+    "withGlobalTauri": true
   },
   "package": {
     "productName": "Porua",
@@ -70,7 +70,7 @@
         "frameworks": [],
         "providerShortName": null,
         "signingIdentity": null,
-        "minimumSystemVersion": "10.13"
+        "minimumSystemVersion": "11.0"
       },
       "dmg": {
         "appPosition": {
@@ -113,7 +113,7 @@
       {
         "title": "Porua Setup",
         "width": 600,
-        "height": 500,
+        "height": 650,
         "center": true,
         "resizable": false,
         "fullscreen": false,
