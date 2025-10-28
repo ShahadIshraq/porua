@@ -46,6 +46,17 @@ fn copy_server_binary() {
         ));
 
         println!("Copied server binary to {:?}", dest);
+
+        // Print architecture info on macOS
+        #[cfg(target_os = "macos")]
+        {
+            use std::process::Command;
+            if let Ok(output) = Command::new("lipo").arg("-info").arg(&dest).output() {
+                if output.status.success() {
+                    println!("Server binary architecture: {}", String::from_utf8_lossy(&output.stdout));
+                }
+            }
+        }
     } else {
         eprintln!(
             "Warning: Server binary not found at {:?}. Build the server first with: cd ../../server && cargo build --release",

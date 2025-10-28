@@ -10,12 +10,12 @@
     <div id="app">
         <!-- Welcome Screen -->
         <div id="welcome-screen" class="screen active">
-            <div class="logo">🎙️</div>
+            <img src="icon.png" alt="Porua" class="app-icon">
             <h1>Welcome to Porua</h1>
             <p class="subtitle">High-quality neural text-to-speech server</p>
             <div class="info-box">
                 <p class="info-title">Setup will:</p>
-                <ul>
+                <ul class="setup-list">
                     <li>Install TTS server and dependencies</li>
                     <li>Download AI models (~340 MB)</li>
                     <li>Configure the application</li>
@@ -27,23 +27,46 @@
         <!-- Progress Screen -->
         <div id="progress-screen" class="screen">
             <div class="progress-container">
-                <div class="step-indicator">
-                    <span id="current-step">1</span> / <span id="total-steps">7</span>
+                <img src="icon.png" alt="Porua" class="app-icon-small">
+                <h2>Installing Porua</h2>
+
+                <div class="tasks-list">
+                    <div class="task-item" data-step="CreatingDirectories">
+                        <div class="task-checkbox pending"></div>
+                        <span class="task-text">Creating directories...</span>
+                    </div>
+                    <div class="task-item" data-step="ExtractingServer">
+                        <div class="task-checkbox pending"></div>
+                        <span class="task-text">Extracting server binary...</span>
+                    </div>
+                    <div class="task-item" data-step="ExtractingEspeak">
+                        <div class="task-checkbox pending"></div>
+                        <span class="task-text">Extracting espeak-ng data...</span>
+                    </div>
+                    <div class="task-item" data-step="ExtractingSamples">
+                        <div class="task-checkbox pending"></div>
+                        <span class="task-text">Extracting voice samples...</span>
+                    </div>
+                    <div class="task-item" data-step="DownloadingModels">
+                        <div class="task-checkbox pending"></div>
+                        <span class="task-text">Downloading TTS models...</span>
+                        <span class="task-details" id="download-details"></span>
+                    </div>
+                    <div class="task-item" data-step="CreatingConfig">
+                        <div class="task-checkbox pending"></div>
+                        <span class="task-text">Creating configuration...</span>
+                    </div>
+                    <div class="task-item" data-step="Complete">
+                        <div class="task-checkbox pending"></div>
+                        <span class="task-text">Finalizing installation...</span>
+                    </div>
                 </div>
-
-                <div class="progress-bar-container">
-                    <div id="progress-bar" class="progress-bar"></div>
-                </div>
-
-                <h2 id="progress-message">Setting up...</h2>
-                <p id="progress-details" class="details"></p>
-
-                <div class="spinner"></div>
             </div>
         </div>
 
         <!-- Success Screen -->
         <div id="success-screen" class="screen">
+            <img src="icon.png" alt="Porua" class="app-icon">
             <div class="success-icon">✓</div>
             <h1>Ready to Use!</h1>
             <p class="subtitle">Porua TTS Server is now running</p>

@@ -121,7 +121,6 @@ impl ServerManager {
 
             #[cfg(unix)]
             {
-                use std::os::unix::process::CommandExt;
                 // Send SIGTERM
                 unsafe {
                     libc::kill(child.id() as i32, libc::SIGTERM);

@@ -121,7 +121,7 @@
         "decorations": true,
         "transparent": false,
         "alwaysOnTop": true,
-        "skipTaskbar": false
+        "skipTaskbar": true
       }
     ]
   }

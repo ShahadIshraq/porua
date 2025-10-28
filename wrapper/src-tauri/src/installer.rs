@@ -48,8 +48,13 @@ impl Installer {
 
     /// Check if installation is needed
     pub fn needs_installation() -> Result<bool> {
-        let flag_file = paths::get_install_flag_file()?;
-        Ok(!flag_file.exists())
+        let flag_file = paths::get_install_flag_file()
+            .context("Failed to determine installation flag file path")?;
+
+        let exists = flag_file.exists();
+        info!("Installation flag file: {:?}, exists: {}", flag_file, exists);
+
+        Ok(!exists)
     }
 
     /// Run the full installation process
