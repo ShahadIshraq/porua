@@ -1,5 +1,6 @@
 # Node modules
 node_modules/
+package-lock.json
 
 # Tauri build outputs
 src-tauri/target/
@@ -20,3 +21,6 @@ Thumbs.db
 
 # Temporary files
 *.tmp
+TODO
+src-tauri/dmg-background-debug.png
+src-tauri/create_dmg_background_debug.py

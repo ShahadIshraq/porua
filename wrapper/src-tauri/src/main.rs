@@ -27,7 +27,17 @@ struct AppState {
 
 #[tauri::command]
 async fn needs_installation() -> Result<bool, String> {
-    Installer::needs_installation().map_err(|e| e.to_string())
+    info!("needs_installation command called");
+    match Installer::needs_installation() {
+        Ok(needs) => {
+            info!("needs_installation result: {}", needs);
+            Ok(needs)
+        }
+        Err(e) => {
+            error!("needs_installation error: {}", e);
+            Err(e.to_string())
+        }
+    }
 }
 
 #[tauri::command]
@@ -46,7 +56,7 @@ async fn start_installation(app_handle: tauri::AppHandle) -> Result<(), String> 
 
 #[tauri::command]
 async fn finish_installation(app_handle: tauri::AppHandle) -> Result<(), String> {
-    // Hide the window
+    // Hide the window first
     if let Some(window) = app_handle.get_window("main") {
         window.hide().map_err(|e| e.to_string())?;
     }
@@ -109,21 +119,41 @@ async fn quit_app() {
 }
 
 fn main() {
-    // Initialize logging
-    let log_dir = paths::get_logs_dir().expect("Failed to get logs directory");
-    std::fs::create_dir_all(&log_dir).expect("Failed to create logs directory");
+    // Initialize logging - use fallback if file logging fails
+    let file_logging_result = (|| -> anyhow::Result<()> {
+        let log_dir = paths::get_logs_dir()?;
+        std::fs::create_dir_all(&log_dir)?;
 
-    let file_appender = tracing_appender::rolling::daily(log_dir, "app.log");
-    let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
+        let file_appender = tracing_appender::rolling::daily(log_dir, "app.log");
+        let (non_blocking, _guard) = tracing_appender::non_blocking(file_appender);
 
-    tracing_subscriber::registry()
-        .with(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new("info")),
-        )
-        .with(fmt::layer().with_writer(non_blocking))
-        .with(fmt::layer().with_writer(std::io::stdout))
-        .init();
+        tracing_subscriber::registry()
+            .with(
+                EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| EnvFilter::new("info")),
+            )
+            .with(fmt::layer().with_writer(non_blocking))
+            .with(fmt::layer().with_writer(std::io::stdout))
+            .init();
+
+        // Keep the guard alive
+        std::mem::forget(_guard);
+        Ok(())
+    })();
+
+    // If file logging failed, fall back to stdout-only logging
+    if let Err(e) = file_logging_result {
+        eprintln!("Warning: Failed to initialize file logging: {}", e);
+        eprintln!("Falling back to stdout-only logging");
+
+        tracing_subscriber::registry()
+            .with(
+                EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| EnvFilter::new("info")),
+            )
+            .with(fmt::layer().with_writer(std::io::stdout))
+            .init();
+    }
 
     info!("Starting Porua Wrapper");
 
@@ -148,6 +178,20 @@ fn main() {
         ])
         .setup(|app| {
             let app_handle = app.handle();
+
+            // Check if already installed - if so, set activation policy immediately
+            #[cfg(target_os = "macos")]
+            {
+                if let Ok(needs_install) = Installer::needs_installation() {
+                    if !needs_install {
+                        // Already installed, hide from dock immediately
+                        info!("App already installed, setting Accessory activation policy");
+                        app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                    } else {
+                        info!("First run - keeping regular activation policy for installer window");
+                    }
+                }
+            }
 
             // Spawn async setup
             tauri::async_runtime::spawn(async move {

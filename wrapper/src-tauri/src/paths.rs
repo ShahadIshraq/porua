@@ -5,7 +5,10 @@ use std::path::PathBuf;
 pub fn get_app_data_dir() -> Result<PathBuf> {
     #[cfg(target_os = "macos")]
     {
-        let home = dirs::home_dir().context("Failed to get home directory")?;
+        // Try dirs::home_dir() first, then fall back to HOME environment variable
+        let home = dirs::home_dir()
+            .or_else(|| std::env::var("HOME").ok().map(PathBuf::from))
+            .context("Failed to get home directory - neither dirs::home_dir() nor HOME env var worked")?;
         Ok(home.join("Library/Application Support/Porua"))
     }
 
@@ -17,7 +20,10 @@ pub fn get_app_data_dir() -> Result<PathBuf> {
 
     #[cfg(target_os = "linux")]
     {
-        let home = dirs::home_dir().context("Failed to get home directory")?;
+        // Try dirs::home_dir() first, then fall back to HOME environment variable
+        let home = dirs::home_dir()
+            .or_else(|| std::env::var("HOME").ok().map(PathBuf::from))
+            .context("Failed to get home directory - neither dirs::home_dir() nor HOME env var worked")?;
         Ok(home.join(".config/porua"))
     }
 }
