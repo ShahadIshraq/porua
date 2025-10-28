@@ -70,10 +70,7 @@
         "frameworks": [],
         "providerShortName": null,
         "signingIdentity": null,
-        "minimumSystemVersion": "10.13",
-        "info_plist_additions": {
-          "LSUIElement": true
-        }
+        "minimumSystemVersion": "10.13"
       },
       "resources": [
         "resources/*"
