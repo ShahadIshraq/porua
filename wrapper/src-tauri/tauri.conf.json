@@ -88,7 +88,9 @@
         }
       },
       "resources": [
-        "resources/*"
+        "resources/*",
+        "icons/icon.png",
+        "icons/icon-running.png"
       ],
       "shortDescription": "Porua TTS Server",
       "targets": "all",

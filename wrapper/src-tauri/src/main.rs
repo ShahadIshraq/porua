@@ -10,7 +10,7 @@ mod server;
 
 use std::sync::Arc;
 use tauri::{
-    CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
+    CustomMenuItem, Icon, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
 };
 use tokio::sync::Mutex;
 use tracing::{error, info};
@@ -157,8 +157,8 @@ fn main() {
 
     info!("Starting Porua Wrapper");
 
-    // Create system tray
-    let tray_menu = create_tray_menu(false);
+    // Create system tray with initial Stopped state
+    let tray_menu = create_tray_menu(&ServerStatus::Stopped);
     let system_tray = SystemTray::new().with_menu(tray_menu);
 
     tauri::Builder::default()
@@ -299,23 +299,54 @@ async fn setup_app(app_handle: tauri::AppHandle) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn create_tray_menu(server_running: bool) -> SystemTrayMenu {
+fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
     let mut menu = SystemTrayMenu::new();
 
-    if server_running {
-        menu = menu
-            .add_item(CustomMenuItem::new("stop", "⏹ Stop Server"))
-            .add_native_item(SystemTrayMenuItem::Separator);
-    } else {
-        menu = menu
-            .add_item(CustomMenuItem::new("start", "▶ Start Server"))
-            .add_native_item(SystemTrayMenuItem::Separator);
+    match status {
+        ServerStatus::Stopped | ServerStatus::Error(_) => {
+            // Show Start button when stopped or in error
+            menu = menu
+                .add_item(CustomMenuItem::new("start", "▶ Start Server"))
+                .add_native_item(SystemTrayMenuItem::Separator);
+        }
+        ServerStatus::Starting => {
+            // Show disabled Starting indicator
+            menu = menu
+                .add_item(CustomMenuItem::new("starting", "⏳ Starting...").disabled())
+                .add_native_item(SystemTrayMenuItem::Separator);
+        }
+        ServerStatus::Running { .. } => {
+            // Show Stop button when running
+            menu = menu
+                .add_item(CustomMenuItem::new("stop", "⏹ Stop Server"))
+                .add_native_item(SystemTrayMenuItem::Separator);
+        }
+        ServerStatus::Stopping => {
+            // Show disabled Stopping indicator
+            menu = menu
+                .add_item(CustomMenuItem::new("stopping", "⏳ Stopping...").disabled())
+                .add_native_item(SystemTrayMenuItem::Separator);
+        }
     }
 
-    let status_text = if server_running {
-        "ℹ️ Status: Running (3000)"
-    } else {
-        "ℹ️ Status: Stopped"
+    // Status text based on current state
+    let status_text = match status {
+        ServerStatus::Stopped => "ℹ️ Status: Stopped",
+        ServerStatus::Starting => "⏳ Status: Starting...",
+        ServerStatus::Running { port } => {
+            return menu
+                .add_item(CustomMenuItem::new("status", format!("ℹ️ Status: Running ({})", port)).disabled())
+                .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(CustomMenuItem::new("quit", "❌ Quit"));
+        }
+        ServerStatus::Stopping => "⏳ Status: Stopping...",
+        ServerStatus::Error(err) => {
+            return menu
+                .add_item(CustomMenuItem::new("status", format!("⚠️ Status: Error")).disabled())
+                .add_item(CustomMenuItem::new("error_detail", format!("Error: {}", err)).disabled())
+                .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(CustomMenuItem::new("quit", "❌ Quit"));
+        }
     };
 
     menu = menu
@@ -327,23 +358,36 @@ fn create_tray_menu(server_running: bool) -> SystemTrayMenu {
 }
 
 fn update_tray_menu(app_handle: &tauri::AppHandle, status: &ServerStatus) {
-    let is_running = matches!(status, ServerStatus::Running { .. });
-    let menu = create_tray_menu(is_running);
+    let menu = create_tray_menu(status);
 
     // Update the tray menu
     let _ = app_handle.tray_handle().set_menu(menu);
 
-    // Update icon based on status
+    // Swap icon based on server status
     #[cfg(target_os = "macos")]
     {
-        let icon_name = if is_running {
-            "icon-green.png"
+        let is_running = matches!(status, ServerStatus::Running { .. });
+
+        // Determine which icon to load
+        let icon_path = if is_running {
+            "icons/icon-running.png"
         } else {
-            "icon-gray.png"
+            "icons/icon.png"
         };
-        // Note: In a real implementation, you'd load different icon files
-        // For now, we'll just use the same icon
-        let _ = icon_name;
+
+        // Load and set the icon
+        if let Ok(icon_bytes) = std::fs::read(icon_path) {
+            if let Ok(img) = image::load_from_memory(&icon_bytes) {
+                let rgba = img.to_rgba8();
+                let (width, height) = rgba.dimensions();
+                let icon = Icon::Rgba {
+                    rgba: rgba.into_raw(),
+                    width,
+                    height,
+                };
+                let _ = app_handle.tray_handle().set_icon(icon);
+            }
+        }
     }
 }
 
@@ -355,10 +399,21 @@ fn handle_tray_event(app: &tauri::AppHandle, event_id: &str) {
             let app_handle = app.clone();
             tauri::async_runtime::spawn(async move {
                 if let Some(state) = app_handle.try_state::<AppState>() {
-                    let mut manager = state.server_manager.lock().await;
-                    match manager.start().await {
-                        Ok(_) => info!("Server start initiated"),
-                        Err(e) => error!("Failed to start server: {}", e),
+                    // Check current status to prevent double-starting
+                    let current_status = {
+                        let manager = state.server_manager.lock().await;
+                        manager.get_status().await
+                    };
+
+                    // Only start if stopped or in error state
+                    if matches!(current_status, ServerStatus::Stopped | ServerStatus::Error(_)) {
+                        let mut manager = state.server_manager.lock().await;
+                        match manager.start().await {
+                            Ok(_) => info!("Server start initiated"),
+                            Err(e) => error!("Failed to start server: {}", e),
+                        }
+                    } else {
+                        info!("Ignoring start request - server is in {:?} state", current_status);
                     }
                 }
             });
@@ -367,10 +422,21 @@ fn handle_tray_event(app: &tauri::AppHandle, event_id: &str) {
             let app_handle = app.clone();
             tauri::async_runtime::spawn(async move {
                 if let Some(state) = app_handle.try_state::<AppState>() {
-                    let mut manager = state.server_manager.lock().await;
-                    match manager.stop().await {
-                        Ok(_) => info!("Server stopped successfully"),
-                        Err(e) => error!("Failed to stop server: {}", e),
+                    // Check current status to prevent double-stopping
+                    let current_status = {
+                        let manager = state.server_manager.lock().await;
+                        manager.get_status().await
+                    };
+
+                    // Only stop if running
+                    if matches!(current_status, ServerStatus::Running { .. }) {
+                        let mut manager = state.server_manager.lock().await;
+                        match manager.stop().await {
+                            Ok(_) => info!("Server stopped successfully"),
+                            Err(e) => error!("Failed to stop server: {}", e),
+                        }
+                    } else {
+                        info!("Ignoring stop request - server is in {:?} state", current_status);
                     }
                 }
             });
