@@ -337,6 +337,7 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
             return menu
                 .add_item(CustomMenuItem::new("status", format!("Running on port {}", port)).disabled())
                 .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(CustomMenuItem::new("about", "About Porua"))
                 .add_item(CustomMenuItem::new("quit", "Quit"));
         }
         ServerStatus::Stopping => "Stopping...",
@@ -345,6 +346,7 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
                 .add_item(CustomMenuItem::new("status", "Error").disabled())
                 .add_item(CustomMenuItem::new("error_detail", err.to_string()).disabled())
                 .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(CustomMenuItem::new("about", "About Porua"))
                 .add_item(CustomMenuItem::new("quit", "Quit"));
         }
     };
@@ -352,6 +354,7 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
     menu = menu
         .add_item(CustomMenuItem::new("status", status_text).disabled())
         .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(CustomMenuItem::new("about", "About Porua"))
         .add_item(CustomMenuItem::new("quit", "Quit"));
 
     menu
@@ -440,6 +443,12 @@ fn handle_tray_event(app: &tauri::AppHandle, event_id: &str) {
                     }
                 }
             });
+        }
+        "about" => {
+            // Open the About Porua URL in the default browser
+            if let Err(e) = open::that("https://shahadishraq.com/porua") {
+                error!("Failed to open About Porua URL: {}", e);
+            }
         }
         "quit" => {
             let app_handle = app.clone();
