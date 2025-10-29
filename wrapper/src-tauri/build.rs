@@ -23,19 +23,25 @@ fn main() {
 }
 
 fn copy_server_binary() {
-    let server_binary_src = if cfg!(target_os = "windows") {
-        PathBuf::from("../../server/target/release/porua_server.exe")
-    } else {
-        PathBuf::from("../../server/target/release/porua_server")
-    };
+    let target = std::env::var("TARGET").unwrap_or_else(|_| "unknown".to_string());
 
-    let dest_name = if cfg!(target_os = "windows") {
+    let binary_name = if target.contains("windows") {
         "porua_server.exe"
     } else {
         "porua_server"
     };
 
-    let dest = PathBuf::from("resources").join(dest_name);
+    // Try target-specific path first (for cross-compilation), then fallback to default
+    let server_binary_src = {
+        let target_path = PathBuf::from(format!("../../server/target/{}/release/{}", target, binary_name));
+        if target_path.exists() {
+            target_path
+        } else {
+            PathBuf::from(format!("../../server/target/release/{}", binary_name))
+        }
+    };
+
+    let dest = PathBuf::from("resources").join(binary_name);
 
     if server_binary_src.exists() {
         std::fs::create_dir_all("resources").expect("Failed to create resources directory");
