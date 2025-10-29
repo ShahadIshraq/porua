@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Porua",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Text-to-speech reader for web pages",
   "icons": {
     "16": "icons/icon-16.png",

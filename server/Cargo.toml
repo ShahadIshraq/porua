@@ -1,7 +1,7 @@
 [package]
 name = "porua_server"
-version = "0.1.1"
-edition = "2021"
+version = "0.2.0"
+edition = "2024"
 
 [[bin]]
 name = "generate_samples"

@@ -5,7 +5,7 @@ description = "Porua TTS Server Wrapper"
 authors = ["Porua Team"]
 license = "MIT"
 repository = "https://github.com/ShahadIshraq/porua"
-edition = "2021"
+edition = "2024"
 
 [build-dependencies]
 tauri-build = { version = "1.5", features = [] }
