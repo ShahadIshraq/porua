@@ -15,9 +15,9 @@ mod utils;
 use auth::load_api_keys;
 use kokoro::model_paths::{get_model_path, get_voices_path};
 use kokoro::voice_config::Voice;
-use kokoro::{TTSPool, TTS};
+use kokoro::{TTS, TTSPool};
 use rate_limit::{PerIpRateLimiter, PerKeyRateLimiter, RateLimitConfig, RateLimiterMode};
-use server::{create_router, AppState};
+use server::{AppState, create_router};
 use std::env;
 use std::io::IsTerminal;
 use std::sync::Arc;
@@ -179,11 +179,15 @@ async fn async_main(args: Vec<String>) -> error::Result<()> {
             match limiter {
                 RateLimiterMode::PerKey(_) => {
                     println!("  Each API key has independent rate limits");
-                    println!("  Configure: RATE_LIMIT_AUTHENTICATED_PER_SECOND, RATE_LIMIT_AUTHENTICATED_BURST_SIZE");
+                    println!(
+                        "  Configure: RATE_LIMIT_AUTHENTICATED_PER_SECOND, RATE_LIMIT_AUTHENTICATED_BURST_SIZE"
+                    );
                 }
                 RateLimiterMode::PerIp(_) => {
                     println!("  Each IP address has independent rate limits");
-                    println!("  Configure: RATE_LIMIT_UNAUTHENTICATED_PER_SECOND, RATE_LIMIT_UNAUTHENTICATED_BURST_SIZE");
+                    println!(
+                        "  Configure: RATE_LIMIT_UNAUTHENTICATED_PER_SECOND, RATE_LIMIT_UNAUTHENTICATED_BURST_SIZE"
+                    );
                 }
             }
             println!("  Set RATE_LIMIT_MODE to change mode (auto, per-key, per-ip, disabled)");
@@ -361,7 +365,10 @@ mod tests {
     #[test]
     fn test_load_request_timeout_default() {
         // Clear environment variable to test default
-        env::remove_var("REQUEST_TIMEOUT_SECONDS");
+        // SAFETY: This is a test environment and we're only modifying test-specific env vars
+        unsafe {
+            env::remove_var("REQUEST_TIMEOUT_SECONDS");
+        }
 
         let timeout = load_request_timeout();
         assert_eq!(
@@ -374,7 +381,10 @@ mod tests {
     #[test]
     fn test_load_request_timeout_custom() {
         // Set custom timeout
-        env::set_var("REQUEST_TIMEOUT_SECONDS", "120");
+        // SAFETY: This is a test environment and we're only modifying test-specific env vars
+        unsafe {
+            env::set_var("REQUEST_TIMEOUT_SECONDS", "120");
+        }
 
         let timeout = load_request_timeout();
         assert_eq!(
@@ -384,13 +394,19 @@ mod tests {
         );
 
         // Cleanup
-        env::remove_var("REQUEST_TIMEOUT_SECONDS");
+        // SAFETY: This is a test environment and we're only modifying test-specific env vars
+        unsafe {
+            env::remove_var("REQUEST_TIMEOUT_SECONDS");
+        }
     }
 
     #[test]
     fn test_load_request_timeout_invalid_falls_back_to_default() {
         // Set invalid timeout value
-        env::set_var("REQUEST_TIMEOUT_SECONDS", "invalid");
+        // SAFETY: This is a test environment and we're only modifying test-specific env vars
+        unsafe {
+            env::set_var("REQUEST_TIMEOUT_SECONDS", "invalid");
+        }
 
         let timeout = load_request_timeout();
         assert_eq!(
@@ -400,13 +416,19 @@ mod tests {
         );
 
         // Cleanup
-        env::remove_var("REQUEST_TIMEOUT_SECONDS");
+        // SAFETY: This is a test environment and we're only modifying test-specific env vars
+        unsafe {
+            env::remove_var("REQUEST_TIMEOUT_SECONDS");
+        }
     }
 
     #[test]
     fn test_load_request_timeout_negative_falls_back_to_default() {
         // Set negative timeout value
-        env::set_var("REQUEST_TIMEOUT_SECONDS", "-1");
+        // SAFETY: This is a test environment and we're only modifying test-specific env vars
+        unsafe {
+            env::set_var("REQUEST_TIMEOUT_SECONDS", "-1");
+        }
 
         let timeout = load_request_timeout();
         assert_eq!(
@@ -416,13 +438,19 @@ mod tests {
         );
 
         // Cleanup
-        env::remove_var("REQUEST_TIMEOUT_SECONDS");
+        // SAFETY: This is a test environment and we're only modifying test-specific env vars
+        unsafe {
+            env::remove_var("REQUEST_TIMEOUT_SECONDS");
+        }
     }
 
     #[test]
     fn test_load_request_timeout_zero_is_valid() {
         // Set zero timeout (edge case - effectively disables timeout)
-        env::set_var("REQUEST_TIMEOUT_SECONDS", "0");
+        // SAFETY: This is a test environment and we're only modifying test-specific env vars
+        unsafe {
+            env::set_var("REQUEST_TIMEOUT_SECONDS", "0");
+        }
 
         let timeout = load_request_timeout();
         assert_eq!(
@@ -432,13 +460,19 @@ mod tests {
         );
 
         // Cleanup
-        env::remove_var("REQUEST_TIMEOUT_SECONDS");
+        // SAFETY: This is a test environment and we're only modifying test-specific env vars
+        unsafe {
+            env::remove_var("REQUEST_TIMEOUT_SECONDS");
+        }
     }
 
     #[test]
     fn test_load_request_timeout_large_value() {
         // Test large timeout value (e.g., 1 hour)
-        env::set_var("REQUEST_TIMEOUT_SECONDS", "3600");
+        // SAFETY: This is a test environment and we're only modifying test-specific env vars
+        unsafe {
+            env::set_var("REQUEST_TIMEOUT_SECONDS", "3600");
+        }
 
         let timeout = load_request_timeout();
         assert_eq!(
@@ -448,6 +482,9 @@ mod tests {
         );
 
         // Cleanup
-        env::remove_var("REQUEST_TIMEOUT_SECONDS");
+        // SAFETY: This is a test environment and we're only modifying test-specific env vars
+        unsafe {
+            env::remove_var("REQUEST_TIMEOUT_SECONDS");
+        }
     }
 }

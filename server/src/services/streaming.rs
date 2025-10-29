@@ -1,8 +1,8 @@
 use axum::{body::Bytes, http::header, response::Response};
 use std::time::Instant;
-use tokio_stream::{wrappers::ReceiverStream, StreamExt};
+use tokio_stream::{StreamExt, wrappers::ReceiverStream};
 
-use crate::chunking::{chunk_text, ChunkingConfig};
+use crate::chunking::{ChunkingConfig, chunk_text};
 use crate::config::constants::{MAX_TEXT_LENGTH, MULTIPART_BOUNDARY};
 use crate::error::{Result, TtsError};
 use crate::models::{ChunkMetadata, TTSRequest};
@@ -687,7 +687,7 @@ mod tests {
 
     #[test]
     fn test_parallel_chunk_processing_with_long_text() {
-        use crate::chunking::{chunk_text, ChunkingConfig};
+        use crate::chunking::{ChunkingConfig, chunk_text};
         use crate::text_processing::normalization::normalize_simple;
 
         // Create text long enough to generate multiple chunks
@@ -768,7 +768,7 @@ mod tests {
 
     #[test]
     fn test_empty_chunks_handling() {
-        use crate::chunking::{chunk_text, ChunkingConfig};
+        use crate::chunking::{ChunkingConfig, chunk_text};
 
         // Test that empty/whitespace text produces single chunk
         let config = ChunkingConfig::default();
@@ -790,7 +790,7 @@ mod tests {
 
     #[test]
     fn test_single_chunk_text() {
-        use crate::chunking::{chunk_text, ChunkingConfig};
+        use crate::chunking::{ChunkingConfig, chunk_text};
 
         // Text shorter than max chunk size should produce single chunk
         let config = ChunkingConfig::default();
