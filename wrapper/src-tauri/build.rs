@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 fn main() {
-    // Standard Tauri build
-    tauri_build::build();
+    // Create resources directory first (required by Tauri before build)
+    std::fs::create_dir_all("resources").expect("Failed to create resources directory");
 
     // Copy server binary to resources
     copy_server_binary();
@@ -15,6 +15,9 @@ fn main() {
 
     // Copy samples
     copy_directory("../../server/samples", "resources/samples");
+
+    // Standard Tauri build (after resources are ready)
+    tauri_build::build();
 
     // Rerun if server binary changes
     println!("cargo:rerun-if-changed=../../server/target/release/porua_server");
@@ -44,8 +47,6 @@ fn copy_server_binary() {
     let dest = PathBuf::from("resources").join(binary_name);
 
     if server_binary_src.exists() {
-        std::fs::create_dir_all("resources").expect("Failed to create resources directory");
-
         std::fs::copy(&server_binary_src, &dest).expect(&format!(
             "Failed to copy server binary from {:?} to {:?}",
             server_binary_src, dest
