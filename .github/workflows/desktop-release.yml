@@ -42,6 +42,11 @@ jobs:
         run: |
           rustup target add ${{ matrix.target }}
 
+      - name: Build server binary
+        run: |
+          cd server
+          cargo build --release --target ${{ matrix.target }}
+
       - name: Build wrapper
         run: |
           cd wrapper/src-tauri
