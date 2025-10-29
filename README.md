@@ -13,12 +13,12 @@ https://github.com/user-attachments/assets/9b16c19b-1334-4e83-b6ef-d4c4ddf920b4
 
 ## Components
 
-### [Wrapper Application](wrapper/README.md) NEW!
-Lightweight menu bar/system tray application:
-- One-click server control (Start/Stop)
-- Automatic installation and model downloads
-- Real-time status monitoring
-- Built with Rust + Tauri (~60MB installer)
+### [Desktop Application](wrapper/README.md)
+Menu bar/system tray app for managing the TTS server:
+- One-click installation with automatic model downloads
+- Start/Stop server control
+- Real-time status updates
+- Built with Tauri (~60MB installer)
 
 ### [Browser Extension](plugin/README.md)
 Modular Chrome/Firefox extension with:
