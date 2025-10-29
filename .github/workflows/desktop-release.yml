@@ -111,32 +111,38 @@ jobs:
             echo "Bundle directory not found"
           fi
 
-      - name: Prepare artifacts (macOS)
+      - name: Create custom DMG (macOS)
         if: matrix.platform == 'macos-latest'
         shell: bash
         run: |
           ARTIFACTS_DIR="${GITHUB_WORKSPACE}/wrapper/src-tauri/target/artifacts"
           BUNDLE_DIR="${GITHUB_WORKSPACE}/wrapper/src-tauri/target/${{ matrix.target }}/release/bundle"
+          APP_BUNDLE="$BUNDLE_DIR/macos/Porua.app"
 
           mkdir -p "$ARTIFACTS_DIR"
 
-          # Copy DMG if it exists
-          if [ -d "$BUNDLE_DIR/dmg" ]; then
-            echo "Found DMG bundle"
-            ls -la "$BUNDLE_DIR/dmg/"
-            cp "$BUNDLE_DIR/dmg"/*.dmg "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg"
-          else
-            echo "Warning: DMG bundle not found"
-          fi
+          # Create custom DMG with background if .app bundle exists
+          if [ -d "$APP_BUNDLE" ]; then
+            echo "Found app bundle at: $APP_BUNDLE"
+            echo "Creating custom DMG with background..."
 
-          # Copy .app bundle if it exists
-          if [ -d "$BUNDLE_DIR/macos" ]; then
-            echo "Found macOS app bundle"
-            ls -la "$BUNDLE_DIR/macos/"
+            cd wrapper/src-tauri
+            chmod +x create_custom_dmg.sh
+            ./create_custom_dmg.sh \
+              "$APP_BUNDLE" \
+              "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg" \
+              "${{ steps.version.outputs.version }}"
+
+            echo "✓ Custom DMG created"
+
+            # Also create a .app.zip as alternative download
+            echo "Creating .app.zip..."
             cd "$BUNDLE_DIR/macos"
-            zip -r "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.app.zip" Porua.app
+            zip -qr "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.app.zip" Porua.app
+            echo "✓ App bundle zip created"
           else
-            echo "Warning: macOS app bundle not found"
+            echo "Error: App bundle not found at $APP_BUNDLE"
+            exit 1
           fi
 
       - name: Prepare artifacts (Windows)
