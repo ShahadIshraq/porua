@@ -45,6 +45,7 @@ jobs:
           brew install openssl@3
 
       - name: Build server binary
+        shell: bash
         run: |
           cd server
           # Set OpenSSL paths for macOS cross-compilation
@@ -56,6 +57,7 @@ jobs:
           cargo build --release --target ${{ matrix.target }}
 
       - name: Build wrapper
+        shell: bash
         run: |
           cd wrapper/src-tauri
           # Set OpenSSL paths for macOS cross-compilation
