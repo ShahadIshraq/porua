@@ -5,7 +5,7 @@ use axum::{
 use porua_server::auth::ApiKeys;
 use porua_server::kokoro::TTSPool;
 use porua_server::rate_limit::{PerKeyRateLimiter, RateLimitConfig, RateLimiterMode};
-use porua_server::server::{AppState, create_router};
+use porua_server::server::{create_router, AppState};
 use std::sync::Arc;
 use std::time::Duration;
 use tower::ServiceExt;
@@ -350,12 +350,10 @@ async fn test_rate_limit_response_format() {
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
     assert_eq!(json["status"], "error");
-    assert!(
-        json["error"]
-            .as_str()
-            .unwrap()
-            .contains("Rate limit exceeded")
-    );
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("Rate limit exceeded"));
 }
 
 #[tokio::test]

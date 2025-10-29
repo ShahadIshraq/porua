@@ -1,9 +1,9 @@
 use axum::{
-    Json, Router,
     extract::State,
     middleware,
     response::Response,
     routing::{get, post},
+    Json, Router,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -13,10 +13,10 @@ use tower_http::timeout::TimeoutLayer;
 
 use crate::audio;
 use crate::auth::ApiKeys;
-use crate::chunking::{ChunkingConfig, chunk_text};
+use crate::chunking::{chunk_text, ChunkingConfig};
 use crate::config::constants::MAX_TEXT_LENGTH;
 use crate::error::{Result, TtsError};
-use crate::kokoro::{TTSPool, model_paths::get_samples_dir, voice_config::Voice};
+use crate::kokoro::{model_paths::get_samples_dir, voice_config::Voice, TTSPool};
 use crate::models::{HealthResponse, PoolStatsResponse, TTSRequest, VoiceInfo, VoicesResponse};
 use crate::rate_limit::RateLimiterMode;
 use crate::utils::temp_file::TempFile;

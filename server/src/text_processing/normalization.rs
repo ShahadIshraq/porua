@@ -565,11 +565,9 @@ mod tests {
     fn test_currency_with_scale() {
         let text = "Sold $10.3 billion in shares";
         let result = normalize_for_tts(text);
-        assert!(
-            result
-                .normalized
-                .contains("ten point three billion dollars")
-        );
+        assert!(result
+            .normalized
+            .contains("ten point three billion dollars"));
         assert!(!result.normalized.contains("$10.3"));
     }
 
@@ -577,11 +575,9 @@ mod tests {
     fn test_simple_currency() {
         let text = "Price is $23.45";
         let result = normalize_for_tts(text);
-        assert!(
-            result
-                .normalized
-                .contains("twenty-three dollars and forty-five cents")
-        );
+        assert!(result
+            .normalized
+            .contains("twenty-three dollars and forty-five cents"));
         assert!(!result.normalized.contains("$23.45"));
     }
 
@@ -648,11 +644,9 @@ mod tests {
     fn test_smart_quote_after_currency() {
         let text = "$10.3 billion's impact";
         let result = normalize_for_tts(text);
-        assert!(
-            result
-                .normalized
-                .contains("ten point three billion dollars")
-        );
+        assert!(result
+            .normalized
+            .contains("ten point three billion dollars"));
 
         // Test position mapping
         if let Some(pos) = result.normalized.find("billion") {

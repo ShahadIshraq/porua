@@ -3,8 +3,8 @@ pub mod voice_config;
 
 use kokoros::tts::koko::{TTSKoko, TTSOpts};
 use std::error::Error;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use tokio::sync::{Mutex, Semaphore};
 
 #[allow(clippy::upper_case_acronyms)]

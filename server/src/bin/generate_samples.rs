@@ -1,4 +1,4 @@
-use porua_server::kokoro::{TTS, voice_config::Voice};
+use porua_server::kokoro::{voice_config::Voice, TTS};
 use std::path::Path;
 
 const SAMPLE_TEXT: &str = "Hello, I'm here to help you read any text on the web. Whether it's an article, a blog post, or a long document, I can read it aloud for you in a natural and clear voice. Just select the text you want to hear, and I'll take care of the rest.";
