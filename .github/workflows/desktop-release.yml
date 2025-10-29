@@ -115,24 +115,26 @@ jobs:
         if: matrix.platform == 'macos-latest'
         shell: bash
         run: |
-          mkdir -p wrapper/src-tauri/target/artifacts
-          cd wrapper/src-tauri/target/${{ matrix.target }}/release/bundle
+          ARTIFACTS_DIR="wrapper/src-tauri/target/artifacts"
+          BUNDLE_DIR="wrapper/src-tauri/target/${{ matrix.target }}/release/bundle"
+
+          mkdir -p "$ARTIFACTS_DIR"
 
           # Copy DMG if it exists
-          if [ -d "dmg" ]; then
+          if [ -d "$BUNDLE_DIR/dmg" ]; then
             echo "Found DMG bundle"
-            ls -la dmg/
-            cp dmg/*.dmg ../../../../artifacts/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg
+            ls -la "$BUNDLE_DIR/dmg/"
+            cp "$BUNDLE_DIR/dmg"/*.dmg "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg"
           else
             echo "Warning: DMG bundle not found"
           fi
 
           # Copy .app bundle if it exists
-          if [ -d "macos" ]; then
+          if [ -d "$BUNDLE_DIR/macos" ]; then
             echo "Found macOS app bundle"
-            ls -la macos/
-            cd macos
-            zip -r ../../../../../artifacts/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.app.zip Porua.app
+            ls -la "$BUNDLE_DIR/macos/"
+            cd "$BUNDLE_DIR/macos"
+            zip -r "$GITHUB_WORKSPACE/$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.app.zip" Porua.app
           else
             echo "Warning: macOS app bundle not found"
           fi
@@ -141,23 +143,25 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: bash
         run: |
-          mkdir -p wrapper/src-tauri/target/artifacts
-          cd wrapper/src-tauri/target/${{ matrix.target }}/release/bundle
+          ARTIFACTS_DIR="wrapper/src-tauri/target/artifacts"
+          BUNDLE_DIR="wrapper/src-tauri/target/${{ matrix.target }}/release/bundle"
+
+          mkdir -p "$ARTIFACTS_DIR"
 
           # Copy MSI if it exists
-          if [ -d "msi" ]; then
+          if [ -d "$BUNDLE_DIR/msi" ]; then
             echo "Found MSI installer"
-            ls -la msi/
-            cp msi/*.msi ../../../../artifacts/Porua-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.msi
+            ls -la "$BUNDLE_DIR/msi/"
+            cp "$BUNDLE_DIR/msi"/*.msi "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.msi"
           else
             echo "Warning: MSI installer not found"
           fi
 
           # Copy NSIS installer if it exists
-          if [ -d "nsis" ]; then
+          if [ -d "$BUNDLE_DIR/nsis" ]; then
             echo "Found NSIS installer"
-            ls -la nsis/
-            cp nsis/*.exe ../../../../artifacts/Porua-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.exe
+            ls -la "$BUNDLE_DIR/nsis/"
+            cp "$BUNDLE_DIR/nsis"/*.exe "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.exe"
           else
             echo "Warning: NSIS installer not found"
           fi
