@@ -1,0 +1,160 @@
+name: Desktop Release
+
+on:
+  push:
+    tags:
+      - 'server-v*'
+
+jobs:
+  build-desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            arch: x64
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            arch: arm64
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            arch: x64
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install dependencies (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          rustup target add ${{ matrix.target }}
+
+      - name: Build wrapper
+        run: |
+          cd wrapper/src-tauri
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: Create DMG (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          cd wrapper/src-tauri
+          cargo install cargo-bundle
+          cargo bundle --release --target ${{ matrix.target }}
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG_NAME#server-v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "desktop_tag=desktop-v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Prepare artifacts (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          cd wrapper/src-tauri/target/${{ matrix.target }}/release/bundle
+          if [ -d "dmg" ]; then
+            mkdir -p ../../../../artifacts
+            cp dmg/*.dmg ../../../../artifacts/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg
+          fi
+          if [ -d "macos" ]; then
+            cd macos
+            zip -r ../../../../../artifacts/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.app.zip Porua.app
+          fi
+
+      - name: Prepare artifacts (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          cd wrapper/src-tauri/target/${{ matrix.target }}/release
+          mkdir -p ../../artifacts
+          if [ -f "porua-wrapper.exe" ]; then
+            cp porua-wrapper.exe ../../artifacts/Porua-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.exe
+          fi
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: porua-desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          path: wrapper/src-tauri/target/artifacts/*
+
+  create-release:
+    needs: build-desktop
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG_NAME#server-v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "desktop_tag=desktop-v$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+
+      - name: Create desktop release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.desktop_tag }}
+          name: Porua Desktop ${{ steps.version.outputs.version }}
+          body: |
+            # Porua Desktop v${{ steps.version.outputs.version }}
+
+            Desktop wrapper application for Porua TTS Server.
+
+            ## Downloads
+
+            ### macOS
+            - **Apple Silicon (M1/M2/M3)**: `Porua-${{ steps.version.outputs.version }}-arm64.dmg`
+            - **Intel**: `Porua-${{ steps.version.outputs.version }}-x64.dmg`
+
+            ### Windows
+            - **64-bit**: `Porua-${{ steps.version.outputs.version }}-windows-x64.exe`
+
+            ## Installation
+
+            ### macOS
+            1. Download the appropriate DMG file for your Mac
+            2. Open the DMG file
+            3. Drag Porua to your Applications folder
+            4. Right-click and select "Open" on first launch (due to macOS security)
+
+            ### Windows
+            1. Download the EXE file
+            2. Run the installer
+            3. Follow the installation prompts
+
+            ---
+            *Built from server release tag: `server-v${{ steps.version.outputs.version }}`*
+          files: |
+            artifacts/**/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
