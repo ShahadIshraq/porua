@@ -41,15 +41,29 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: |
           rustup target add ${{ matrix.target }}
+          # Install OpenSSL for cross-compilation
+          brew install openssl@3
 
       - name: Build server binary
         run: |
           cd server
+          # Set OpenSSL paths for macOS cross-compilation
+          if [ "${{ matrix.platform }}" = "macos-latest" ]; then
+            export OPENSSL_DIR=$(brew --prefix openssl@3)
+            export OPENSSL_LIB_DIR=$(brew --prefix openssl@3)/lib
+            export OPENSSL_INCLUDE_DIR=$(brew --prefix openssl@3)/include
+          fi
           cargo build --release --target ${{ matrix.target }}
 
       - name: Build wrapper
         run: |
           cd wrapper/src-tauri
+          # Set OpenSSL paths for macOS cross-compilation
+          if [ "${{ matrix.platform }}" = "macos-latest" ]; then
+            export OPENSSL_DIR=$(brew --prefix openssl@3)
+            export OPENSSL_LIB_DIR=$(brew --prefix openssl@3)/lib
+            export OPENSSL_INCLUDE_DIR=$(brew --prefix openssl@3)/include
+          fi
           cargo build --release --target ${{ matrix.target }}
 
       - name: Create DMG (macOS)
