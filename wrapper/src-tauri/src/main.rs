@@ -306,53 +306,53 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
         ServerStatus::Stopped | ServerStatus::Error(_) => {
             // Show Start button when stopped or in error
             menu = menu
-                .add_item(CustomMenuItem::new("start", "▶ Start Server"))
+                .add_item(CustomMenuItem::new("start", "Start Server"))
                 .add_native_item(SystemTrayMenuItem::Separator);
         }
         ServerStatus::Starting => {
             // Show disabled Starting indicator
             menu = menu
-                .add_item(CustomMenuItem::new("starting", "⏳ Starting...").disabled())
+                .add_item(CustomMenuItem::new("starting", "Starting...").disabled())
                 .add_native_item(SystemTrayMenuItem::Separator);
         }
         ServerStatus::Running { .. } => {
             // Show Stop button when running
             menu = menu
-                .add_item(CustomMenuItem::new("stop", "⏹ Stop Server"))
+                .add_item(CustomMenuItem::new("stop", "Stop Server"))
                 .add_native_item(SystemTrayMenuItem::Separator);
         }
         ServerStatus::Stopping => {
             // Show disabled Stopping indicator
             menu = menu
-                .add_item(CustomMenuItem::new("stopping", "⏳ Stopping...").disabled())
+                .add_item(CustomMenuItem::new("stopping", "Stopping...").disabled())
                 .add_native_item(SystemTrayMenuItem::Separator);
         }
     }
 
     // Status text based on current state
     let status_text = match status {
-        ServerStatus::Stopped => "ℹ️ Status: Stopped",
-        ServerStatus::Starting => "⏳ Status: Starting...",
+        ServerStatus::Stopped => "Stopped",
+        ServerStatus::Starting => "Starting...",
         ServerStatus::Running { port } => {
             return menu
-                .add_item(CustomMenuItem::new("status", format!("ℹ️ Status: Running ({})", port)).disabled())
+                .add_item(CustomMenuItem::new("status", format!("Running on port {}", port)).disabled())
                 .add_native_item(SystemTrayMenuItem::Separator)
-                .add_item(CustomMenuItem::new("quit", "❌ Quit"));
+                .add_item(CustomMenuItem::new("quit", "Quit"));
         }
-        ServerStatus::Stopping => "⏳ Status: Stopping...",
+        ServerStatus::Stopping => "Stopping...",
         ServerStatus::Error(err) => {
             return menu
-                .add_item(CustomMenuItem::new("status", format!("⚠️ Status: Error")).disabled())
-                .add_item(CustomMenuItem::new("error_detail", format!("Error: {}", err)).disabled())
+                .add_item(CustomMenuItem::new("status", "Error").disabled())
+                .add_item(CustomMenuItem::new("error_detail", err.to_string()).disabled())
                 .add_native_item(SystemTrayMenuItem::Separator)
-                .add_item(CustomMenuItem::new("quit", "❌ Quit"));
+                .add_item(CustomMenuItem::new("quit", "Quit"));
         }
     };
 
     menu = menu
         .add_item(CustomMenuItem::new("status", status_text).disabled())
         .add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(CustomMenuItem::new("quit", "❌ Quit"));
+        .add_item(CustomMenuItem::new("quit", "Quit"));
 
     menu
 }
