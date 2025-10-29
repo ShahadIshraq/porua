@@ -115,8 +115,8 @@ jobs:
         if: matrix.platform == 'macos-latest'
         shell: bash
         run: |
-          ARTIFACTS_DIR="wrapper/src-tauri/target/artifacts"
-          BUNDLE_DIR="wrapper/src-tauri/target/${{ matrix.target }}/release/bundle"
+          ARTIFACTS_DIR="${GITHUB_WORKSPACE}/wrapper/src-tauri/target/artifacts"
+          BUNDLE_DIR="${GITHUB_WORKSPACE}/wrapper/src-tauri/target/${{ matrix.target }}/release/bundle"
 
           mkdir -p "$ARTIFACTS_DIR"
 
@@ -134,7 +134,7 @@ jobs:
             echo "Found macOS app bundle"
             ls -la "$BUNDLE_DIR/macos/"
             cd "$BUNDLE_DIR/macos"
-            zip -r "$GITHUB_WORKSPACE/$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.app.zip" Porua.app
+            zip -r "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.app.zip" Porua.app
           else
             echo "Warning: macOS app bundle not found"
           fi
@@ -143,8 +143,8 @@ jobs:
         if: matrix.platform == 'windows-latest'
         shell: bash
         run: |
-          ARTIFACTS_DIR="wrapper/src-tauri/target/artifacts"
-          BUNDLE_DIR="wrapper/src-tauri/target/${{ matrix.target }}/release/bundle"
+          ARTIFACTS_DIR="${GITHUB_WORKSPACE}/wrapper/src-tauri/target/artifacts"
+          BUNDLE_DIR="${GITHUB_WORKSPACE}/wrapper/src-tauri/target/${{ matrix.target }}/release/bundle"
 
           mkdir -p "$ARTIFACTS_DIR"
 
