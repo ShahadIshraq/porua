@@ -124,8 +124,6 @@ jobs:
           tag_name: ${{ steps.version.outputs.desktop_tag }}
           name: Porua Desktop ${{ steps.version.outputs.version }}
           body: |
-            # Porua Desktop v${{ steps.version.outputs.version }}
-
             Desktop wrapper application for Porua TTS Server.
 
             ## Downloads
