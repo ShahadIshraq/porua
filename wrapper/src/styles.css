@@ -410,6 +410,71 @@ button {
     }
 }
 
+/* Extension Info */
+.extension-info {
+    background: #f0f4ff;
+    border: 2px solid #667eea;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+    text-align: left;
+    width: 100%;
+    max-width: 400px;
+}
+
+.extension-info .info-title {
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 8px;
+    font-size: 16px;
+}
+
+.extension-description {
+    color: #4a5568;
+    font-size: 14px;
+    margin-bottom: 16px;
+}
+
+.extension-links {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.extension-link {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.extension-link:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.link-icon {
+    font-size: 16px;
+    font-weight: bold;
+}
+
+.extension-note {
+    color: #718096;
+    font-size: 12px;
+    font-style: italic;
+    margin-top: 8px;
+}
+
 /* Error Details */
 .error-details {
     background: #fff5f5;
