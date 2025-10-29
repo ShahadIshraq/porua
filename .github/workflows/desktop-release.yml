@@ -67,24 +67,28 @@ jobs:
           fi
           cargo build --release --target ${{ matrix.target }}
 
-      - name: Build wrapper
+      - name: Install Tauri CLI
         shell: bash
         run: |
-          cd wrapper/src-tauri
-          # Set OpenSSL paths for macOS cross-compilation
-          if [ "${{ matrix.platform }}" = "macos-latest" ]; then
-            export OPENSSL_DIR=$(brew --prefix openssl@3)
-            export OPENSSL_LIB_DIR=$(brew --prefix openssl@3)/lib
-            export OPENSSL_INCLUDE_DIR=$(brew --prefix openssl@3)/include
-          fi
-          cargo build --release --target ${{ matrix.target }}
+          cargo install tauri-cli --version ^1.5
 
-      - name: Create DMG (macOS)
+      - name: Build wrapper (macOS)
         if: matrix.platform == 'macos-latest'
+        shell: bash
         run: |
-          cd wrapper/src-tauri
-          cargo install cargo-bundle
-          cargo bundle --release --target ${{ matrix.target }}
+          cd wrapper
+          # Set OpenSSL paths for macOS cross-compilation
+          export OPENSSL_DIR=$(brew --prefix openssl@3)
+          export OPENSSL_LIB_DIR=$(brew --prefix openssl@3)/lib
+          export OPENSSL_INCLUDE_DIR=$(brew --prefix openssl@3)/include
+          cargo tauri build --target ${{ matrix.target }}
+
+      - name: Build wrapper (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          cd wrapper
+          cargo tauri build --target ${{ matrix.target }}
 
       - name: Extract version from tag
         id: version
@@ -95,27 +99,67 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "desktop_tag=desktop-v$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Debug bundle output
+        shell: bash
+        run: |
+          echo "Checking bundle directory structure..."
+          ls -la wrapper/src-tauri/target/${{ matrix.target }}/release/ || echo "Release directory not found"
+          if [ -d "wrapper/src-tauri/target/${{ matrix.target }}/release/bundle" ]; then
+            echo "Bundle directory contents:"
+            ls -la wrapper/src-tauri/target/${{ matrix.target }}/release/bundle/
+          else
+            echo "Bundle directory not found"
+          fi
+
       - name: Prepare artifacts (macOS)
         if: matrix.platform == 'macos-latest'
+        shell: bash
         run: |
+          mkdir -p wrapper/src-tauri/target/artifacts
           cd wrapper/src-tauri/target/${{ matrix.target }}/release/bundle
+
+          # Copy DMG if it exists
           if [ -d "dmg" ]; then
-            mkdir -p ../../../../artifacts
+            echo "Found DMG bundle"
+            ls -la dmg/
             cp dmg/*.dmg ../../../../artifacts/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg
+          else
+            echo "Warning: DMG bundle not found"
           fi
+
+          # Copy .app bundle if it exists
           if [ -d "macos" ]; then
+            echo "Found macOS app bundle"
+            ls -la macos/
             cd macos
             zip -r ../../../../../artifacts/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.app.zip Porua.app
+          else
+            echo "Warning: macOS app bundle not found"
           fi
 
       - name: Prepare artifacts (Windows)
         if: matrix.platform == 'windows-latest'
         shell: bash
         run: |
-          cd wrapper/src-tauri/target/${{ matrix.target }}/release
-          mkdir -p ../../artifacts
-          if [ -f "porua-wrapper.exe" ]; then
-            cp porua-wrapper.exe ../../artifacts/Porua-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.exe
+          mkdir -p wrapper/src-tauri/target/artifacts
+          cd wrapper/src-tauri/target/${{ matrix.target }}/release/bundle
+
+          # Copy MSI if it exists
+          if [ -d "msi" ]; then
+            echo "Found MSI installer"
+            ls -la msi/
+            cp msi/*.msi ../../../../artifacts/Porua-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.msi
+          else
+            echo "Warning: MSI installer not found"
+          fi
+
+          # Copy NSIS installer if it exists
+          if [ -d "nsis" ]; then
+            echo "Found NSIS installer"
+            ls -la nsis/
+            cp nsis/*.exe ../../../../artifacts/Porua-${{ steps.version.outputs.version }}-windows-${{ matrix.arch }}.exe
+          else
+            echo "Warning: NSIS installer not found"
           fi
 
       - name: Upload artifacts
@@ -161,11 +205,12 @@ jobs:
             ## Downloads
 
             ### macOS
-            - **Apple Silicon (M1/M2/M3)**: `Porua-${{ steps.version.outputs.version }}-arm64.dmg`
-            - **Intel**: `Porua-${{ steps.version.outputs.version }}-x64.dmg`
+            - **Apple Silicon (M1/M2/M3)**: `Porua-${{ steps.version.outputs.version }}-arm64.dmg` or `Porua-${{ steps.version.outputs.version }}-arm64.app.zip`
+            - **Intel**: `Porua-${{ steps.version.outputs.version }}-x64.dmg` or `Porua-${{ steps.version.outputs.version }}-x64.app.zip`
 
             ### Windows
-            - **64-bit**: `Porua-${{ steps.version.outputs.version }}-windows-x64.exe`
+            - **64-bit MSI**: `Porua-${{ steps.version.outputs.version }}-windows-x64.msi`
+            - **64-bit EXE**: `Porua-${{ steps.version.outputs.version }}-windows-x64.exe`
 
             ## Installation
 
@@ -175,8 +220,10 @@ jobs:
             3. Drag Porua to your Applications folder
             4. Right-click and select "Open" on first launch (due to macOS security)
 
+            Alternatively, download the .app.zip file, extract it, and move to Applications.
+
             ### Windows
-            1. Download the EXE file
+            1. Download the MSI or EXE installer
             2. Run the installer
             3. Follow the installation prompts
 
