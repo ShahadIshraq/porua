@@ -1,4 +1,4 @@
-# Porua
+# Porua - পড়ুয়া
 
 <img src="plugin/icons/icon-128.png" alt="Porua Icon" width="128" height="128">
 
