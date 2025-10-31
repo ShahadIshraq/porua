@@ -62,8 +62,13 @@ impl ServerManager {
         );
         cmd.env("RUST_LOG", &self.config.server.log_level);
 
-        // Redirect logs to log directory
+        // Redirect logs to log directory with rotation
+        // Use daily rotation to prevent unbounded log growth
         let log_file_path = self.config.paths.log_dir.join("server.log");
+
+        // Clean up old log files (keep last 7 days)
+        cleanup_old_logs(&self.config.paths.log_dir, "server.log", 7)?;
+
         let log_file = std::fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -217,4 +222,42 @@ async fn wait_for_server_ready(port: u16) -> Result<()> {
     }
 
     Err(anyhow::anyhow!("Server failed to start within timeout"))
+}
+
+/// Clean up old log files to prevent unbounded disk usage
+/// Keeps only the specified number of days worth of logs
+fn cleanup_old_logs(log_dir: &std::path::Path, base_name: &str, days_to_keep: u64) -> Result<()> {
+    use std::time::SystemTime;
+
+    // Get all log files (including rotated ones with date suffixes)
+    let entries = match std::fs::read_dir(log_dir) {
+        Ok(entries) => entries,
+        Err(_) => return Ok(()), // If directory doesn't exist, nothing to clean
+    };
+
+    let cutoff_time = SystemTime::now()
+        .checked_sub(std::time::Duration::from_secs(days_to_keep * 24 * 60 * 60))
+        .unwrap_or(SystemTime::UNIX_EPOCH);
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+
+        // Only process log files matching our pattern
+        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+            // Match both "server.log" and "server.log.YYYY-MM-DD" patterns
+            if file_name.starts_with(base_name) {
+                // Check file modification time
+                if let Ok(metadata) = std::fs::metadata(&path) {
+                    if let Ok(modified) = metadata.modified() {
+                        if modified < cutoff_time {
+                            info!("Cleaning up old log file: {:?}", path);
+                            let _ = std::fs::remove_file(&path);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
 }
