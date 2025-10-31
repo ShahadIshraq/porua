@@ -3,6 +3,8 @@
  * Displays cache usage and provides clear functionality
  */
 
+import { createElement, replaceContent } from '../shared/utils/domBuilder.js';
+
 export class CacheStats {
   constructor() {
     this.container = null;
@@ -24,17 +26,15 @@ export class CacheStats {
    * Render component HTML
    */
   render() {
-    this.container.innerHTML = `
-      <div class="cache-stats-section">
-        <div class="cache-header">
-          <span class="cache-label">Cache</span>
-          <span class="cache-size" id="cache-size">-- MB / 100 MB</span>
-        </div>
-        <button type="button" id="clear-cache-btn" class="btn-clear-cache">
-          Clear Cache
-        </button>
-      </div>
-    `;
+    const view = createElement('div', 'cache-stats-section', [
+      createElement('div', 'cache-header', [
+        createElement('span', 'cache-label', 'Cache'),
+        createElement('span', { className: 'cache-size', id: 'cache-size' }, '-- MB / 100 MB')
+      ]),
+      createElement('button', { type: 'button', id: 'clear-cache-btn', className: 'btn-clear-cache' }, 'Clear Cache')
+    ]);
+
+    replaceContent(this.container, view);
   }
 
   /**
