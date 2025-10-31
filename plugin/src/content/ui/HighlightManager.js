@@ -12,6 +12,8 @@ export class HighlightManager {
 
   wrapPhrases(paragraph, timeline) {
     if (!paragraph.dataset.originalHtml) {
+      // Safe: Storing original page HTML for later restoration
+      // eslint-disable-next-line no-unsanitized/property
       paragraph.dataset.originalHtml = paragraph.innerHTML;
     }
 
@@ -272,6 +274,8 @@ export class HighlightManager {
 
     // Restore original HTML
     if (paragraph.dataset.originalHtml) {
+      // Safe: Restoring previously saved page HTML (no user input)
+      // eslint-disable-next-line no-unsanitized/property
       paragraph.innerHTML = paragraph.dataset.originalHtml;
     }
 
@@ -283,6 +287,8 @@ export class HighlightManager {
     if (!paragraph) return;
 
     if (paragraph.dataset.originalHtml) {
+      // Safe: Restoring previously saved page HTML (no user input)
+      // eslint-disable-next-line no-unsanitized/property
       paragraph.innerHTML = paragraph.dataset.originalHtml;
       delete paragraph.dataset.originalHtml;
     }
