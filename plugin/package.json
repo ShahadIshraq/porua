@@ -9,6 +9,8 @@
     "test:coverage": "vitest run --coverage",
     "build": "node build/bundle.js",
     "dev": "node build/bundle.js --watch",
+    "dev:firefox": "bash scripts/run-firefox.sh",
+    "lint:firefox": "bash scripts/lint-firefox.sh",
     "package": "node build/package.cjs",
     "package:chrome": "node build/package.cjs --chrome",
     "package:firefox": "node build/package.cjs --firefox",
@@ -24,6 +26,7 @@
     "fs-extra": "^11.3.2",
     "happy-dom": "^20.0.0",
     "jsdom": "^27.0.0",
-    "vitest": "^3.2.4"
+    "vitest": "^3.2.4",
+    "web-ext": "^9.1.0"
   }
 }
