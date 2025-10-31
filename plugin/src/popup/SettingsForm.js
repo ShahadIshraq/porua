@@ -367,7 +367,11 @@ export class SettingsForm {
     if (this.isDirty) {
       this.saveButton.disabled = false;
       this.saveButton.classList.add('has-changes');
-      this.saveButton.innerHTML = 'Save Changes <span class="changes-indicator">●</span>';
+      this.saveButton.textContent = 'Save Changes ';
+      const indicator = document.createElement('span');
+      indicator.className = 'changes-indicator';
+      indicator.textContent = '●';
+      this.saveButton.appendChild(indicator);
 
       // Show reset button
       if (this.resetButton) {

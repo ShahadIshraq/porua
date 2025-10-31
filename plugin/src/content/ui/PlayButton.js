@@ -64,7 +64,7 @@ export class PlayButton {
 
   create() {
     const button = createElement('div', 'tts-play-button');
-    button.innerHTML = '▶';
+    button.textContent = '▶';
     button.title = 'Read aloud';
 
     this.eventManager.on(button, 'click', (e) => {
