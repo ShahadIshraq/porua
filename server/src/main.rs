@@ -212,7 +212,12 @@ async fn async_main(args: Vec<String>) -> error::Result<()> {
 
         let app = create_router(state);
 
-        axum::serve(listener, app).await?;
+        // Use into_make_service_with_connect_info to enable client IP extraction
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await?;
     } else {
         // CLI mode - use single TTS instance
         println!("Initializing TTS engine for CLI mode...");
