@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - 'server-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number for test build'
+        required: true
+        default: '0.0.0-test'
 
 jobs:
   build-desktop:
@@ -159,8 +165,12 @@ jobs:
         id: version
         shell: bash
         run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          VERSION=${TAG_NAME#server-v}
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            VERSION=${TAG_NAME#server-v}
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "desktop_tag=desktop-v$VERSION" >> $GITHUB_OUTPUT
 
@@ -343,8 +353,12 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          TAG_NAME=${GITHUB_REF#refs/tags/}
-          VERSION=${TAG_NAME#server-v}
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            VERSION=${TAG_NAME#server-v}
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "desktop_tag=desktop-v$VERSION" >> $GITHUB_OUTPUT
 
