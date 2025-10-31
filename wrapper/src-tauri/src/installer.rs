@@ -143,7 +143,7 @@ impl Installer {
         }
         info!("Models downloaded successfully");
 
-        // Step 6: Create configuration (95%)
+        // Step 6: Create configuration and environment (95%)
         self.emit_progress(InstallProgress {
             step: "CreatingConfig".to_string(),
             progress: 0.95,
@@ -151,12 +151,21 @@ impl Installer {
             details: None,
         });
         self.notify("Creating configuration...");
-        if let Err(e) = Config::new().and_then(|config| config.save())
-            .context("Failed to create configuration") {
+
+        // Create config and save both config.json and .env
+        let config = Config::new().context("Failed to create configuration")?;
+
+        if let Err(e) = config.save().context("Failed to save config.json") {
             self.emit_error(&e.to_string());
             return Err(e);
         }
-        info!("Configuration created");
+
+        if let Err(e) = config.save_env_file().context("Failed to save .env file") {
+            self.emit_error(&e.to_string());
+            return Err(e);
+        }
+
+        info!("Configuration and environment created successfully");
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
         // Step 7: Mark installation as complete (100%)
