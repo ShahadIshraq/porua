@@ -15,6 +15,7 @@ module.exports = {
     'scripts',
     'tests',
     'packages',
+    'coverage',
     '.git',
     '.packaging-temp',
     'manifest.json.bak',
