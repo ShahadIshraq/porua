@@ -1,6 +1,7 @@
 import { ttsService } from '../shared/services/TTSService.js';
 import { SettingsStore } from '../shared/storage/SettingsStore.js';
 import { AudioPreview } from './AudioPreview.js';
+import { createElement, replaceContent } from '../shared/utils/domBuilder.js';
 
 /**
  * Voice selector component with audio preview
@@ -53,19 +54,17 @@ export class VoiceSelector {
    * Render collapsed view showing current voice
    */
   renderCollapsedView() {
-    this.container.innerHTML = `
-      <div class="voice-selector-collapsed">
-        <div class="current-voice">
-          <label>Selected Voice</label>
-          <div class="current-voice-display">
-            <span class="voice-name">${this.selectedVoiceName}</span>
-            <button type="button" class="btn-expand" id="voice-selector-expand">
-              Change Voice
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
+    const view = createElement('div', 'voice-selector-collapsed', [
+      createElement('div', 'current-voice', [
+        createElement('label', null, 'Selected Voice'),
+        createElement('div', 'current-voice-display', [
+          createElement('span', 'voice-name', this.selectedVoiceName),
+          createElement('button', { type: 'button', className: 'btn-expand', id: 'voice-selector-expand' }, 'Change Voice')
+        ])
+      ])
+    ]);
+
+    replaceContent(this.container, view);
   }
 
   /**
@@ -115,31 +114,31 @@ export class VoiceSelector {
    * Render loading view
    */
   renderLoadingView() {
-    this.container.innerHTML = `
-      <div class="voice-selector-loading">
-        <div class="loading-spinner"></div>
-        <p>Loading voices...</p>
-      </div>
-    `;
+    const view = createElement('div', 'voice-selector-loading', [
+      createElement('div', 'loading-spinner'),
+      createElement('p', null, 'Loading voices...')
+    ]);
+
+    replaceContent(this.container, view);
   }
 
   /**
    * Render error view
    */
   renderErrorView() {
-    this.container.innerHTML = `
-      <div class="voice-selector-error">
-        <p class="error-message">Failed to load voices: ${this.error}</p>
-        <button type="button" class="btn-retry" id="voice-selector-retry">Retry</button>
-        <button type="button" class="btn-cancel" id="voice-selector-cancel">Cancel</button>
-      </div>
-    `;
+    const retryBtn = createElement('button', { type: 'button', className: 'btn-retry', id: 'voice-selector-retry' }, 'Retry');
+    const cancelBtn = createElement('button', { type: 'button', className: 'btn-cancel', id: 'voice-selector-cancel' }, 'Cancel');
 
-    const retryBtn = this.container.querySelector('#voice-selector-retry');
-    const cancelBtn = this.container.querySelector('#voice-selector-cancel');
+    const view = createElement('div', 'voice-selector-error', [
+      createElement('p', 'error-message', `Failed to load voices: ${this.error}`),
+      retryBtn,
+      cancelBtn
+    ]);
 
-    if (retryBtn) retryBtn.addEventListener('click', () => this.expand());
-    if (cancelBtn) cancelBtn.addEventListener('click', () => this.renderCollapsedView());
+    replaceContent(this.container, view);
+
+    retryBtn.addEventListener('click', () => this.expand());
+    cancelBtn.addEventListener('click', () => this.renderCollapsedView());
   }
 
   /**
@@ -148,22 +147,22 @@ export class VoiceSelector {
   renderExpandedView() {
     const groupedVoices = this.groupVoicesByLanguageAndGender();
 
-    let html = '<div class="voice-selector-expanded">';
-    html += '<div class="voice-selector-header">';
-    html += '<h3>Select Voice</h3>';
-    html += '<button type="button" class="btn-close" id="voice-selector-close">✕</button>';
-    html += '</div>';
-    html += '<div class="voice-sections">';
+    const header = createElement('div', 'voice-selector-header', [
+      createElement('h3', null, 'Select Voice'),
+      createElement('button', { type: 'button', className: 'btn-close', id: 'voice-selector-close' }, '✕')
+    ]);
 
-    // Render each language section
+    const languageSections = [];
     for (const [language, genderGroups] of Object.entries(groupedVoices)) {
-      html += this.renderLanguageSection(language, genderGroups);
+      languageSections.push(this.renderLanguageSection(language, genderGroups));
     }
 
-    html += '</div>';
-    html += '</div>';
+    const view = createElement('div', 'voice-selector-expanded', [
+      header,
+      createElement('div', 'voice-sections', languageSections)
+    ]);
 
-    this.container.innerHTML = html;
+    replaceContent(this.container, view);
     this.attachEventListeners();
   }
 
@@ -213,58 +212,54 @@ export class VoiceSelector {
    * Render a language section with gender groups
    * @param {string} language
    * @param {Object} genderGroups - { Female: [...], Male: [...] }
-   * @returns {string} HTML string
+   * @returns {HTMLElement} DOM element
    */
   renderLanguageSection(language, genderGroups) {
     const isCollapsed = this.collapsedSections[language];
     const toggleIcon = isCollapsed ? '▶' : '▼';
 
-    let html = `<div class="language-section" data-language="${language}">`;
-    html += `<div class="language-header">`;
-    html += `<button type="button" class="language-toggle" data-language="${language}">`;
-    html += `<span class="toggle-icon">${toggleIcon}</span>`;
-    html += `<span class="language-name">${language}</span>`;
-    html += `</button>`;
-    html += `</div>`;
+    const header = createElement('div', 'language-header', [
+      createElement('button', { type: 'button', className: 'language-toggle', 'data-language': language }, [
+        createElement('span', 'toggle-icon', toggleIcon),
+        createElement('span', 'language-name', language)
+      ])
+    ]);
+
+    const children = [header];
 
     if (!isCollapsed) {
-      html += `<div class="language-content">`;
+      const genderGroups_content = [];
 
       // Render Female voices
       if (genderGroups.Female && genderGroups.Female.length > 0) {
-        html += `<div class="gender-group">`;
-        html += `<h4 class="gender-label">Female</h4>`;
-        html += `<div class="voice-list">`;
-        genderGroups.Female.forEach(voice => {
-          html += this.renderVoiceItem(voice);
-        });
-        html += `</div>`;
-        html += `</div>`;
+        genderGroups_content.push(
+          createElement('div', 'gender-group', [
+            createElement('h4', 'gender-label', 'Female'),
+            createElement('div', 'voice-list', genderGroups.Female.map(voice => this.renderVoiceItem(voice)))
+          ])
+        );
       }
 
       // Render Male voices
       if (genderGroups.Male && genderGroups.Male.length > 0) {
-        html += `<div class="gender-group">`;
-        html += `<h4 class="gender-label">Male</h4>`;
-        html += `<div class="voice-list">`;
-        genderGroups.Male.forEach(voice => {
-          html += this.renderVoiceItem(voice);
-        });
-        html += `</div>`;
-        html += `</div>`;
+        genderGroups_content.push(
+          createElement('div', 'gender-group', [
+            createElement('h4', 'gender-label', 'Male'),
+            createElement('div', 'voice-list', genderGroups.Male.map(voice => this.renderVoiceItem(voice)))
+          ])
+        );
       }
 
-      html += `</div>`;
+      children.push(createElement('div', 'language-content', genderGroups_content));
     }
 
-    html += `</div>`;
-    return html;
+    return createElement('div', { className: 'language-section', 'data-language': language }, children);
   }
 
   /**
    * Render a single voice item
    * @param {Object} voice - { id, name, gender, language, description, sample_url }
-   * @returns {string} HTML string
+   * @returns {HTMLElement} DOM element
    */
   renderVoiceItem(voice) {
     const isSelected = voice.id === this.selectedVoiceId;
@@ -272,12 +267,12 @@ export class VoiceSelector {
 
     let playButtonContent = '▶';
     let playButtonClass = 'btn-play';
-    let playButtonDisabled = '';
+    const playButtonAttrs = { type: 'button', className: playButtonClass, 'data-voice-id': voice.id };
 
     if (state === 'loading') {
       playButtonContent = '⋯';
       playButtonClass += ' loading';
-      playButtonDisabled = 'disabled';
+      playButtonAttrs.disabled = true;
     } else if (state === 'playing') {
       playButtonContent = '❚❚';
       playButtonClass += ' playing';
@@ -285,29 +280,27 @@ export class VoiceSelector {
       playButtonContent = '▶';
       playButtonClass += ' paused';
     }
+    playButtonAttrs.className = playButtonClass;
 
     const selectButtonClass = isSelected ? 'btn-select selected' : 'btn-select';
     const selectButtonText = isSelected ? 'Selected' : 'Select';
-    const selectButtonDisabled = isSelected ? 'disabled' : '';
-
-    let html = `<div class="voice-item ${isSelected ? 'selected' : ''}" data-voice-id="${voice.id}">`;
-    html += `<div class="voice-info">`;
-    html += `<span class="voice-name">${voice.name}</span>`;
-    if (voice.description) {
-      html += `<span class="voice-description">${voice.description}</span>`;
+    const selectButtonAttrs = { type: 'button', className: selectButtonClass, 'data-voice-id': voice.id };
+    if (isSelected) {
+      selectButtonAttrs.disabled = true;
     }
-    html += `</div>`;
-    html += `<div class="voice-actions">`;
-    html += `<button type="button" class="${playButtonClass}" data-voice-id="${voice.id}" ${playButtonDisabled}>`;
-    html += playButtonContent;
-    html += `</button>`;
-    html += `<button type="button" class="${selectButtonClass}" data-voice-id="${voice.id}" ${selectButtonDisabled}>`;
-    html += selectButtonText;
-    html += `</button>`;
-    html += `</div>`;
-    html += `</div>`;
 
-    return html;
+    const voiceInfoChildren = [createElement('span', 'voice-name', voice.name)];
+    if (voice.description) {
+      voiceInfoChildren.push(createElement('span', 'voice-description', voice.description));
+    }
+
+    return createElement('div', { className: `voice-item ${isSelected ? 'selected' : ''}`, 'data-voice-id': voice.id }, [
+      createElement('div', 'voice-info', voiceInfoChildren),
+      createElement('div', 'voice-actions', [
+        createElement('button', playButtonAttrs, playButtonContent),
+        createElement('button', selectButtonAttrs, selectButtonText)
+      ])
+    ]);
   }
 
   /**
