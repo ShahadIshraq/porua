@@ -65,7 +65,7 @@
       "identifier": "com.porua.app",
       "longDescription": "Porua TTS Server - High-quality text-to-speech using Kokoro TTS",
       "macOS": {
-        "entitlements": null,
+        "entitlements": "Entitlements.plist",
         "exceptionDomain": "",
         "frameworks": [],
         "providerShortName": null,

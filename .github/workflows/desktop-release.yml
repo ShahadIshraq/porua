@@ -67,6 +67,69 @@ jobs:
           fi
           cargo build --release --target ${{ matrix.target }}
 
+      - name: Sign server binary (macOS)
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        shell: bash
+        run: |
+          echo "::group::Setting up signing keychain"
+
+          # Create temporary keychain
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          # Create and unlock keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import certificate
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security import certificate.p12 \
+            -k "$KEYCHAIN_PATH" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+
+          # Set key partition list to avoid UI prompts
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          # Add keychain to search list
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | sed s/\"//g)
+
+          echo "✓ Keychain setup complete"
+          echo "::endgroup::"
+
+          echo "::group::Signing server binary"
+
+          # Sign server binary
+          codesign --force \
+            --sign "$APPLE_SIGNING_IDENTITY" \
+            --options runtime \
+            --entitlements wrapper/src-tauri/Entitlements.plist \
+            --timestamp \
+            --verbose \
+            server/target/${{ matrix.target }}/release/porua_server
+
+          # Verify signature
+          codesign --verify --verbose server/target/${{ matrix.target }}/release/porua_server
+          echo "✓ Server binary signed successfully"
+
+          echo "::endgroup::"
+
+          # Copy signed binary to wrapper resources
+          mkdir -p wrapper/resources
+          cp server/target/${{ matrix.target }}/release/porua_server wrapper/resources/
+
+          # Cleanup
+          rm certificate.p12
+
       - name: Install Tauri CLI
         shell: bash
         run: |
@@ -74,6 +137,8 @@ jobs:
 
       - name: Build wrapper (macOS)
         if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         shell: bash
         run: |
           cd wrapper
@@ -144,6 +209,93 @@ jobs:
             echo "Error: App bundle not found at $APP_BUNDLE"
             exit 1
           fi
+
+      - name: Notarize app bundle and DMG (macOS)
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        shell: bash
+        run: |
+          ARTIFACTS_DIR="${GITHUB_WORKSPACE}/wrapper/src-tauri/target/artifacts"
+          BUNDLE_DIR="${GITHUB_WORKSPACE}/wrapper/src-tauri/target/${{ matrix.target }}/release/bundle"
+          APP_BUNDLE="$BUNDLE_DIR/macos/Porua.app"
+          DMG_FILE="$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg"
+
+          echo "::group::Notarizing app bundle"
+
+          # Create a ZIP for notarization (required format)
+          cd "$BUNDLE_DIR/macos"
+          zip -qr "$RUNNER_TEMP/Porua.zip" Porua.app
+
+          # Submit for notarization
+          echo "Submitting app bundle to Apple for notarization..."
+          xcrun notarytool submit "$RUNNER_TEMP/Porua.zip" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --timeout 30m
+
+          # Check notarization status
+          if [ $? -eq 0 ]; then
+            echo "✓ App bundle notarization successful"
+
+            # Staple the notarization ticket to the app
+            echo "Stapling notarization ticket to app bundle..."
+            xcrun stapler staple "$APP_BUNDLE"
+
+            # Verify stapling
+            xcrun stapler validate "$APP_BUNDLE"
+          else
+            echo "✗ App bundle notarization failed"
+            exit 1
+          fi
+
+          echo "::endgroup::"
+
+          echo "::group::Notarizing DMG"
+
+          # Recreate DMG with notarized app
+          rm -f "$DMG_FILE"
+          cd "${GITHUB_WORKSPACE}/wrapper/src-tauri"
+          ./create_custom_dmg.sh \
+            "$APP_BUNDLE" \
+            "$DMG_FILE" \
+            "${{ steps.version.outputs.version }}"
+
+          # Submit DMG for notarization
+          echo "Submitting DMG to Apple for notarization..."
+          xcrun notarytool submit "$DMG_FILE" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait \
+            --timeout 30m
+
+          if [ $? -eq 0 ]; then
+            echo "✓ DMG notarization successful"
+
+            # Staple the notarization ticket to the DMG
+            echo "Stapling notarization ticket to DMG..."
+            xcrun stapler staple "$DMG_FILE"
+
+            # Verify stapling
+            xcrun stapler validate "$DMG_FILE"
+          else
+            echo "✗ DMG notarization failed"
+            exit 1
+          fi
+
+          echo "::endgroup::"
+
+          # Recreate .app.zip with notarized app
+          cd "$BUNDLE_DIR/macos"
+          rm -f "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.app.zip"
+          zip -qr "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.app.zip" Porua.app
+
+          echo "✓ All artifacts signed, notarized, and stapled"
 
       - name: Prepare artifacts (Windows)
         if: matrix.platform == 'windows-latest'
