@@ -1,4 +1,5 @@
 import { toBlob } from '../shared/api/ResponseHandler.js';
+import { createElement, replaceContent } from '../shared/utils/domBuilder.js';
 
 /**
  * SpeedControl component for adjusting TTS playback speed
@@ -64,66 +65,61 @@ export class SpeedControl {
    * Renders the speed control UI
    */
   render() {
-    this.container.innerHTML = `
-      <div class="speed-control">
-        <label for="speed-slider" class="speed-label">Playback Speed</label>
+    const slider = createElement('input', {
+      type: 'range',
+      id: 'speed-slider',
+      className: 'speed-slider',
+      min: this.MIN_SPEED,
+      max: this.MAX_SPEED,
+      step: this.STEP,
+      value: this.currentSpeed,
+      'aria-label': 'Playback speed',
+      'aria-valuemin': this.MIN_SPEED,
+      'aria-valuemax': this.MAX_SPEED,
+      'aria-valuenow': this.currentSpeed
+    });
 
-        <div class="speed-slider-container">
-          <span class="speed-min">0.5x</span>
-          <input
-            type="range"
-            id="speed-slider"
-            class="speed-slider"
-            min="${this.MIN_SPEED}"
-            max="${this.MAX_SPEED}"
-            step="${this.STEP}"
-            value="${this.currentSpeed}"
-            aria-label="Playback speed"
-            aria-valuemin="${this.MIN_SPEED}"
-            aria-valuemax="${this.MAX_SPEED}"
-            aria-valuenow="${this.currentSpeed}"
-          >
-          <span class="speed-max">2.0x</span>
-        </div>
+    const valueDisplay = createElement('span', 'speed-value', this.formatSpeed(this.currentSpeed));
 
-        <div class="speed-value-display" aria-live="polite">
-          <span class="speed-value">${this.formatSpeed(this.currentSpeed)}</span>
-        </div>
+    const presetButtons = this.PRESETS.map(preset =>
+      createElement('button', {
+        type: 'button',
+        className: `speed-preset-btn ${preset.value === this.currentSpeed ? 'active' : ''}`,
+        'data-speed': preset.value,
+        'aria-label': `Set speed to ${preset.label}`
+      }, preset.label)
+    );
 
-        <div class="speed-presets">
-          ${this.PRESETS.map(preset => `
-            <button
-              type="button"
-              class="speed-preset-btn ${preset.value === this.currentSpeed ? 'active' : ''}"
-              data-speed="${preset.value}"
-              aria-label="Set speed to ${preset.label}"
-            >
-              ${preset.label}
-            </button>
-          `).join('')}
-        </div>
+    const testButton = createElement('button', {
+      type: 'button',
+      id: 'speed-test-btn',
+      className: 'speed-test-btn',
+      'aria-label': 'Test playback speed'
+    }, [
+      createElement('span', 'test-btn-icon', '▶'),
+      createElement('span', 'test-btn-text', 'Test Speed')
+    ]);
 
-        <small class="help-text">Adjust the playback speed (0.5x slower to 2.0x faster)</small>
+    const view = createElement('div', 'speed-control', [
+      createElement('label', { htmlFor: 'speed-slider', className: 'speed-label' }, 'Playback Speed'),
+      createElement('div', 'speed-slider-container', [
+        createElement('span', 'speed-min', '0.5x'),
+        slider,
+        createElement('span', 'speed-max', '2.0x')
+      ]),
+      createElement('div', { className: 'speed-value-display', 'aria-live': 'polite' }, valueDisplay),
+      createElement('div', 'speed-presets', presetButtons),
+      createElement('small', 'help-text', 'Adjust the playback speed (0.5x slower to 2.0x faster)'),
+      createElement('div', 'speed-test-container', testButton)
+    ]);
 
-        <div class="speed-test-container">
-          <button
-            type="button"
-            id="speed-test-btn"
-            class="speed-test-btn"
-            aria-label="Test playback speed"
-          >
-            <span class="test-btn-icon">▶</span>
-            <span class="test-btn-text">Test Speed</span>
-          </button>
-        </div>
-      </div>
-    `;
+    replaceContent(this.container, view);
 
     // Store references to elements
-    this.slider = this.container.querySelector('#speed-slider');
-    this.valueDisplay = this.container.querySelector('.speed-value');
-    this.presetButtons = Array.from(this.container.querySelectorAll('.speed-preset-btn'));
-    this.testButton = this.container.querySelector('#speed-test-btn');
+    this.slider = slider;
+    this.valueDisplay = valueDisplay;
+    this.presetButtons = presetButtons;
+    this.testButton = testButton;
   }
 
   /**
