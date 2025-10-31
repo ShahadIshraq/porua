@@ -29,7 +29,7 @@ export class PlayerControl {
 
   createSkipButton(direction) {
     const button = createElement('button', 'tts-skip-button');
-    button.innerHTML = direction === 'backward' ? '⏮' : '⏭';
+    button.textContent = direction === 'backward' ? '⏮' : '⏭';
     button.title = direction === 'backward' ? 'Skip Backward' : 'Skip Forward';
     button.disabled = true; // Start disabled
 
@@ -98,7 +98,7 @@ export class PlayerControl {
     playButtonContainer.appendChild(this.progressRing);
 
     this.button = createElement('button', 'tts-player-button');
-    this.button.innerHTML = '▶';
+    this.button.textContent = '▶';
 
     this.eventManager.on(this.button, 'click', (e) => {
       e.stopPropagation();
@@ -228,24 +228,26 @@ export class PlayerControl {
 
     switch (state) {
       case PLAYER_STATES.IDLE:
-        this.button.innerHTML = '▶';
+        this.button.textContent = '▶';
         this.button.title = 'Play';
         this.resetProgress();
         break;
       case PLAYER_STATES.LOADING:
         this.button.classList.add('loading');
-        this.button.innerHTML = '<div class="tts-spinner"></div>';
+        this.button.textContent = '';
+        const spinner = createElement('div', 'tts-spinner');
+        this.button.appendChild(spinner);
         this.button.title = 'Loading...';
         this.resetProgress();
         break;
       case PLAYER_STATES.PLAYING:
         this.button.classList.add('playing');
-        this.button.innerHTML = '⏸';
+        this.button.textContent = '⏸';
         this.button.title = 'Pause';
         break;
       case PLAYER_STATES.PAUSED:
         this.button.classList.add('paused');
-        this.button.innerHTML = '▶';
+        this.button.textContent = '▶';
         this.button.title = 'Resume';
         break;
     }
