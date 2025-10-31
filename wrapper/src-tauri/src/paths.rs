@@ -63,6 +63,11 @@ pub fn get_install_flag_file() -> Result<PathBuf> {
     Ok(get_app_data_dir()?.join("installed.flag"))
 }
 
+/// Get the path to the .env file
+pub fn get_env_file() -> Result<PathBuf> {
+    Ok(get_app_data_dir()?.join(".env"))
+}
+
 /// Create all necessary directories
 pub fn ensure_directories_exist() -> Result<()> {
     let app_dir = get_app_data_dir()?;
