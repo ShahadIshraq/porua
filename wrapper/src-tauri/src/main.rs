@@ -372,24 +372,36 @@ fn update_tray_menu(app_handle: &tauri::AppHandle, status: &ServerStatus) {
         let is_running = matches!(status, ServerStatus::Running { .. });
 
         // Determine which icon to load
-        let icon_path = if is_running {
+        let icon_name = if is_running {
             "icons/icon-running.png"
         } else {
             "icons/icon.png"
         };
 
-        // Load and set the icon
-        if let Ok(icon_bytes) = std::fs::read(icon_path) {
-            if let Ok(img) = image::load_from_memory(&icon_bytes) {
-                let rgba = img.to_rgba8();
-                let (width, height) = rgba.dimensions();
-                let icon = Icon::Rgba {
-                    rgba: rgba.into_raw(),
-                    width,
-                    height,
-                };
-                let _ = app_handle.tray_handle().set_icon(icon);
+        // Load icon from Tauri resources
+        if let Some(icon_path) = app_handle.path_resolver().resolve_resource(icon_name) {
+            if let Ok(icon_bytes) = std::fs::read(&icon_path) {
+                if let Ok(img) = image::load_from_memory(&icon_bytes) {
+                    let rgba = img.to_rgba8();
+                    let (width, height) = rgba.dimensions();
+                    let icon = Icon::Rgba {
+                        rgba: rgba.into_raw(),
+                        width,
+                        height,
+                    };
+                    if let Err(e) = app_handle.tray_handle().set_icon(icon) {
+                        error!("Failed to set tray icon: {}", e);
+                    } else {
+                        info!("Tray icon updated to: {}", icon_name);
+                    }
+                } else {
+                    error!("Failed to load image from: {:?}", icon_path);
+                }
+            } else {
+                error!("Failed to read icon file: {:?}", icon_path);
             }
+        } else {
+            error!("Failed to resolve icon resource: {}", icon_name);
         }
     }
 }
