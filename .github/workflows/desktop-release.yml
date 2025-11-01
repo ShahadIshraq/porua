@@ -205,7 +205,7 @@ jobs:
             chmod +x create_custom_dmg.sh
             ./create_custom_dmg.sh \
               "$APP_BUNDLE" \
-              "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg" \
+              "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-macos-${{ matrix.arch }}.dmg" \
               "${{ steps.version.outputs.version }}"
 
             echo "✓ Custom DMG created"
@@ -213,7 +213,7 @@ jobs:
             # Also create a .app.zip as alternative download
             echo "Creating .app.zip..."
             cd "$BUNDLE_DIR/macos"
-            zip -qr "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.app.zip" Porua.app
+            zip -qr "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-macos-${{ matrix.arch }}.app.zip" Porua.app
             echo "✓ App bundle zip created"
           else
             echo "Error: App bundle not found at $APP_BUNDLE"
@@ -231,7 +231,7 @@ jobs:
           ARTIFACTS_DIR="${GITHUB_WORKSPACE}/wrapper/src-tauri/target/artifacts"
           BUNDLE_DIR="${GITHUB_WORKSPACE}/wrapper/src-tauri/target/${{ matrix.target }}/release/bundle"
           APP_BUNDLE="$BUNDLE_DIR/macos/Porua.app"
-          DMG_FILE="$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.dmg"
+          DMG_FILE="$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-macos-${{ matrix.arch }}.dmg"
 
           echo "::group::Notarizing app bundle"
 
@@ -302,8 +302,8 @@ jobs:
 
           # Recreate .app.zip with notarized app
           cd "$BUNDLE_DIR/macos"
-          rm -f "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.app.zip"
-          zip -qr "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-${{ matrix.arch }}.app.zip" Porua.app
+          rm -f "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-macos-${{ matrix.arch }}.app.zip"
+          zip -qr "$ARTIFACTS_DIR/Porua-${{ steps.version.outputs.version }}-macos-${{ matrix.arch }}.app.zip" Porua.app
 
           echo "✓ All artifacts signed, notarized, and stapled"
 
@@ -381,8 +381,8 @@ jobs:
             ## Downloads
 
             ### macOS
-            - **Apple Silicon (M1/M2/M3)**: `Porua-${{ steps.version.outputs.version }}-arm64.dmg` or `Porua-${{ steps.version.outputs.version }}-arm64.app.zip`
-            - **Intel**: `Porua-${{ steps.version.outputs.version }}-x64.dmg` or `Porua-${{ steps.version.outputs.version }}-x64.app.zip`
+            - **Apple Silicon (M1/M2/M3)**: `Porua-${{ steps.version.outputs.version }}-macos-arm64.dmg` or `Porua-${{ steps.version.outputs.version }}-macos-arm64.app.zip`
+            - **Intel**: `Porua-${{ steps.version.outputs.version }}-macos-x64.dmg` or `Porua-${{ steps.version.outputs.version }}-macos-x64.app.zip`
 
             ### Windows
             - **64-bit MSI**: `Porua-${{ steps.version.outputs.version }}-windows-x64.msi`
