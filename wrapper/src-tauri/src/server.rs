@@ -56,10 +56,11 @@ impl ServerManager {
             "TTS_POOL_SIZE",
             &self.config.server.pool_size.to_string(),
         );
-        cmd.env(
-            "PIPER_ESPEAKNG_DATA_DIRECTORY",
-            &self.config.paths.espeak_data_dir,
-        );
+        // PIPER_ESPEAKNG_DATA_DIRECTORY must point to the PARENT directory containing espeak-ng-data/
+        // espeak_data_dir is the full path to espeak-ng-data/, so we need its parent
+        if let Some(parent) = self.config.paths.espeak_data_dir.parent() {
+            cmd.env("PIPER_ESPEAKNG_DATA_DIRECTORY", parent);
+        }
         cmd.env("RUST_LOG", &self.config.server.log_level);
 
         // Redirect logs to log directory with rotation
