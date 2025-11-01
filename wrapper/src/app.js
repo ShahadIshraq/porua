@@ -1,9 +1,10 @@
 // Tauri API access
-let invoke, listen;
+let invoke, listen, openUrl;
 try {
     if (window.__TAURI__) {
         invoke = window.__TAURI__.invoke || (window.__TAURI__.tauri && window.__TAURI__.tauri.invoke);
         listen = window.__TAURI__.listen || (window.__TAURI__.event && window.__TAURI__.event.listen);
+        openUrl = window.__TAURI__.shell?.open || (window.__TAURI__.shell && window.__TAURI__.shell.open);
 
         if (!invoke || !listen) {
             throw new Error('Tauri API not properly initialized');
@@ -171,6 +172,16 @@ document.getElementById('start-btn').addEventListener('click', startInstallation
 document.getElementById('done-btn').addEventListener('click', finishInstallation);
 document.getElementById('retry-btn').addEventListener('click', retryInstallation);
 document.getElementById('quit-btn').addEventListener('click', quitApplication);
+
+// Handle external links - open in default browser
+document.addEventListener('click', (event) => {
+    const target = event.target.closest('a[href^="http"]');
+    if (target && openUrl) {
+        event.preventDefault();
+        const url = target.getAttribute('href');
+        openUrl(url).catch(err => console.error('Failed to open URL:', err));
+    }
+});
 
 // Initialize the application
 async function initialize() {

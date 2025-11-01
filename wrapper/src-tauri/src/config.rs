@@ -90,6 +90,12 @@ impl Config {
     pub fn save_env_file(&self) -> Result<()> {
         let env_file = paths::get_env_file()?;
 
+        // PIPER_ESPEAKNG_DATA_DIRECTORY must point to the PARENT directory containing espeak-ng-data
+        // See server/.env.example:L110 for documentation
+        let espeak_parent_dir = self.paths.espeak_data_dir
+            .parent()
+            .context("Failed to get parent directory of espeak_data_dir")?;
+
         // Create .env file content from config
         let env_content = format!(
             "# Porua Server Environment Configuration\n\
@@ -98,7 +104,7 @@ impl Config {
              # Model directory path\n\
              TTS_MODEL_DIR={}\n\
              \n\
-             # eSpeak-ng data directory path\n\
+             # eSpeak-ng data directory (parent directory containing espeak-ng-data/)\n\
              PIPER_ESPEAKNG_DATA_DIRECTORY={}\n\
              \n\
              # Pool size (number of TTS engines)\n\
@@ -107,7 +113,7 @@ impl Config {
              # Log level (trace, debug, info, warn, error)\n\
              RUST_LOG={}\n",
             self.paths.model_dir.display(),
-            self.paths.espeak_data_dir.display(),
+            espeak_parent_dir.display(),
             self.server.pool_size,
             self.server.log_level
         );
