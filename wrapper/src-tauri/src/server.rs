@@ -81,6 +81,14 @@ impl ServerManager {
         ));
         cmd.stderr(Stdio::from(log_file));
 
+        // Hide console window on Windows
+        #[cfg(target_os = "windows")]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+
         // Spawn process
         let child = cmd.spawn().context("Failed to spawn server process")?;
 
