@@ -190,7 +190,14 @@ impl Installer {
 
     /// Extract server binary from Tauri resources
     fn extract_server_binary(&self) -> Result<()> {
-        let resource_path = self.get_resource_path("porua_server")?;
+        // Use platform-specific binary name
+        let binary_name = if cfg!(windows) {
+            "porua_server.exe"
+        } else {
+            "porua_server"
+        };
+
+        let resource_path = self.get_resource_path(binary_name)?;
         let dest_path = paths::get_server_binary_path()?;
 
         std::fs::copy(&resource_path, &dest_path)

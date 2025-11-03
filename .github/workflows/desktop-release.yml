@@ -154,6 +154,13 @@ jobs:
           export OPENSSL_INCLUDE_DIR=$(brew --prefix openssl@3)/include
           cargo tauri build --target ${{ matrix.target }}
 
+      - name: Copy server binary to wrapper resources (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          mkdir -p wrapper/resources
+          cp server/target/${{ matrix.target }}/release/porua_server.exe wrapper/resources/
+
       - name: Build wrapper (Windows)
         if: matrix.platform == 'windows-latest'
         shell: bash

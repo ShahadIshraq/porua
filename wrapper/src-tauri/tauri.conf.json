@@ -111,20 +111,6 @@
     "updater": {
       "active": false
     },
-    "windows": [
-      {
-        "title": "Porua Setup",
-        "width": 600,
-        "height": 750,
-        "center": true,
-        "resizable": false,
-        "fullscreen": false,
-        "visible": false,
-        "decorations": true,
-        "transparent": false,
-        "alwaysOnTop": true,
-        "skipTaskbar": true
-      }
-    ]
+    "windows": []
   }
 }
