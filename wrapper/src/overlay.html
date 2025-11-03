@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Porua Reader</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: transparent;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #container {
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Header with controls */
+        #header {
+            background: rgba(0, 0, 0, 0.05);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            cursor: move;
+            -webkit-app-region: drag;
+        }
+
+        #controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            -webkit-app-region: no-drag;
+        }
+
+        .control-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: rgba(0, 0, 0, 0.2);
+            transform: scale(1.05);
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+
+        .control-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        #close-btn {
+            background: rgba(239, 68, 68, 0.8);
+            color: white;
+        }
+
+        #close-btn:hover {
+            background: rgba(239, 68, 68, 1);
+        }
+
+        /* Text display area */
+        #text-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            -webkit-app-region: no-drag;
+        }
+
+        #text-display {
+            font-size: 16px;
+            line-height: 1.8;
+            color: #1f2937;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .text-phrase {
+            display: inline;
+            transition: background-color 0.2s, color 0.2s;
+            padding: 2px 0;
+        }
+
+        .text-phrase.highlighted {
+            background: linear-gradient(120deg, #fbbf24 0%, #f59e0b 100%);
+            color: #1f2937;
+            padding: 4px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        /* Progress bar */
+        #progress-container {
+            padding: 12px 16px;
+            background: rgba(0, 0, 0, 0.02);
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            -webkit-app-region: no-drag;
+        }
+
+        #progress-bar {
+            width: 100%;
+            height: 6px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        #progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #0ea5e9, #06b6d4);
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        #time-display {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #6b7280;
+            font-family: monospace;
+        }
+
+        /* Status messages */
+        #status {
+            padding: 12px 16px;
+            text-align: center;
+            font-size: 14px;
+            color: #6b7280;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        #status.error {
+            background: rgba(239, 68, 68, 0.1);
+            color: #dc2626;
+        }
+
+        #status.loading {
+            background: rgba(59, 130, 246, 0.1);
+            color: #2563eb;
+        }
+
+        /* Scrollbar styling */
+        #text-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #text-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 4px;
+        }
+
+        #text-container::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        #text-container::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.3);
+        }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #9ca3af;
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        .empty-state p {
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <!-- Header with controls -->
+        <div id="header">
+            <div id="controls">
+                <button class="control-btn" id="prev-btn" title="Previous phrase (←)" disabled>⏮</button>
+                <button class="control-btn" id="play-btn" title="Play/Pause (Space)">▶</button>
+                <button class="control-btn" id="stop-btn" title="Stop (S)" disabled>⏹</button>
+                <button class="control-btn" id="next-btn" title="Next phrase (→)" disabled>⏭</button>
+            </div>
+            <div id="controls">
+                <button class="control-btn" id="recapture-btn" title="Select new region (Cmd+R)">🔄</button>
+                <button class="control-btn" id="close-btn" title="Close (Esc)">✕</button>
+            </div>
+        </div>
+
+        <!-- Status bar -->
+        <div id="status" style="display: none;"></div>
+
+        <!-- Text display -->
+        <div id="text-container">
+            <div id="text-display">
+                <div class="empty-state">
+                    <h3>No text loaded</h3>
+                    <p>Select a region to start reading</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress bar -->
+        <div id="progress-container">
+            <div id="progress-bar">
+                <div id="progress-fill"></div>
+            </div>
+            <div id="time-display">
+                <span id="current-time">0:00</span>
+                <span id="total-time">0:00</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="overlay.js"></script>
+</body>
+</html>

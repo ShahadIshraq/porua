@@ -4,6 +4,10 @@ fn main() {
     // Create resources directory first (required by Tauri before build)
     std::fs::create_dir_all("resources").expect("Failed to create resources directory");
 
+    // Build Swift library for macOS
+    #[cfg(target_os = "macos")]
+    build_swift_library();
+
     // Copy server binary to resources
     copy_server_binary();
 
@@ -23,6 +27,7 @@ fn main() {
     println!("cargo:rerun-if-changed=../../server/target/release/porua_server");
     println!("cargo:rerun-if-changed=../../server/packaging/espeak-ng-data");
     println!("cargo:rerun-if-changed=../../server/samples");
+    println!("cargo:rerun-if-changed=swift-src");
 }
 
 fn copy_server_binary() {
@@ -109,4 +114,39 @@ fn copy_dir_recursive(src: &PathBuf, dst: &PathBuf) -> std::io::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn build_swift_library() {
+    use std::process::Command;
+
+    println!("cargo:warning=Building Swift screen capture library...");
+
+    // Run Swift build script
+    let status = Command::new("sh")
+        .arg("build-swift.sh")
+        .status()
+        .expect("Failed to execute Swift build script");
+
+    if !status.success() {
+        panic!("Swift library build failed");
+    }
+
+    // Link against Swift library
+    let swift_lib_path = PathBuf::from("target/swift-build");
+    println!("cargo:rustc-link-search=native={}", swift_lib_path.display());
+    println!("cargo:rustc-link-lib=static=ScreenCapture");
+
+    // Link against required frameworks
+    println!("cargo:rustc-link-lib=framework=ScreenCaptureKit");
+    println!("cargo:rustc-link-lib=framework=Vision");
+    println!("cargo:rustc-link-lib=framework=AppKit");
+    println!("cargo:rustc-link-lib=framework=CoreGraphics");
+    println!("cargo:rustc-link-lib=framework=Foundation");
+
+    // Link against Swift runtime
+    println!("cargo:rustc-link-lib=dylib=swiftCore");
+    println!("cargo:rustc-link-lib=dylib=swiftFoundation");
+
+    println!("cargo:warning=Swift library configuration complete");
 }

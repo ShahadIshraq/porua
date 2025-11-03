@@ -1,0 +1,4 @@
+module ScreenCapture {
+    header "ScreenCapture-Bridging-Header.h"
+    export *
+}

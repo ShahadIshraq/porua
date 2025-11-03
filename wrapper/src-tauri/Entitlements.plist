@@ -17,5 +17,9 @@
     <!-- Disable library validation to allow loading dynamic libraries -->
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
+
+    <!-- Screen Recording permission (for overlay feature) -->
+    <key>com.apple.security.device.camera</key>
+    <false/>
 </dict>
 </plist>

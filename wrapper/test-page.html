@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Porua Overlay Test Page</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        h1 {
+            color: #1f2937;
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+
+        .test-section {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .test-section h2 {
+            color: #374151;
+            font-size: 24px;
+            margin-top: 0;
+        }
+
+        .test-section p {
+            color: #4b5563;
+            margin: 10px 0;
+        }
+
+        .large-text {
+            font-size: 24px;
+        }
+
+        .small-text {
+            font-size: 12px;
+        }
+
+        .code-block {
+            background: #1f2937;
+            color: #f9fafb;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+
+        .highlight-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .emoji-test {
+            font-size: 48px;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .mixed-fonts {
+            font-size: 18px;
+        }
+
+        .serif { font-family: Georgia, serif; }
+        .sans { font-family: Arial, sans-serif; }
+        .mono { font-family: 'Courier New', monospace; }
+
+        .instructions {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .instructions h3 {
+            margin-top: 0;
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body>
+    <h1>Porua Overlay OCR Test Page</h1>
+
+    <div class="instructions">
+        <h3>How to Test:</h3>
+        <ol>
+            <li>Open the Porua application</li>
+            <li>Click "Read from Screen..." from the system tray menu</li>
+            <li>Select one of the test sections below</li>
+            <li>Verify the text is correctly extracted and displayed</li>
+            <li>Test different sections to validate OCR accuracy</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 1: Standard Paragraph</h2>
+        <p>
+            The quick brown fox jumps over the lazy dog. This sentence contains every letter
+            of the English alphabet and is commonly used for testing fonts and OCR systems.
+        </p>
+        <p>
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
+            incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
+            exercitation ullamco laboris.
+        </p>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 2: Different Font Sizes</h2>
+        <p class="large-text">Large text: This is 24px font size</p>
+        <p>Normal text: This is default font size (16px)</p>
+        <p class="small-text">Small text: This is 12px font size</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 3: Mixed Font Families</h2>
+        <p class="mixed-fonts serif">Serif font: The quick brown fox jumps over the lazy dog.</p>
+        <p class="mixed-fonts sans">Sans-serif font: The quick brown fox jumps over the lazy dog.</p>
+        <p class="mixed-fonts mono">Monospace font: The quick brown fox jumps over the lazy dog.</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 4: Code Block</h2>
+        <div class="code-block">
+function greet(name) {
+    console.log(`Hello, ${name}!`);
+    return true;
+}
+
+greet("World");
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 5: Numbers and Special Characters</h2>
+        <p>Numbers: 0123456789</p>
+        <p>Special characters: !@#$%^&*()_+-={}[]|\:;"'<>,.?/</p>
+        <p>Email: test@example.com</p>
+        <p>URL: https://www.example.com</p>
+        <p>Date: 2025-11-03</p>
+        <p>Phone: +1 (555) 123-4567</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 6: Multi-line List</h2>
+        <ul>
+            <li>First item in the list</li>
+            <li>Second item with more text to test line wrapping</li>
+            <li>Third item</li>
+            <li>Fourth item with numbers: 123, 456, 789</li>
+            <li>Last item</li>
+        </ul>
+    </div>
+
+    <div class="test-section highlight-box">
+        <h2 style="margin: 0 0 10px 0;">Test 7: White Text on Colored Background</h2>
+        <p style="margin: 0;">
+            This tests OCR capability with light text on a dark background.
+            Vision Framework should handle this well with proper contrast detection.
+        </p>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 8: Sentence Case Variations</h2>
+        <p>lowercase text: the quick brown fox jumps over the lazy dog</p>
+        <p>UPPERCASE TEXT: THE QUICK BROWN FOX JUMPS OVER THE LAZY DOG</p>
+        <p>Title Case Text: The Quick Brown Fox Jumps Over The Lazy Dog</p>
+        <p>camelCaseText: thisIsCamelCaseTextFormat</p>
+    </div>
+
+    <div class="test-section emoji-test">
+        <h2>Test 9: Emoji and Unicode</h2>
+        <p>😀 😃 😄 😁 🎉 ✨ 🚀 💡</p>
+        <p>Symbols: © ® ™ € £ ¥ °</p>
+        <p>Math: × ÷ ± ≈ ≠ √ ∞</p>
+    </div>
+
+    <div class="test-section">
+        <h2>Test 10: Real-world Example</h2>
+        <p><strong>Article Title:</strong> Understanding Text-to-Speech Technology</p>
+        <p>
+            <strong>Published:</strong> November 3, 2025<br>
+            <strong>Author:</strong> John Doe<br>
+            <strong>Category:</strong> Technology
+        </p>
+        <p>
+            Text-to-speech (TTS) technology has revolutionized the way we interact with digital
+            content. Modern TTS systems use advanced neural networks to produce natural-sounding
+            speech that is nearly indistinguishable from human voices.
+        </p>
+        <p>
+            With applications ranging from accessibility tools to virtual assistants, TTS has
+            become an essential component of the modern computing experience. The technology
+            continues to improve with each iteration, offering better prosody, emotion, and
+            contextual understanding.
+        </p>
+    </div>
+
+    <div class="instructions">
+        <h3>Expected Results:</h3>
+        <ul>
+            <li>✓ Standard text should be recognized with >95% accuracy</li>
+            <li>✓ Different font sizes should all be detected</li>
+            <li>✓ Special characters may have lower accuracy</li>
+            <li>✓ Code blocks should preserve structure</li>
+            <li>✓ White-on-color text should be readable</li>
+            <li>✓ Lists should maintain order</li>
+            <li>⚠ Emojis may not be recognized (expected)</li>
+        </ul>
+    </div>
+
+</body>
+</html>
