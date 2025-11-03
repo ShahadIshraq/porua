@@ -46,7 +46,7 @@ async fn start_installation(app_handle: tauri::AppHandle) -> Result<(), String> 
 
     tauri::async_runtime::spawn(async move {
         if let Err(e) = installer.install().await {
-            error!("Installation failed: {}", e);
+            error!("Installation failed: {:?}", e);
             let _ = app_handle.emit_all("install-error", e.to_string());
         }
     });
@@ -114,8 +114,20 @@ async fn get_log_path() -> Result<String, String> {
 }
 
 #[tauri::command]
-async fn quit_app() {
-    std::process::exit(0);
+async fn quit_app(app_handle: tauri::AppHandle, state: tauri::State<'_, AppState>) -> Result<(), String> {
+    info!("Quit requested, stopping server before exit");
+
+    // Stop the server first
+    let manager = state.server_manager.clone();
+    let mut mgr = manager.lock().await;
+    if let Err(e) = mgr.stop().await {
+        error!("Error stopping server: {}", e);
+    }
+    info!("Server stopped successfully");
+
+    // Exit the app
+    app_handle.exit(0);
+    Ok(())
 }
 
 fn main() {
@@ -171,6 +183,17 @@ fn main() {
                 handle_tray_event(app, &id);
             }
         })
+        .on_window_event(|event| {
+            match event.event() {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    // For tray-only apps, hide the window instead of closing it
+                    // This keeps the app running with the system tray active
+                    event.window().hide().unwrap();
+                    api.prevent_close();
+                }
+                _ => {}
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             needs_installation,
             start_installation,
@@ -188,13 +211,13 @@ fn main() {
                 if let Ok(needs_install) = Installer::needs_installation() {
                     if !needs_install {
                         // Already installed, hide from dock immediately
-                        info!("App already installed, setting Accessory activation policy");
                         app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-                    } else {
-                        info!("First run - keeping regular activation policy for installer window");
                     }
                 }
             }
+
+            // Note: No window is created initially (windows: [] in tauri.conf.json)
+            // Windows are created programmatically only when needed (e.g., for installation)
 
             // Spawn async setup
             tauri::async_runtime::spawn(async move {
@@ -212,62 +235,44 @@ fn main() {
         })
         .build(tauri::generate_context!())
         .expect("Error building Tauri application")
-        .run(|app_handle, event| {
+        .run(|_app_handle, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                info!("Exit requested, stopping server before exit");
-
-                // Prevent immediate exit
+                // Always prevent default exit behavior
+                // For tray-only apps, we want to keep running even when windows close
+                // Explicit quit is handled via the quit_app() command
                 api.prevent_exit();
-
-                // Stop the server before allowing exit
-                if let Some(state) = app_handle.try_state::<AppState>() {
-                    let manager = state.server_manager.clone();
-                    let app_handle_clone = app_handle.clone();
-
-                    tauri::async_runtime::spawn(async move {
-                        info!("Stopping server...");
-                        let mut mgr = manager.lock().await;
-                        if let Err(e) = mgr.stop().await {
-                            error!("Error stopping server: {}", e);
-                        }
-                        info!("Server stopped successfully");
-
-                        // Now exit the app
-                        app_handle_clone.exit(0);
-                    });
-                } else {
-                    // No state, just exit
-                    info!("No state found, exiting immediately");
-                    app_handle.exit(0);
-                }
             }
         });
 }
 
 async fn setup_app(app_handle: tauri::AppHandle) -> anyhow::Result<()> {
-    info!("Setting up application");
-
     // Check if installation is needed
     if Installer::needs_installation()? {
-        info!("First run detected - showing installer window");
+        // Create the installer window programmatically
+        let window = tauri::WindowBuilder::new(
+            &app_handle,
+            "main",
+            tauri::WindowUrl::App("index.html".into()),
+        )
+        .title("Porua Setup")
+        .inner_size(600.0, 750.0)
+        .center()
+        .resizable(false)
+        .fullscreen(false)
+        .decorations(true)
+        .build()?;
 
-        // Show the window for installation
-        if let Some(window) = app_handle.get_window("main") {
-            window.show()?;
-            window.center()?;
-            window.set_focus()?;
-        }
+        window.show()?;
+        window.set_focus()?;
 
         // Wait for user to complete installation via UI
         return Ok(());
     }
 
     // Already installed - proceed normally
-    info!("Application already installed");
 
     // Load configuration
     let config = Config::load()?;
-    info!("Configuration loaded: port={}", config.server.port);
 
     // Create server manager
     let server_manager = ServerManager::new(config);
@@ -279,7 +284,6 @@ async fn setup_app(app_handle: tauri::AppHandle) -> anyhow::Result<()> {
     app_handle.manage(state.clone());
 
     // Start server automatically
-    info!("Starting server automatically");
     let mut manager = state.server_manager.lock().await;
     if let Err(e) = manager.start().await {
         error!("Failed to start server: {}", e);
@@ -296,7 +300,6 @@ async fn setup_app(app_handle: tauri::AppHandle) -> anyhow::Result<()> {
 
     update_tray_menu(&app_handle, &status);
 
-    // Start status monitor
     start_status_monitor(app_handle.clone(), state.server_manager.clone());
 
     Ok(())
@@ -369,43 +372,39 @@ fn update_tray_menu(app_handle: &tauri::AppHandle, status: &ServerStatus) {
     // Update the tray menu
     let _ = app_handle.tray_handle().set_menu(menu);
 
-    // Swap icon based on server status
-    #[cfg(target_os = "macos")]
-    {
-        let is_running = matches!(status, ServerStatus::Running { .. });
+    // Swap icon based on server status (works on all platforms)
+    let is_running = matches!(status, ServerStatus::Running { .. });
 
-        // Determine which icon to load
-        let icon_name = if is_running {
-            "icons/icon-running.png"
-        } else {
-            "icons/icon.png"
-        };
+    // Determine which icon to load
+    let icon_name = if is_running {
+        "icons/icon-running.png"
+    } else {
+        "icons/icon.png"
+    };
 
-        // Load icon from Tauri resources
-        if let Some(icon_path) = app_handle.path_resolver().resolve_resource(icon_name) {
-            if let Ok(icon_bytes) = std::fs::read(&icon_path) {
-                if let Ok(img) = image::load_from_memory(&icon_bytes) {
-                    let rgba = img.to_rgba8();
-                    let (width, height) = rgba.dimensions();
-                    let icon = Icon::Rgba {
-                        rgba: rgba.into_raw(),
-                        width,
-                        height,
-                    };
-                    if let Err(e) = app_handle.tray_handle().set_icon(icon) {
-                        error!("Failed to set tray icon: {}", e);
-                    } else {
-                        info!("Tray icon updated to: {}", icon_name);
-                    }
-                } else {
-                    error!("Failed to load image from: {:?}", icon_path);
+    // Load icon from Tauri resources
+    if let Some(icon_path) = app_handle.path_resolver().resolve_resource(icon_name) {
+        if let Ok(icon_bytes) = std::fs::read(&icon_path) {
+            if let Ok(img) = image::load_from_memory(&icon_bytes) {
+                let rgba = img.to_rgba8();
+                let (width, height) = rgba.dimensions();
+
+                let icon = Icon::Rgba {
+                    rgba: rgba.into_raw(),
+                    width,
+                    height,
+                };
+                if let Err(e) = app_handle.tray_handle().set_icon(icon) {
+                    error!("Failed to set tray icon: {}", e);
                 }
             } else {
-                error!("Failed to read icon file: {:?}", icon_path);
+                error!("Failed to load image from: {:?}", icon_path);
             }
         } else {
-            error!("Failed to resolve icon resource: {}", icon_name);
+            error!("Failed to read icon file: {:?}", icon_path);
         }
+    } else {
+        error!("Failed to resolve icon resource: {}", icon_name);
     }
 }
 
