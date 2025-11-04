@@ -121,10 +121,8 @@ async function showError(message, errorDetails = '') {
 async function finishInstallation() {
     try {
         // Notify backend that installation is complete
+        // The backend will hide the window and start the server
         await invoke('finish_installation');
-
-        // Close the installer window
-        window.close();
     } catch (error) {
         console.error('Failed to finish installation:', error);
     }
