@@ -246,6 +246,18 @@ fn main() {
 }
 
 async fn setup_app(app_handle: tauri::AppHandle) -> anyhow::Result<()> {
+    // Create a persistent hidden window to keep the app alive on Windows
+    // This prevents the app from exiting when the installer window closes
+    let _keep_alive_window = tauri::WindowBuilder::new(
+        &app_handle,
+        "keep-alive",
+        tauri::WindowUrl::App("index.html".into()),
+    )
+    .title("Porua Background")
+    .inner_size(1.0, 1.0)
+    .visible(false)
+    .build()?;
+
     // Check if installation is needed
     if Installer::needs_installation()? {
         // Create the installer window programmatically
