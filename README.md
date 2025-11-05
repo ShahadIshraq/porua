@@ -79,11 +79,13 @@ Then install the browser extension (see Option B, step 2-3).
 
 ### Option B: Manual Setup
 
+**Prerequisites:** Building from source requires system dependencies. See [Server Prerequisites](server/README.md#prerequisites) for details.
+
 **1. Start the server:**
 ```bash
 cd server
 cargo build --release
-./target/release/tts_server --server --port 3000
+./target/release/porua_server --server --port 3000
 ```
 
 **2. Build the extension:**

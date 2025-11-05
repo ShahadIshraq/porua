@@ -40,6 +40,23 @@ Models are **NOT included** in the repository or release packages to keep downlo
 
 - **Rust** (1.75 or later): [Install Rust](https://rustup.rs/)
 - **macOS/Linux**: Tested on macOS (Apple Silicon and Intel) and Linux
+- **System Dependencies**: Required for building from source
+  - **Debian/Ubuntu/Raspberry Pi OS:**
+    ```bash
+    sudo apt install pkg-config libssl-dev llvm-dev libclang-dev clang espeak-ng libespeak-ng-dev cmake
+    ```
+  - **Fedora/RHEL:**
+    ```bash
+    sudo dnf install pkg-config openssl-devel llvm-devel clang-devel clang espeak-ng espeak-ng-devel cmake
+    ```
+  - **Arch Linux:**
+    ```bash
+    sudo pacman -S pkg-config openssl llvm clang espeak-ng cmake
+    ```
+  - **macOS:**
+    ```bash
+    brew install pkg-config openssl llvm espeak-ng cmake
+    ```
 - **Model files**: Downloaded automatically during installation
   - `kokoro-v1.0.onnx` (310 MB) - from [thewh1teagle/kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx/releases)
   - `voices-v1.0.bin` (27 MB)
@@ -82,7 +99,7 @@ cd server
 cargo build --release
 ```
 
-The compiled binary will be at `target/release/tts_server`.
+The compiled binary will be at `target/release/porua_server`.
 
 ## Quick Start
 
@@ -90,19 +107,19 @@ The compiled binary will be at `target/release/tts_server`.
 
 **Start the server with default settings (pool size: 2, port: 3000):**
 ```bash
-./target/release/tts_server --server
+./target/release/porua_server --server
 ```
 
 **Start with custom configuration:**
 ```bash
 # Pool of 3 TTS engines on port 3003
-TTS_POOL_SIZE=3 ./target/release/tts_server --server --port 3003
+TTS_POOL_SIZE=3 ./target/release/porua_server --server --port 3003
 
 # With debug logging
-RUST_LOG=debug TTS_POOL_SIZE=3 ./target/release/tts_server --server --port 3003
+RUST_LOG=debug TTS_POOL_SIZE=3 ./target/release/porua_server --server --port 3003
 
 # Quiet mode (warnings and errors only)
-RUST_LOG=warn ./target/release/tts_server --server --port 3003
+RUST_LOG=warn ./target/release/porua_server --server --port 3003
 ```
 
 **Expected output:**
@@ -161,7 +178,7 @@ curl http://localhost:3003/voices | jq .
 ### 3. CLI Mode
 
 ```bash
-./target/release/tts_server "Hello, this is Kokoro TTS speaking!"
+./target/release/porua_server "Hello, this is Kokoro TTS speaking!"
 ```
 
 Generates `output.wav` and `output.json` with timing metadata.
@@ -436,7 +453,7 @@ cargo build --release
 
 ```bash
 cargo build
-./target/debug/tts_server "Development test"
+./target/debug/porua_server "Development test"
 ```
 
 ### Check for Errors
@@ -490,19 +507,19 @@ The server uses the `RUST_LOG` environment variable to control logging verbosity
 
 ```bash
 # Default - clean output, hides voice listings
-./target/release/tts_server --server
+./target/release/porua_server --server
 
 # Show voice listings during startup
-RUST_LOG=kokoros=info ./target/release/tts_server --server
+RUST_LOG=kokoros=info ./target/release/porua_server --server
 
 # Debug mode - shows detailed operation logs
-RUST_LOG=debug ./target/release/tts_server --server
+RUST_LOG=debug ./target/release/porua_server --server
 
 # Very quiet mode - only warnings and errors
-RUST_LOG=warn ./target/release/tts_server --server
+RUST_LOG=warn ./target/release/porua_server --server
 
 # Module-specific logging
-RUST_LOG=tts_server=debug,ort=warn,kokoros=warn ./target/release/tts_server --server
+RUST_LOG=tts_server=debug,ort=warn,kokoros=warn ./target/release/porua_server --server
 ```
 
 ### ANSI Color Codes in Logs
@@ -529,13 +546,13 @@ And ensures clean logs like this:
 
 ```bash
 # Force enable colors (even in non-TTY environments)
-LOG_ANSI=true ./target/release/tts_server --server
+LOG_ANSI=true ./target/release/porua_server --server
 
 # Force disable colors (even in interactive terminal)
-LOG_ANSI=false ./target/release/tts_server --server
+LOG_ANSI=false ./target/release/porua_server --server
 
 # Auto-detect (default - recommended)
-./target/release/tts_server --server
+./target/release/porua_server --server
 ```
 
 **When to use manual override:**
@@ -613,26 +630,26 @@ Set via `RATE_LIMIT_MODE` environment variable:
 
 ```bash
 # Default behavior - auto mode
-./target/release/tts_server --server
+./target/release/porua_server --server
 
 # Explicitly set auto mode
-RATE_LIMIT_MODE=auto ./target/release/tts_server --server
+RATE_LIMIT_MODE=auto ./target/release/porua_server --server
 
 # Force per-IP mode even with API keys
-RATE_LIMIT_MODE=per-ip ./target/release/tts_server --server
+RATE_LIMIT_MODE=per-ip ./target/release/porua_server --server
 
 # Disable rate limiting (development only!)
-RATE_LIMIT_MODE=disabled ./target/release/tts_server --server
+RATE_LIMIT_MODE=disabled ./target/release/porua_server --server
 
 # Custom authenticated rate limits
 RATE_LIMIT_AUTHENTICATED_PER_SECOND=20 \
 RATE_LIMIT_AUTHENTICATED_BURST_SIZE=40 \
-./target/release/tts_server --server
+./target/release/porua_server --server
 
 # Custom unauthenticated rate limits
 RATE_LIMIT_UNAUTHENTICATED_PER_SECOND=3 \
 RATE_LIMIT_UNAUTHENTICATED_BURST_SIZE=5 \
-./target/release/tts_server --server
+./target/release/porua_server --server
 ```
 
 **Environment Variables:**
