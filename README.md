@@ -27,6 +27,10 @@ Modular Chrome/Firefox extension with:
 - Streaming audio with phrase-level timing metadata
 - Encrypted API key storage
 
+**Install:**
+- [Chrome Web Store](https://chromewebstore.google.com/detail/porua/ggdmgcopgoceppjdnkhmnfgefbbaahia)
+- [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/porua/)
+
 ### [TTS Server](server/README.md)
 High-performance Rust HTTP server featuring:
 - Kokoro v1.0 TTS engine with 28 voices (American & British)

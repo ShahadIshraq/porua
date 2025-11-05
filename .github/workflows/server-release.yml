@@ -58,6 +58,12 @@ jobs:
           body: |
             High-performance Text-to-Speech HTTP server with Kokoro TTS engine.
 
+            ## 🛒 Browser Extensions
+
+            Install the browser extension to use with the server:
+            - **Chrome:** [Chrome Web Store](https://chromewebstore.google.com/detail/porua/ggdmgcopgoceppjdnkhmnfgefbbaahia)
+            - **Firefox:** [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/porua/)
+
             ## 📦 What's Included
             - Cross-platform server binaries (macOS ARM64, Windows x64, Linux x64, Linux ARM64)
             - Automated model download script

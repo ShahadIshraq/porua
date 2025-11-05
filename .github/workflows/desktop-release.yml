@@ -385,6 +385,12 @@ jobs:
           body: |
             Desktop wrapper application for Porua TTS Server.
 
+            ## Browser Extensions
+
+            Install the browser extension to use with the Desktop app:
+            - **Chrome:** [Chrome Web Store](https://chromewebstore.google.com/detail/porua/ggdmgcopgoceppjdnkhmnfgefbbaahia)
+            - **Firefox:** [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/porua/)
+
             ## Downloads
 
             ### macOS

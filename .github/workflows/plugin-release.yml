@@ -58,6 +58,11 @@ jobs:
           body: |
             Text-to-speech reader for web pages powered by Kokoro TTS.
 
+            ## 🛒 Install from Store
+
+            - **Chrome:** [Chrome Web Store](https://chromewebstore.google.com/detail/porua/ggdmgcopgoceppjdnkhmnfgefbbaahia)
+            - **Firefox:** [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/porua/)
+
             ## 📦 What's Included
             - Chrome extension package (ready for Chrome Web Store)
             - Firefox add-on package (ready for Firefox AMO)
