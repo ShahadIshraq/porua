@@ -2,6 +2,10 @@
 
 A lightweight menu bar/system tray application for managing the Porua TTS Server.
 
+**Browser Extensions:**
+- [Chrome Web Store](https://chromewebstore.google.com/detail/porua/ggdmgcopgoceppjdnkhmnfgefbbaahia)
+- [Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/porua/)
+
 ## Features
 
 - **System Tray Control**: Start/Stop the TTS server from your menu bar (macOS) or system tray (Windows)
