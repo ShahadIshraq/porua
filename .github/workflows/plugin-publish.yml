@@ -1,0 +1,140 @@
+name: Publish Plugin to Stores
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  submit-to-mozilla:
+    name: Submit to Mozilla Add-ons
+    runs-on: ubuntu-latest
+    # Only run for plugin releases (not server/desktop) and not for pre-releases
+    if: startsWith(github.event.release.tag_name, 'plugin-v') && !github.event.release.prerelease
+    permissions:
+      contents: write  # For commenting on release
+
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#plugin-v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Download Firefox addon package
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Downloading Firefox addon v${VERSION}..."
+          curl -fL -o firefox-addon.zip \
+            "https://github.com/${{ github.repository }}/releases/download/plugin-v${VERSION}/porua-extension-firefox-v${VERSION}.zip"
+
+          echo "Downloading source code archive..."
+          curl -fL -o source-code.zip \
+            "https://github.com/${{ github.repository }}/releases/download/plugin-v${VERSION}/porua-extension-source-v${VERSION}.zip"
+
+          echo "Downloading checksums..."
+          curl -fL -o SHA256SUMS \
+            "https://github.com/${{ github.repository }}/releases/download/plugin-v${VERSION}/SHA256SUMS"
+
+          echo "Files downloaded:"
+          ls -lh *.zip SHA256SUMS
+
+      - name: Verify checksums
+        run: |
+          echo "Verifying file integrity..."
+          sha256sum -c SHA256SUMS --ignore-missing
+          echo "✓ All checksums verified successfully"
+
+      - name: Submit to Mozilla AMO
+        id: amo_submit
+        timeout-minutes: 10
+        uses: browser-actions/release-firefox-addon@v0
+        with:
+          addon-id: 'porua'
+          addon-path: firefox-addon.zip
+          source-path: source-code.zip
+          auth-api-issuer: ${{ secrets.AMO_JWT_ISSUER }}
+          auth-api-secret: ${{ secrets.AMO_JWT_SECRET }}
+          channel: listed
+          approval-note: |
+            Build instructions: See BUILD_INSTRUCTIONS.md in source archive.
+
+            Extension connects to local Porua TTS server (default: http://localhost:8080).
+            No external services or tracking. All processing is local.
+
+            To build:
+            1. npm install
+            2. npm run build
+            3. npm run package
+
+            The extension uses esbuild to bundle JavaScript modules.
+          release-note: |
+            See full changelog: https://github.com/${{ github.repository }}/releases/tag/plugin-v${{ steps.version.outputs.version }}
+        continue-on-error: true
+
+      - name: Update release with submission status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ steps.amo_submit.outcome }}';
+            const version = '${{ steps.amo_submit.outputs.version }}';
+            const versionId = '${{ steps.amo_submit.outputs.version-id }}';
+            const editUrl = '${{ steps.amo_submit.outputs.version-edit-url }}';
+
+            let statusMessage;
+            if (status === 'success') {
+              statusMessage = `## 🦊 Mozilla Add-ons Submission\n\n` +
+                     `✅ Successfully submitted version **${version}** to Mozilla AMO\n\n` +
+                     `**Status**: Pending review (typically 1-2 weeks)\n` +
+                     `**Version ID**: ${versionId}\n` +
+                     `**Manage version**: ${editUrl}\n\n` +
+                     `### What happens next?\n` +
+                     `- Mozilla reviewers will examine the code (usually takes 1-2 weeks)\n` +
+                     `- You'll receive email notifications about the review status\n` +
+                     `- Once approved, the update will be live on the Firefox Add-ons store\n\n` +
+                     `### Need to make changes?\n` +
+                     `Visit the [version management page](${editUrl}) to update metadata or respond to reviewers.`;
+            } else {
+              statusMessage = `## 🦊 Mozilla Add-ons Submission\n\n` +
+                     `⚠️ Automated submission encountered an issue.\n\n` +
+                     `**Status**: Failed - manual submission required\n\n` +
+                     `### Manual submission steps:\n` +
+                     `1. Visit https://addons.mozilla.org/developers/addon/porua/versions/submit/\n` +
+                     `2. Upload the Firefox addon: \`porua-extension-firefox-v${{ steps.version.outputs.version }}.zip\`\n` +
+                     `3. Upload the source code: \`porua-extension-source-v${{ steps.version.outputs.version }}.zip\`\n` +
+                     `4. Fill in the release notes and submit\n\n` +
+                     `**Download packages from this release** (scroll to Assets section below)\n\n` +
+                     `Check the [workflow logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for error details.`;
+            }
+
+            // Get current release
+            const release = await github.rest.repos.getRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id
+            });
+
+            // Append status message to release body
+            const updatedBody = release.data.body + '\n\n---\n\n' + statusMessage;
+
+            // Update release with new body
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id,
+              body: updatedBody
+            });
+
+      - name: Output submission results
+        if: always()
+        run: |
+          echo "==================================="
+          echo "Mozilla AMO Submission Results"
+          echo "==================================="
+          echo "Status: ${{ steps.amo_submit.outcome }}"
+          echo "Version: ${{ steps.amo_submit.outputs.version }}"
+          echo "Version ID: ${{ steps.amo_submit.outputs.version-id }}"
+          echo "Edit URL: ${{ steps.amo_submit.outputs.version-edit-url }}"
+          echo "==================================="

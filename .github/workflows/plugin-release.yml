@@ -53,7 +53,7 @@ jobs:
         with:
           tag_name: plugin-v${{ steps.version.outputs.version }}
           name: Porua Browser Extension v${{ steps.version.outputs.version }}
-          draft: false
+          draft: true
           prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           body: |
             Text-to-speech reader for web pages powered by Kokoro TTS.
@@ -181,9 +181,32 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: plugin-v${{ needs.create-release.outputs.version }}
+          draft: true
+          prerelease: ${{ needs.create-release.outputs.is_prerelease }}
           files: |
             plugin/packages/porua-extension-chrome-v${{ needs.create-release.outputs.version }}.zip
             plugin/packages/porua-extension-firefox-v${{ needs.create-release.outputs.version }}.zip
+            plugin/packages/porua-extension-source-v${{ needs.create-release.outputs.version }}.zip
             plugin/packages/SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Mark release on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release edit "plugin-v${{ needs.create-release.outputs.version }}" \
+            --notes-file <(cat <<EOF
+          ⚠️ **Build Failed**
+
+          The build process encountered errors. Please check the workflow run for details:
+
+          **[View Workflow Run →](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})**
+
+          This release will remain as a draft until the build succeeds.
+
+          ---
+          $(gh release view "plugin-v${{ needs.create-release.outputs.version }}" --json body --jq '.body')
+          EOF
+          )
