@@ -138,3 +138,123 @@ jobs:
           echo "Version ID: ${{ steps.amo_submit.outputs.version-id }}"
           echo "Edit URL: ${{ steps.amo_submit.outputs.version-edit-url }}"
           echo "==================================="
+
+  submit-to-chrome:
+    name: Submit to Chrome Web Store
+    runs-on: ubuntu-latest
+    # Only run for plugin releases (not server/desktop) and not for pre-releases
+    if: startsWith(github.event.release.tag_name, 'plugin-v') && !github.event.release.prerelease
+    permissions:
+      contents: write  # For commenting on release
+
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${VERSION#plugin-v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Extracted version: $VERSION"
+
+      - name: Download Chrome extension package
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          echo "Downloading Chrome extension v${VERSION}..."
+          curl -fL -O \
+            "https://github.com/${{ github.repository }}/releases/download/plugin-v${VERSION}/porua-extension-chrome-v${VERSION}.zip"
+
+          echo "Downloading checksums..."
+          curl -fL -O \
+            "https://github.com/${{ github.repository }}/releases/download/plugin-v${VERSION}/SHA256SUMS"
+
+          echo "Files downloaded:"
+          ls -lh *.zip SHA256SUMS
+
+      - name: Verify checksums
+        run: |
+          echo "Verifying file integrity..."
+          sha256sum -c SHA256SUMS --ignore-missing
+          echo "✓ All checksums verified successfully"
+
+      - name: Upload to Chrome Web Store
+        id: chrome_upload
+        timeout-minutes: 10
+        uses: mnao305/chrome-extension-upload@v5.0.0
+        with:
+          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
+          client-id: ${{ secrets.CHROME_CLIENT_ID }}
+          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+          file-path: porua-extension-chrome-v${{ steps.version.outputs.version }}.zip
+          publish: false  # Stage the release, don't auto-publish
+        continue-on-error: true
+
+      - name: Update release with submission status
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ steps.chrome_upload.outcome }}';
+            const version = '${{ steps.version.outputs.version }}';
+
+            let statusMessage;
+            if (status === 'success') {
+              statusMessage = `## 🌐 Chrome Web Store Submission\n\n` +
+                     `✅ Successfully uploaded version **${version}** to Chrome Web Store\n\n` +
+                     `**Status**: Staged for review (not published)\n` +
+                     `**Extension ID**: ${{ secrets.CHROME_EXTENSION_ID }}\n` +
+                     `**Developer Dashboard**: https://chrome.google.com/webstore/devconsole\n\n` +
+                     `### What happens next?\n` +
+                     `- Google will review the extension (typically within 24-72 hours)\n` +
+                     `- You'll receive email notifications about the review status\n` +
+                     `- Once approved, it will show "Ready to publish" in the dashboard\n` +
+                     `- **You must manually click "Publish" to make it live**\n` +
+                     `- You have 30 days to publish after approval, or it reverts to draft\n\n` +
+                     `### Manual publish steps:\n` +
+                     `1. Go to [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)\n` +
+                     `2. Find your extension\n` +
+                     `3. Once approved, click the "Publish" button\n` +
+                     `4. The update will be live within a few hours`;
+            } else {
+              statusMessage = `## 🌐 Chrome Web Store Submission\n\n` +
+                     `⚠️ Automated upload encountered an issue.\n\n` +
+                     `**Status**: Failed - manual upload required\n\n` +
+                     `### Manual upload steps:\n` +
+                     `1. Visit [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole)\n` +
+                     `2. Click on your Porua extension\n` +
+                     `3. Click "Package" → "Upload new package"\n` +
+                     `4. Upload the Chrome extension: \`porua-extension-chrome-v${version}.zip\`\n` +
+                     `5. Fill in any required information\n` +
+                     `6. Click "Submit for review"\n` +
+                     `7. After approval, manually click "Publish"\n\n` +
+                     `**Download package from this release** (scroll to Assets section below)\n\n` +
+                     `Check the [workflow logs](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) for error details.`;
+            }
+
+            // Get current release
+            const release = await github.rest.repos.getRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id
+            });
+
+            // Append status message to release body
+            const updatedBody = release.data.body + '\n\n---\n\n' + statusMessage;
+
+            // Update release with new body
+            await github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: context.payload.release.id,
+              body: updatedBody
+            });
+
+      - name: Output submission results
+        if: always()
+        run: |
+          echo "==================================="
+          echo "Chrome Web Store Submission Results"
+          echo "==================================="
+          echo "Status: ${{ steps.chrome_upload.outcome }}"
+          echo "Extension ID: ${{ secrets.CHROME_EXTENSION_ID }}"
+          echo "==================================="
