@@ -3,13 +3,31 @@ name: Publish Plugin to Stores
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release tag to publish (e.g., plugin-v0.2.1)'
+        required: true
+        type: string
+
+# Required GitHub Secrets:
+# Mozilla Add-ons:
+#   - AMO_JWT_ISSUER: Mozilla API JWT issuer
+#   - AMO_JWT_SECRET: Mozilla API JWT secret
+# Chrome Web Store:
+#   - CHROME_EXTENSION_ID: Chrome extension ID
+#   - CHROME_CLIENT_ID: Chrome OAuth client ID
+#   - CHROME_CLIENT_SECRET: Chrome OAuth client secret
+#   - CHROME_REFRESH_TOKEN: Chrome OAuth refresh token
 
 jobs:
   submit-to-mozilla:
     name: Submit to Mozilla Add-ons
     runs-on: ubuntu-latest
     # Only run for plugin releases (not server/desktop) and not for pre-releases
-    if: startsWith(github.event.release.tag_name, 'plugin-v') && !github.event.release.prerelease
+    if: |
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'plugin-v') && !github.event.release.prerelease) ||
+      (github.event_name == 'workflow_dispatch' && startsWith(inputs.tag_name, 'plugin-v'))
     permissions:
       contents: write  # For commenting on release
 
@@ -17,7 +35,11 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          VERSION="${{ github.event.release.tag_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.tag_name }}"
+          else
+            VERSION="${{ github.event.release.tag_name }}"
+          fi
           VERSION="${VERSION#plugin-v}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION"
@@ -143,7 +165,9 @@ jobs:
     name: Submit to Chrome Web Store
     runs-on: ubuntu-latest
     # Only run for plugin releases (not server/desktop) and not for pre-releases
-    if: startsWith(github.event.release.tag_name, 'plugin-v') && !github.event.release.prerelease
+    if: |
+      (github.event_name == 'release' && startsWith(github.event.release.tag_name, 'plugin-v') && !github.event.release.prerelease) ||
+      (github.event_name == 'workflow_dispatch' && startsWith(inputs.tag_name, 'plugin-v'))
     permissions:
       contents: write  # For commenting on release
 
@@ -151,7 +175,11 @@ jobs:
       - name: Extract version from tag
         id: version
         run: |
-          VERSION="${{ github.event.release.tag_name }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.tag_name }}"
+          else
+            VERSION="${{ github.event.release.tag_name }}"
+          fi
           VERSION="${VERSION#plugin-v}"
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extracted version: $VERSION"
