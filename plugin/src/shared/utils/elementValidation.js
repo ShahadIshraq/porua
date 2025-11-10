@@ -163,12 +163,55 @@ export function isReadableElement(element) {
 }
 
 /**
+ * Check if an element is nested within another element from the same list
+ * @param {HTMLElement} element - The element to check
+ * @param {HTMLElement[]} elements - Array of elements to check against
+ * @returns {boolean} True if the element is nested within another element in the list
+ */
+export function isNestedWithinAnother(element, elements) {
+  if (!element || !elements || elements.length === 0) {
+    return false;
+  }
+
+  // Check if any other element in the list contains this element
+  return elements.some(other =>
+    other !== element && other.contains && other.contains(element)
+  );
+}
+
+/**
+ * Filter out elements that are nested within other readable elements
+ * Keeps only the outermost readable element in a nested hierarchy
+ *
+ * Example:
+ * - <ol><li><p>text</p></li></ol> -> keeps <li>, removes <p>
+ * - <blockquote><p>text</p></blockquote> -> keeps <blockquote>, removes <p>
+ *
+ * @param {HTMLElement[]} elements - Array of DOM elements to filter
+ * @returns {HTMLElement[]} Filtered array with nested elements removed
+ */
+export function removeNestedElements(elements) {
+  if (!elements || elements.length === 0) {
+    return [];
+  }
+
+  return elements.filter(element =>
+    !isNestedWithinAnother(element, elements)
+  );
+}
+
+/**
  * Filter an array of elements to only include readable ones with sufficient content
+ * Also removes nested elements to avoid duplicates (e.g., <p> inside <li>)
  * @param {HTMLElement[]} elements - Array of DOM elements to filter
  * @returns {HTMLElement[]} Filtered array of readable elements
  */
 export function filterReadableElements(elements) {
-  return elements.filter(element =>
+  // First filter by readability criteria
+  const readable = elements.filter(element =>
     isReadableElement(element) && hasMinimumTextContent(element)
   );
+
+  // Then remove nested elements to avoid duplicates
+  return removeNestedElements(readable);
 }
