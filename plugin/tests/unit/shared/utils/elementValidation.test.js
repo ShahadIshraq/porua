@@ -6,7 +6,9 @@ import {
   isInteractiveElement,
   shouldShowPlayButton,
   isReadableElement,
-  filterReadableElements
+  filterReadableElements,
+  isNestedWithinAnother,
+  removeNestedElements
 } from '../../../../src/shared/utils/elementValidation.js';
 
 describe('elementValidation', () => {
@@ -339,6 +341,181 @@ describe('elementValidation', () => {
     });
   });
 
+  describe('isNestedWithinAnother', () => {
+    it('should return true if element is nested within another element in the list', () => {
+      const parent = document.createElement('li');
+      const child = document.createElement('p');
+      parent.appendChild(child);
+
+      const elements = [parent, child];
+      expect(isNestedWithinAnother(child, elements)).toBe(true);
+    });
+
+    it('should return false if element is not nested within any other element', () => {
+      const p1 = document.createElement('p');
+      const p2 = document.createElement('p');
+
+      const elements = [p1, p2];
+      expect(isNestedWithinAnother(p1, elements)).toBe(false);
+      expect(isNestedWithinAnother(p2, elements)).toBe(false);
+    });
+
+    it('should return false for the outermost element', () => {
+      const parent = document.createElement('li');
+      const child = document.createElement('p');
+      parent.appendChild(child);
+
+      const elements = [parent, child];
+      expect(isNestedWithinAnother(parent, elements)).toBe(false);
+    });
+
+    it('should handle multiple levels of nesting', () => {
+      const grandparent = document.createElement('blockquote');
+      const parent = document.createElement('li');
+      const child = document.createElement('p');
+
+      grandparent.appendChild(parent);
+      parent.appendChild(child);
+
+      const elements = [grandparent, parent, child];
+
+      expect(isNestedWithinAnother(child, elements)).toBe(true);
+      expect(isNestedWithinAnother(parent, elements)).toBe(true);
+      expect(isNestedWithinAnother(grandparent, elements)).toBe(false);
+    });
+
+    it('should return false for null or undefined', () => {
+      const p = document.createElement('p');
+      expect(isNestedWithinAnother(null, [p])).toBe(false);
+      expect(isNestedWithinAnother(undefined, [p])).toBe(false);
+    });
+
+    it('should return false for empty elements array', () => {
+      const p = document.createElement('p');
+      expect(isNestedWithinAnother(p, [])).toBe(false);
+    });
+
+    it('should return false if elements is null or undefined', () => {
+      const p = document.createElement('p');
+      expect(isNestedWithinAnother(p, null)).toBe(false);
+      expect(isNestedWithinAnother(p, undefined)).toBe(false);
+    });
+  });
+
+  describe('removeNestedElements', () => {
+    it('should remove nested paragraph inside list item', () => {
+      const li = document.createElement('li');
+      const p = document.createElement('p');
+      p.textContent = 'List item text content';
+      li.appendChild(p);
+
+      const elements = [li, p];
+      const filtered = removeNestedElements(elements);
+
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0]).toBe(li);
+    });
+
+    it('should remove nested paragraph inside blockquote', () => {
+      const blockquote = document.createElement('blockquote');
+      const p = document.createElement('p');
+      p.textContent = 'Quote text content';
+      blockquote.appendChild(p);
+
+      const elements = [blockquote, p];
+      const filtered = removeNestedElements(elements);
+
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0]).toBe(blockquote);
+    });
+
+    it('should keep all elements if none are nested', () => {
+      const p1 = document.createElement('p');
+      const p2 = document.createElement('p');
+      const h1 = document.createElement('h1');
+
+      const elements = [p1, p2, h1];
+      const filtered = removeNestedElements(elements);
+
+      expect(filtered).toHaveLength(3);
+      expect(filtered).toEqual(elements);
+    });
+
+    it('should handle multiple nested elements (real-world Cloudflare blog scenario)', () => {
+      // Simulate: <ol><li><p>text1</p></li><li><p>text2</p></li></ol>
+      const ol = document.createElement('ol');
+
+      const li1 = document.createElement('li');
+      const p1 = document.createElement('p');
+      p1.textContent = 'All of the fatal panics happen within stack unwinding.';
+      li1.appendChild(p1);
+      ol.appendChild(li1);
+
+      const li2 = document.createElement('li');
+      const p2 = document.createElement('p');
+      p2.textContent = 'We correlated an increased volume of recovered panics.';
+      li2.appendChild(p2);
+      ol.appendChild(li2);
+
+      // querySelectorAll would return both li and p elements
+      const elements = [li1, p1, li2, p2];
+      const filtered = removeNestedElements(elements);
+
+      // Should only keep the li elements, removing the nested p elements
+      expect(filtered).toHaveLength(2);
+      expect(filtered[0]).toBe(li1);
+      expect(filtered[1]).toBe(li2);
+    });
+
+    it('should handle deeply nested structures', () => {
+      const outer = document.createElement('blockquote');
+      const middle = document.createElement('li');
+      const inner = document.createElement('p');
+
+      outer.appendChild(middle);
+      middle.appendChild(inner);
+
+      const elements = [outer, middle, inner];
+      const filtered = removeNestedElements(elements);
+
+      // Should only keep the outermost element
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0]).toBe(outer);
+    });
+
+    it('should return empty array for empty input', () => {
+      const filtered = removeNestedElements([]);
+      expect(filtered).toEqual([]);
+    });
+
+    it('should return empty array for null or undefined', () => {
+      expect(removeNestedElements(null)).toEqual([]);
+      expect(removeNestedElements(undefined)).toEqual([]);
+    });
+
+    it('should handle mix of nested and non-nested elements', () => {
+      const standalone = document.createElement('h1');
+      standalone.textContent = 'Standalone heading';
+
+      const li = document.createElement('li');
+      const p = document.createElement('p');
+      p.textContent = 'Nested paragraph';
+      li.appendChild(p);
+
+      const another = document.createElement('h2');
+      another.textContent = 'Another standalone';
+
+      const elements = [standalone, li, p, another];
+      const filtered = removeNestedElements(elements);
+
+      expect(filtered).toHaveLength(3);
+      expect(filtered).toContain(standalone);
+      expect(filtered).toContain(li);
+      expect(filtered).toContain(another);
+      expect(filtered).not.toContain(p);
+    });
+  });
+
   describe('filterReadableElements', () => {
     it('should filter out non-readable elements', () => {
       const p = document.createElement('p');
@@ -408,6 +585,78 @@ describe('elementValidation', () => {
       expect(filtered).toHaveLength(2);
       expect(filtered[0]).toBe(p);
       expect(filtered[1]).toBe(li);
+    });
+
+    it('should remove nested readable elements to avoid duplicates', () => {
+      // Simulate the Cloudflare blog issue: <li><p>text</p></li>
+      const li = document.createElement('li');
+      const p = document.createElement('p');
+      p.textContent = 'All of the fatal panics happen within stack unwinding.';
+      li.appendChild(p);
+
+      const elements = [li, p];
+      const filtered = filterReadableElements(elements);
+
+      // Should only return the li, not the nested p
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0]).toBe(li);
+    });
+
+    it('should handle real-world nested list scenario', () => {
+      // Simulate: <ol><li><p>text1</p></li><li><p>text2</p></li><li><p>text3</p></li></ol>
+      const li1 = document.createElement('li');
+      const p1 = document.createElement('p');
+      p1.textContent = 'All of the fatal panics happen within stack unwinding.';
+      li1.appendChild(p1);
+
+      const li2 = document.createElement('li');
+      const p2 = document.createElement('p');
+      p2.textContent = 'We correlated an increased volume of recovered panics.';
+      li2.appendChild(p2);
+
+      const li3 = document.createElement('li');
+      const p3 = document.createElement('p');
+      p3.textContent = 'Recovering a panic unwinds goroutine stacks.';
+      li3.appendChild(p3);
+
+      const elements = [li1, p1, li2, p2, li3, p3];
+      const filtered = filterReadableElements(elements);
+
+      // Should only return the 3 list items, not the 3 nested paragraphs
+      expect(filtered).toHaveLength(3);
+      expect(filtered[0]).toBe(li1);
+      expect(filtered[1]).toBe(li2);
+      expect(filtered[2]).toBe(li3);
+    });
+
+    it('should handle blockquote with nested paragraph', () => {
+      const blockquote = document.createElement('blockquote');
+      const p = document.createElement('p');
+      p.textContent = 'This is a quote with nested paragraph element.';
+      blockquote.appendChild(p);
+
+      const elements = [blockquote, p];
+      const filtered = filterReadableElements(elements);
+
+      // Should only return blockquote, not the nested paragraph
+      expect(filtered).toHaveLength(1);
+      expect(filtered[0]).toBe(blockquote);
+    });
+
+    it('should keep standalone paragraphs when not nested', () => {
+      const p1 = document.createElement('p');
+      p1.textContent = 'First standalone paragraph with enough text.';
+
+      const p2 = document.createElement('p');
+      p2.textContent = 'Second standalone paragraph with enough text.';
+
+      const elements = [p1, p2];
+      const filtered = filterReadableElements(elements);
+
+      // Both standalone paragraphs should be kept
+      expect(filtered).toHaveLength(2);
+      expect(filtered[0]).toBe(p1);
+      expect(filtered[1]).toBe(p2);
     });
   });
 });

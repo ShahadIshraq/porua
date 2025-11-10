@@ -108,6 +108,8 @@ class TTSContentScript {
     const startIndex = all.indexOf(startParagraph);
     if (startIndex === -1) return [];
 
+    // filterReadableElements removes nested duplicates (e.g., <p> inside <li>)
+    // to prevent the same content from being read twice
     return filterReadableElements(all.slice(startIndex + 1));
   }
 
