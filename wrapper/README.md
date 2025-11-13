@@ -216,6 +216,56 @@ gh release upload v0.1.0 \
 4. Wait for installation (~337 MB model download)
 5. Server starts automatically
 
+## Windows Uninstallation
+
+### What Gets Removed
+
+When you uninstall Porua on Windows using the MSI installer, the following is **completely removed**:
+
+1. **Installation Directory** (`C:\Program Files\Porua\`)
+   - Application executable
+   - Bundled resources
+
+2. **User Data Directory** (`%APPDATA%\Porua\`, approximately **400-500 MB**)
+   - `bin/porua_server` - Server binary (~29 MB)
+   - `models/` - TTS models (~337 MB)
+     - `kokoro-v1.0.onnx` (~310 MB)
+     - `voices-v1.0.bin` (~27 MB)
+   - `espeak-ng-data/` - Phoneme data (~25 MB)
+   - `samples/` - Voice samples
+   - `logs/` - Application and server logs
+   - `config.json` - User configuration
+   - `.env` - Server environment settings
+   - `installed.flag` - Installation marker
+
+3. **Registry Entries**
+   - `HKCU\Software\Porua Team\Porua`
+
+### Important Notes
+
+- **Automatic Process Termination**: The uninstaller will force-terminate Porua.exe if running
+- **Complete Data Removal**: All downloaded models and configurations are deleted
+- **No Backup**: User data is not backed up before removal
+
+### Manual Cleanup (if needed)
+
+If uninstallation is incomplete:
+
+```powershell
+# Remove app data
+Remove-Item -Recurse -Force "$env:APPDATA\Porua"
+
+# Remove registry entries
+Remove-Item -Path "HKCU:\Software\Porua Team\Porua" -Recurse -ErrorAction SilentlyContinue
+```
+
+### Re-installing After Uninstall
+
+After uninstalling, you can reinstall Porua:
+- All models will need to be re-downloaded (~337 MB)
+- Configuration will reset to defaults
+- First-launch installation will trigger automatically
+
 ## Troubleshooting
 
 ### Server won't start

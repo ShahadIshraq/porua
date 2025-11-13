@@ -102,4 +102,56 @@ mod tests {
         let dir = get_app_data_dir().unwrap();
         assert!(dir.to_string_lossy().contains("Porua") || dir.to_string_lossy().contains("porua"));
     }
+
+    #[test]
+    fn test_app_data_dir_uses_porua_name() {
+        // This test ensures the directory name matches what the WiX uninstaller expects
+        // The WiX template uses [AppDataFolder]Porua for cleanup
+        let dir = get_app_data_dir().unwrap();
+        let dir_name = dir.file_name().unwrap().to_string_lossy();
+
+        #[cfg(target_os = "windows")]
+        {
+            // On Windows, must be exactly "Porua" to match WiX template
+            assert_eq!(dir_name, "Porua", "Windows app data directory must be named 'Porua' for WiX uninstaller cleanup");
+        }
+
+        #[cfg(target_os = "macos")]
+        {
+            assert_eq!(dir_name, "Porua", "macOS app data directory should be 'Porua'");
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            assert_eq!(dir_name, "porua", "Linux app data directory should be 'porua'");
+        }
+    }
+
+    #[test]
+    fn test_all_subdirectories_under_app_data_dir() {
+        // Ensure all subdirectories are under the app data directory
+        // This is important for cleanup - WiX removes the entire Porua directory
+        let app_dir = get_app_data_dir().unwrap();
+
+        let server_bin = get_server_binary_path().unwrap();
+        assert!(server_bin.starts_with(&app_dir), "Server binary should be under app data dir");
+
+        let models_dir = get_models_dir().unwrap();
+        assert!(models_dir.starts_with(&app_dir), "Models directory should be under app data dir");
+
+        let samples_dir = get_samples_dir().unwrap();
+        assert!(samples_dir.starts_with(&app_dir), "Samples directory should be under app data dir");
+
+        let espeak_dir = get_espeak_data_dir().unwrap();
+        assert!(espeak_dir.starts_with(&app_dir), "espeak-ng-data directory should be under app data dir");
+
+        let logs_dir = get_logs_dir().unwrap();
+        assert!(logs_dir.starts_with(&app_dir), "Logs directory should be under app data dir");
+
+        let config_file = get_config_file().unwrap();
+        assert!(config_file.starts_with(&app_dir), "Config file should be under app data dir");
+
+        let env_file = get_env_file().unwrap();
+        assert!(env_file.starts_with(&app_dir), "Env file should be under app data dir");
+    }
 }
