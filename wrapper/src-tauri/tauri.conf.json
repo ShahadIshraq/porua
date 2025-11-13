@@ -93,8 +93,13 @@
         "icons/icon-running.png"
       ],
       "shortDescription": "Porua TTS Server",
-      "targets": "all",
+      "targets": ["deb", "appimage", "msi", "app", "dmg", "updater"],
       "windows": {
+        "wix": {
+          "fragmentPaths": ["./windows/complete-cleanup.wxs"],
+          "componentRefs": ["PoruaDataCleanup"],
+          "language": ["en-US"]
+        },
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",
         "timestampUrl": ""
