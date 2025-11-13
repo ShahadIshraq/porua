@@ -80,6 +80,11 @@
             <RegistrySearch Id="PrevInstallDirReg" Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="InstallDir" Type="raw"/>
         </Property>
 
+        <!-- Property to retrieve app data directory path for cleanup on uninstall -->
+        <Property Id="PORUAAPPDATADIR">
+            <RegistrySearch Id="PoruaAppDataDirSearch" Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="AppDataDir" Type="raw"/>
+        </Property>
+
         <!-- launch app checkbox -->
         <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="!(loc.LaunchApp)" />
         <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1"/>
@@ -129,6 +134,18 @@
                 <RegistryKey Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}">
                     <RegistryValue Name="InstallDir" Type="string" Value="[INSTALLDIR]" KeyPath="yes" />
                 </RegistryKey>
+            </Component>
+            <!-- Component to track and clean up app data directory -->
+            <Component Id="PoruaAppDataCleanup" Guid="*">
+                <!-- Write the app data path to registry during install -->
+                <RegistryValue Root="HKCU"
+                               Key="Software\\{{manufacturer}}\\{{product_name}}"
+                               Name="AppDataDir"
+                               Type="string"
+                               Value="[AppDataFolder]Porua"
+                               KeyPath="yes" />
+                <!-- Remove the app data directory on uninstall (not during upgrades) -->
+                <util:RemoveFolderEx On="uninstall" Property="PORUAAPPDATADIR" />
             </Component>
             <Component Id="Path" Guid="{{path_component_guid}}" Win64="$(var.Win64)">
                 <File Id="Path" Source="{{app_exe_source}}" KeyPath="yes" Checksum="yes"/>
@@ -206,6 +223,7 @@
                 Absent="disallow">
 
             <ComponentRef Id="RegistryEntries"/>
+            <ComponentRef Id="PoruaAppDataCleanup"/>
 
             {{#each resource_file_ids as |resource_file_id| ~}}
                 <ComponentRef Id="{{ resource_file_id }}"/>
