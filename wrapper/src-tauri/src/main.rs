@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+mod cleanup;
 mod config;
 mod installer;
 mod paths;

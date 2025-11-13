@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+
+  <Fragment>
+    <!--
+      COMPLETE CLEANUP FRAGMENT FOR PORUA
+
+      This fragment ensures 100% removal of all Porua files during uninstall:
+      1. Terminates running Porua.exe process
+      2. Removes entire AppData directory (models, config, logs)
+      3. Cleans up registry tracking keys
+      4. Ensures installation directory is completely removed
+    -->
+
+    <!-- Property to remember AppData path for uninstall -->
+    <Property Id="PORUAAPPDATA">
+      <RegistrySearch
+        Id="PoruaAppDataSearch"
+        Root="HKCU"
+        Key="Software\Porua"
+        Name="AppDataPath"
+        Type="raw" />
+    </Property>
+
+    <!--
+      Custom Action: Terminate Porua.exe before uninstall
+      This ensures the main executable can be deleted
+    -->
+    <CustomAction
+      Id="TerminatePoruaProcess"
+      ExeCommand='[SystemFolder]taskkill.exe /F /IM Porua.exe'
+      Execute="deferred"
+      Impersonate="yes"
+      Return="ignore" />
+
+    <!--
+      Custom Action: Terminate porua_server.exe before uninstall
+      This ensures the server process doesn't lock AppData files
+    -->
+    <CustomAction
+      Id="TerminateServerProcess"
+      ExeCommand='[SystemFolder]taskkill.exe /F /IM porua_server.exe'
+      Execute="deferred"
+      Impersonate="yes"
+      Return="ignore" />
+
+    <!--
+      Schedule custom actions to run during uninstall BEFORE files are removed
+    -->
+    <InstallExecuteSequence>
+      <!-- Only run during uninstall (not install or upgrade) -->
+      <Custom Action="TerminatePoruaProcess" Before="RemoveFiles">
+        REMOVE~="ALL"
+      </Custom>
+      <Custom Action="TerminateServerProcess" Before="RemoveFiles">
+        REMOVE~="ALL"
+      </Custom>
+    </InstallExecuteSequence>
+
+    <!-- Main cleanup component -->
+    <DirectoryRef Id="TARGETDIR">
+      <Component
+        Id="PoruaDataCleanup"
+        Guid="41E7109C-CC5E-4C4E-8627-7E6571DA9B6B">
+
+        <!-- Remove entire AppData directory on uninstall -->
+        <util:RemoveFolderEx
+          On="uninstall"
+          Property="PORUAAPPDATA" />
+
+        <!-- Clean up registry key itself on uninstall -->
+        <RegistryKey
+          Root="HKCU"
+          Key="Software\Porua"
+          Action="createAndRemoveOnUninstall">
+          <RegistryValue
+            Name="AppDataPath"
+            Type="string"
+            Value="[AppDataFolder]Porua"
+            KeyPath="yes" />
+        </RegistryKey>
+      </Component>
+    </DirectoryRef>
+  </Fragment>
+</Wix>
