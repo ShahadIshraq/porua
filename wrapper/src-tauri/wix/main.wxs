@@ -11,8 +11,7 @@
     <?error Unsupported value of sys.BUILDARCH=$(sys.BUILDARCH)?>
 <?endif?>
 
-<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
-     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
     <Product
             Id="*"
             Name="{{product_name}}"
@@ -44,16 +43,24 @@
             <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="!(loc.DowngradeErrorMessage)" AllowSameVersionUpgrades="yes" />
         {{/if}}
 
-        <!-- Force-terminate Porua.exe before uninstall to prevent file locking -->
-        <CustomAction Id="KillPoruaApp"
-                      Directory="INSTALLDIR"
-                      ExeCommand="&quot;[SystemFolder]taskkill.exe&quot; /F /IM &quot;Porua.exe&quot;"
-                      Return="ignore" />
+        <!-- Force-terminate application before uninstall to prevent file locking -->
+        <!-- Uses taskkill to forcefully terminate the process if running -->
+        <!-- SECURITY NOTE: {{main_binary_name}} is controlled by Tauri build system (tauri.conf.json productName) -->
+        <!-- and validated during build. No user input reaches this template variable. -->
+        <CustomAction Id="KillPoruaApp" Directory="INSTALLDIR" ExeCommand='cmd.exe /c taskkill /F /IM "{{main_binary_name}}.exe" /T' Execute="deferred" Return="ignore" Impersonate="yes" />
+
+        <!-- Remove app data directory on uninstall -->
+        <!-- Uses hardcoded path %APPDATA%\Porua to prevent registry tampering attacks -->
+        <CustomAction Id="RemovePoruaAppData" Directory="INSTALLDIR" ExeCommand='cmd.exe /c if exist "%APPDATA%\Porua" rmdir /s /q "%APPDATA%\Porua"' Execute="deferred" Return="ignore" Impersonate="yes" />
 
         <InstallExecuteSequence>
             <RemoveShortcuts>Installed AND NOT UPGRADINGPRODUCTCODE</RemoveShortcuts>
-            <!-- Kill the app before removing files to prevent locked file issues -->
-            <Custom Action="KillPoruaApp" Before="InstallValidate">
+            <!-- Kill the app immediately before removing files to minimize race condition window -->
+            <Custom Action="KillPoruaApp" Before="RemoveFiles">
+                (REMOVE="ALL") AND NOT UPGRADINGPRODUCTCODE
+            </Custom>
+            <!-- Remove app data after killing the process but before removing installation files -->
+            <Custom Action="RemovePoruaAppData" After="KillPoruaApp">
                 (REMOVE="ALL") AND NOT UPGRADINGPRODUCTCODE
             </Custom>
         </InstallExecuteSequence>
@@ -78,11 +85,6 @@
         <!-- initialize with previous InstallDir -->
         <Property Id="INSTALLDIR">
             <RegistrySearch Id="PrevInstallDirReg" Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="InstallDir" Type="raw"/>
-        </Property>
-
-        <!-- Property to retrieve app data directory path for cleanup on uninstall -->
-        <Property Id="PORUAAPPDATADIR">
-            <RegistrySearch Id="PoruaAppDataDirSearch" Root="HKCU" Key="Software\\{{manufacturer}}\\{{product_name}}" Name="AppDataDir" Type="raw"/>
         </Property>
 
         <!-- launch app checkbox -->
@@ -135,17 +137,14 @@
                     <RegistryValue Name="InstallDir" Type="string" Value="[INSTALLDIR]" KeyPath="yes" />
                 </RegistryKey>
             </Component>
-            <!-- Component to track and clean up app data directory -->
+            <!-- Registry entry for app data directory (informational only, cleanup uses CustomAction) -->
             <Component Id="PoruaAppDataCleanup" Guid="*">
-                <!-- Write the app data path to registry during install -->
                 <RegistryValue Root="HKCU"
                                Key="Software\\{{manufacturer}}\\{{product_name}}"
                                Name="AppDataDir"
                                Type="string"
                                Value="[AppDataFolder]Porua"
                                KeyPath="yes" />
-                <!-- Remove the app data directory on uninstall (not during upgrades) -->
-                <util:RemoveFolderEx On="uninstall" Property="PORUAAPPDATADIR" />
             </Component>
             <Component Id="Path" Guid="{{path_component_guid}}" Win64="$(var.Win64)">
                 <File Id="Path" Source="{{app_exe_source}}" KeyPath="yes" Checksum="yes"/>
