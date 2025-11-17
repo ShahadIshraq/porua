@@ -12,6 +12,7 @@ export class PlayButton {
     this.hideTimeout = null;
     this.rafId = null;
     this.pendingPosition = false;
+    this.enabled = true; // Play button is enabled by default
   }
 
   init() {
@@ -98,6 +99,11 @@ export class PlayButton {
   }
 
   show(paragraph) {
+    // Don't show button if it's disabled
+    if (!this.enabled) {
+      return;
+    }
+
     if (this.hideTimeout) {
       clearTimeout(this.hideTimeout);
       this.hideTimeout = null;
@@ -139,6 +145,33 @@ export class PlayButton {
     this.hideTimeout = setTimeout(() => {
       this.hide();
     }, TIMEOUTS.BUTTON_HIDE);
+  }
+
+  /**
+   * Enable the play button (allow it to be shown)
+   */
+  enable() {
+    this.enabled = true;
+  }
+
+  /**
+   * Disable the play button (prevent it from being shown and hide if currently visible)
+   */
+  disable() {
+    this.enabled = false;
+    this.hide();
+  }
+
+  /**
+   * Set the enabled state of the play button
+   * @param {boolean} enabled - Whether the button should be enabled
+   */
+  setEnabled(enabled) {
+    if (enabled) {
+      this.enable();
+    } else {
+      this.disable();
+    }
   }
 
   cleanup() {

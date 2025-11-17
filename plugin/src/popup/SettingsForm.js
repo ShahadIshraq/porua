@@ -3,6 +3,7 @@ import { ttsService } from '../shared/services/TTSService.js';
 import { VoiceSelector } from './VoiceSelector.js';
 import { SpeedControl } from './SpeedControl.js';
 import { AudioPreview } from './AudioPreview.js';
+import { PlayButtonToggle } from './PlayButtonToggle.js';
 
 export class SettingsForm {
   constructor(formElement, statusMessage) {
@@ -52,6 +53,10 @@ export class SettingsForm {
       statusMessage: statusMessage
     });
 
+    // Initialize PlayButtonToggle
+    const playButtonToggleContainer = formElement.querySelector('#play-button-toggle-container');
+    this.playButtonToggle = new PlayButtonToggle(playButtonToggleContainer, statusMessage);
+
     // Setup combined callback for shared AudioPreview
     this.setupSharedAudioPreviewCallback();
   }
@@ -78,6 +83,7 @@ export class SettingsForm {
     await this.loadSettings();
     this.setupEventListeners();
     await this.voiceSelector.init();
+    await this.playButtonToggle.init();
 
     // Set initial UI state (disabled save button)
     this.isDirty = false;
@@ -480,6 +486,9 @@ export class SettingsForm {
     }
     if (this.speedControl) {
       this.speedControl.cleanup();
+    }
+    if (this.playButtonToggle) {
+      this.playButtonToggle.cleanup();
     }
     if (this.audioPreview) {
       this.audioPreview.cleanup();

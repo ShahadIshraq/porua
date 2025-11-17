@@ -53,8 +53,22 @@ class TTSContentScript {
     this.wireupContinuousPlayback();
   }
 
-  init() {
+  async init() {
+    // Check if play button should be enabled
+    const playButtonEnabled = await SettingsStore.getPlayButtonEnabled();
+    this.playButton.setEnabled(playButtonEnabled);
+
     this.playButton.init();
+    this.setupMessageListener();
+  }
+
+  setupMessageListener() {
+    // Listen for play button toggle messages from popup
+    chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+      if (message.type === 'PLAY_BUTTON_TOGGLE') {
+        this.playButton.setEnabled(message.enabled);
+      }
+    });
   }
 
   wireupContinuousPlayback() {

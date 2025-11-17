@@ -8,6 +8,7 @@ export class SettingsStore {
       selectedVoiceId: DEFAULT_SETTINGS.selectedVoiceId,
       selectedVoiceName: DEFAULT_SETTINGS.selectedVoiceName,
       speed: DEFAULT_SETTINGS.speed,
+      playButtonEnabled: DEFAULT_SETTINGS.playButtonEnabled,
       isConfigured: false
     });
 
@@ -26,17 +27,19 @@ export class SettingsStore {
       selectedVoiceId: syncData.selectedVoiceId,
       selectedVoiceName: syncData.selectedVoiceName,
       speed: syncData.speed,
+      playButtonEnabled: syncData.playButtonEnabled,
       isConfigured: syncData.isConfigured
     };
   }
 
-  static async set({ apiUrl, apiKey, selectedVoiceId, selectedVoiceName, speed, isConfigured }) {
+  static async set({ apiUrl, apiKey, selectedVoiceId, selectedVoiceName, speed, playButtonEnabled, isConfigured }) {
     // Build sync data object dynamically
     const syncData = {};
     if (apiUrl !== undefined) syncData.apiUrl = apiUrl;
     if (selectedVoiceId !== undefined) syncData.selectedVoiceId = selectedVoiceId;
     if (selectedVoiceName !== undefined) syncData.selectedVoiceName = selectedVoiceName;
     if (speed !== undefined) syncData.speed = speed;
+    if (playButtonEnabled !== undefined) syncData.playButtonEnabled = playButtonEnabled;
     if (isConfigured !== undefined) syncData.isConfigured = isConfigured;
 
     if (Object.keys(syncData).length > 0) {
@@ -91,5 +94,16 @@ export class SettingsStore {
 
   static async setSpeed(speed) {
     await chrome.storage.sync.set({ speed });
+  }
+
+  static async getPlayButtonEnabled() {
+    const data = await chrome.storage.sync.get({
+      playButtonEnabled: DEFAULT_SETTINGS.playButtonEnabled
+    });
+    return data.playButtonEnabled;
+  }
+
+  static async setPlayButtonEnabled(enabled) {
+    await chrome.storage.sync.set({ playButtonEnabled: enabled });
   }
 }

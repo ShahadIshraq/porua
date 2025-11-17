@@ -17,7 +17,8 @@ export const DEFAULT_SETTINGS = {
   apiUrl: 'http://localhost:3000',
   selectedVoiceId: 'bf_lily',
   selectedVoiceName: 'Lily',
-  speed: 1.0
+  speed: 1.0,
+  playButtonEnabled: true
 };
 
 export const Z_INDEX = {
