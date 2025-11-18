@@ -11,7 +11,8 @@ mod server;
 
 use std::sync::Arc;
 use tauri::{
-    CustomMenuItem, Icon, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
+    CustomMenuItem, GlobalShortcutManager, Icon, Manager, SystemTray, SystemTrayEvent,
+    SystemTrayMenu, SystemTrayMenuItem,
 };
 use tokio::sync::Mutex;
 use tracing::{error, info};
@@ -422,6 +423,9 @@ fn main() {
             // Note: No window is created initially (windows: [] in tauri.conf.json)
             // Windows are created programmatically only when needed (e.g., for installation)
 
+            // Register global keyboard shortcut for screen capture
+            register_capture_shortcut(&app_handle);
+
             // Spawn async setup
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = setup_app(app_handle).await {
@@ -523,6 +527,19 @@ async fn setup_app(app_handle: tauri::AppHandle) -> anyhow::Result<()> {
 fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
     let mut menu = SystemTrayMenu::new();
 
+    // Add capture option at the top (available in all states)
+    #[cfg(target_os = "macos")]
+    let shortcut_hint = "⌘⇧S";
+    #[cfg(not(target_os = "macos"))]
+    let shortcut_hint = "Ctrl+Shift+S";
+
+    menu = menu
+        .add_item(CustomMenuItem::new(
+            "capture",
+            format!("Capture Screen    {}", shortcut_hint),
+        ))
+        .add_native_item(SystemTrayMenuItem::Separator);
+
     match status {
         ServerStatus::Stopped | ServerStatus::Error(_) => {
             // Show Start button when stopped or in error
@@ -623,10 +640,82 @@ fn update_tray_menu(app_handle: &tauri::AppHandle, status: &ServerStatus) {
     }
 }
 
+/// Helper function to trigger screen capture mode
+/// Used by both tray menu and global shortcut
+async fn trigger_capture(app_handle: &tauri::AppHandle) {
+    // Check if overlay already exists
+    if app_handle.get_window("capture-overlay").is_some() {
+        info!("Capture overlay already open, ignoring trigger");
+        return;
+    }
+
+    // Hide main window if it exists
+    if let Some(window) = app_handle.get_window("main") {
+        let _ = window.hide();
+    }
+
+    // Create the overlay window
+    match tauri::WindowBuilder::new(
+        app_handle,
+        "capture-overlay",
+        tauri::WindowUrl::App("overlay.html".into()),
+    )
+    .title("Screen Capture")
+    .fullscreen(true)
+    .transparent(true)
+    .decorations(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .build()
+    {
+        Ok(overlay) => {
+            if let Err(e) = overlay.show() {
+                error!("Failed to show overlay: {}", e);
+            }
+            if let Err(e) = overlay.set_focus() {
+                error!("Failed to focus overlay: {}", e);
+            }
+            info!("Capture overlay window created via shortcut/tray");
+        }
+        Err(e) => {
+            error!("Failed to create overlay window: {}", e);
+        }
+    }
+}
+
+/// Register global keyboard shortcut for screen capture
+fn register_capture_shortcut(app_handle: &tauri::AppHandle) {
+    let handle = app_handle.clone();
+
+    // Use Cmd+Shift+S on macOS, Ctrl+Shift+S on other platforms
+    #[cfg(target_os = "macos")]
+    let shortcut = "Cmd+Shift+S";
+    #[cfg(not(target_os = "macos"))]
+    let shortcut = "Ctrl+Shift+S";
+
+    match app_handle.global_shortcut_manager().register(shortcut, move || {
+        info!("Global shortcut {} triggered", shortcut);
+        let app = handle.clone();
+        tauri::async_runtime::spawn(async move {
+            trigger_capture(&app).await;
+        });
+    }) {
+        Ok(_) => info!("Registered global shortcut: {}", shortcut),
+        Err(e) => error!("Failed to register global shortcut {}: {}", shortcut, e),
+    }
+}
+
 fn handle_tray_event(app: &tauri::AppHandle, event_id: &str) {
     info!("Tray event: {}", event_id);
 
     match event_id {
+        "capture" => {
+            let app_handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                info!("Capture requested from tray menu");
+                trigger_capture(&app_handle).await;
+            });
+        }
         "start" => {
             let app_handle = app.clone();
             tauri::async_runtime::spawn(async move {
