@@ -17,11 +17,22 @@ const state = {
     currentPoint: null,
     selectionRect: null,
     animationFrameId: null,
-    instructionsVisible: true
+    instructionsVisible: true,
+    permissionChecked: false,
+    hasPermission: true
 };
 
 // Minimum selection size in pixels
 const MIN_SELECTION_SIZE = 10;
+
+// Error types for better user feedback
+const ErrorType = {
+    SELECTION_TOO_SMALL: 'selection_too_small',
+    PERMISSION_DENIED: 'permission_denied',
+    CAPTURE_FAILED: 'capture_failed',
+    SAVE_FAILED: 'save_failed',
+    UNKNOWN: 'unknown'
+};
 
 // ==================== DOM Elements ====================
 
@@ -31,12 +42,33 @@ let instructions, errorToast, toastMessage;
 
 // ==================== Initialization ====================
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     initializeElements();
     initializeCanvas();
     attachEventListeners();
     startRenderLoop();
+    await checkCapturePermission();
 });
+
+/**
+ * Check if we have permission to capture screen
+ * On macOS, this requires Screen Recording permission
+ */
+async function checkCapturePermission() {
+    try {
+        state.hasPermission = await invoke('check_capture_permission');
+        state.permissionChecked = true;
+
+        if (!state.hasPermission) {
+            showError('Screen recording permission required. Please grant permission in System Preferences > Privacy & Security > Screen Recording.');
+        }
+    } catch (error) {
+        console.warn('Permission check failed:', error);
+        // Assume we have permission if check fails (Windows doesn't need it)
+        state.hasPermission = true;
+        state.permissionChecked = true;
+    }
+}
 
 function initializeElements() {
     canvas = document.getElementById('overlay-canvas');
@@ -145,25 +177,88 @@ function calculateRect(point1, point2) {
 }
 
 /**
+ * Check if selection meets minimum size requirements
+ */
+function isSelectionValid(rect) {
+    if (!rect) return false;
+    return rect.width >= MIN_SELECTION_SIZE && rect.height >= MIN_SELECTION_SIZE;
+}
+
+/**
+ * Check if selection is just a click (not a real drag)
+ */
+function isJustAClick(rect) {
+    if (!rect) return true;
+    return rect.width < 2 && rect.height < 2;
+}
+
+/**
+ * Parse error message and return appropriate user-friendly message
+ */
+function parseErrorMessage(error) {
+    const errorStr = error.toString().toLowerCase();
+
+    if (errorStr.includes('permission') || errorStr.includes('denied')) {
+        return {
+            type: ErrorType.PERMISSION_DENIED,
+            message: 'Screen recording permission denied. Please enable it in System Preferences.'
+        };
+    }
+
+    if (errorStr.includes('too small') || errorStr.includes('minimum')) {
+        return {
+            type: ErrorType.SELECTION_TOO_SMALL,
+            message: `Selection too small (minimum ${MIN_SELECTION_SIZE}x${MIN_SELECTION_SIZE}px)`
+        };
+    }
+
+    if (errorStr.includes('save') || errorStr.includes('write') || errorStr.includes('file')) {
+        return {
+            type: ErrorType.SAVE_FAILED,
+            message: 'Failed to save captured image. Check disk space and permissions.'
+        };
+    }
+
+    return {
+        type: ErrorType.CAPTURE_FAILED,
+        message: 'Failed to capture screen. Please try again.'
+    };
+}
+
+/**
  * Validate selection and trigger capture
  */
 async function completeSelection(rect) {
     // Check if this is just a click (no real drag)
-    if (rect.width < 2 && rect.height < 2) {
+    if (isJustAClick(rect)) {
         // Just a click, reset state and continue
         resetSelectionState();
         return;
     }
 
     // Check minimum size
-    if (rect.width < MIN_SELECTION_SIZE || rect.height < MIN_SELECTION_SIZE) {
+    if (!isSelectionValid(rect)) {
         showError(`Selection too small (minimum ${MIN_SELECTION_SIZE}x${MIN_SELECTION_SIZE}px)`);
+        resetSelectionState();
+        return;
+    }
+
+    // Check permission before attempting capture
+    if (!state.hasPermission) {
+        showError('Screen recording permission required. Please grant permission and try again.');
         resetSelectionState();
         return;
     }
 
     // Clamp to screen boundaries
     const clampedRect = clampToScreen(rect);
+
+    // Final validation after clamping
+    if (!isSelectionValid(clampedRect)) {
+        showError('Selection extends outside screen boundaries. Please select within visible area.');
+        resetSelectionState();
+        return;
+    }
 
     try {
         // Call Tauri backend to capture the region
@@ -174,6 +269,11 @@ async function completeSelection(rect) {
             height: Math.round(clampedRect.height)
         });
 
+        // Validate result
+        if (!result || !result.file_path) {
+            throw new Error('Capture returned invalid result');
+        }
+
         // Open preview window with the captured image
         await invoke('open_preview_window', {
             imagePath: result.file_path,
@@ -182,7 +282,8 @@ async function completeSelection(rect) {
 
     } catch (error) {
         console.error('Capture failed:', error);
-        showError('Failed to capture screen: ' + error);
+        const parsed = parseErrorMessage(error);
+        showError(parsed.message);
         resetSelectionState();
     }
 }
@@ -283,9 +384,13 @@ function drawDarkOverlay(rect) {
 
 /**
  * Draw selection rectangle border
+ * Shows red border if selection is too small
  */
 function drawSelectionBorder(rect) {
-    ctx.strokeStyle = '#2196F3';
+    const isTooSmall = !isSelectionValid(rect);
+
+    // Use red border if selection is too small
+    ctx.strokeStyle = isTooSmall ? '#f44336' : '#2196F3';
     ctx.lineWidth = 2;
     ctx.setLineDash([]);
     ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
@@ -298,10 +403,12 @@ function drawSelectionBorder(rect) {
 
 /**
  * Draw corner handles for visual feedback
+ * Shows red handles if selection is too small
  */
 function drawCornerHandles(rect) {
     const handleSize = 8;
-    ctx.fillStyle = '#2196F3';
+    const isTooSmall = !isSelectionValid(rect);
+    ctx.fillStyle = isTooSmall ? '#f44336' : '#2196F3';
 
     // Top-left
     ctx.fillRect(rect.x - handleSize/2, rect.y - handleSize/2, handleSize, handleSize);
@@ -376,7 +483,11 @@ if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
         calculateRect,
         clampToScreen,
+        isSelectionValid,
+        isJustAClick,
+        parseErrorMessage,
         state,
-        MIN_SELECTION_SIZE
+        MIN_SELECTION_SIZE,
+        ErrorType
     };
 }
