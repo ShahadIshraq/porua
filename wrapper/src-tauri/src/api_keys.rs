@@ -1,10 +1,13 @@
-use anyhow::{Context, Result};
+#[cfg(not(test))]
+use anyhow::Context;
+use anyhow::Result;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use tracing::{error, info};
 
 /// Service name used for keyring entries
+#[cfg(not(test))]
 const KEYRING_SERVICE: &str = "porua";
 
 /// Validation timeout in seconds
@@ -104,8 +107,10 @@ pub trait KeyStorage: Send + Sync {
 }
 
 /// Production implementation using system keyring
+#[cfg(not(test))]
 pub struct SystemKeyring;
 
+#[cfg(not(test))]
 impl KeyStorage for SystemKeyring {
     fn store(&self, key_id: &str, value: &str) -> Result<()> {
         let entry = keyring::Entry::new(KEYRING_SERVICE, key_id)
@@ -340,22 +345,6 @@ pub async fn validate_api_key(provider: Provider, key: &str) -> Result<Validatio
         Provider::Gemini => validate_gemini_key(key).await,
         Provider::OpenAI => validate_openai_key(key).await,
     }
-}
-
-/// Validate and store an API key
-pub async fn validate_and_store_api_key(
-    provider: Provider,
-    key: &str,
-) -> Result<ValidationResult> {
-    // First validate
-    let result = validate_api_key(provider, key).await?;
-
-    // Only store if valid
-    if result.valid {
-        store_api_key(provider, key)?;
-    }
-
-    Ok(result)
 }
 
 #[cfg(test)]

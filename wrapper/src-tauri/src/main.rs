@@ -17,7 +17,8 @@ use tokio::sync::Mutex;
 use tracing::{error, info};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use crate::config::Config;
+use crate::api_keys::{KeyStatus, Provider, ValidationResult};
+use crate::config::{Config, LlmConfig};
 use crate::installer::Installer;
 use crate::server::{ServerManager, ServerStatus};
 
@@ -131,6 +132,137 @@ async fn quit_app(app_handle: tauri::AppHandle, state: tauri::State<'_, AppState
     Ok(())
 }
 
+// ============================================================================
+// API Key Management Commands
+// ============================================================================
+
+/// Get the status of an API key for a provider
+#[tauri::command]
+async fn get_api_key_status(provider: String) -> Result<KeyStatus, String> {
+    info!("get_api_key_status called for provider: {}", provider);
+
+    let provider = Provider::from_str(&provider)
+        .ok_or_else(|| format!("Invalid provider: {}. Must be 'gemini' or 'openai'", provider))?;
+
+    api_keys::get_key_status(provider).map_err(|e| e.to_string())
+}
+
+/// Validate and save an API key for a provider
+#[tauri::command]
+async fn validate_and_save_api_key(provider: String, key: String) -> Result<ValidationResult, String> {
+    info!("validate_and_save_api_key called for provider: {}", provider);
+
+    let provider = Provider::from_str(&provider)
+        .ok_or_else(|| format!("Invalid provider: {}. Must be 'gemini' or 'openai'", provider))?;
+
+    // Validate the key first
+    let result = api_keys::validate_api_key(provider, &key)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Only store if valid
+    if result.valid {
+        api_keys::store_api_key(provider, &key).map_err(|e| e.to_string())?;
+        info!("API key stored successfully for provider: {:?}", provider);
+    } else {
+        info!("API key validation failed for provider: {:?}: {}", provider, result.message);
+    }
+
+    Ok(result)
+}
+
+/// Remove an API key for a provider
+#[tauri::command]
+async fn remove_api_key(provider: String) -> Result<(), String> {
+    info!("remove_api_key called for provider: {}", provider);
+
+    let provider = Provider::from_str(&provider)
+        .ok_or_else(|| format!("Invalid provider: {}. Must be 'gemini' or 'openai'", provider))?;
+
+    api_keys::delete_api_key(provider).map_err(|e| e.to_string())?;
+    info!("API key removed for provider: {:?}", provider);
+
+    Ok(())
+}
+
+/// Response structure for API keys configuration
+#[derive(serde::Serialize)]
+struct ApiKeysConfig {
+    gemini_configured: bool,
+    openai_configured: bool,
+    active_provider: Option<String>,
+}
+
+/// Get the current API keys configuration
+#[tauri::command]
+async fn get_api_keys_config() -> Result<ApiKeysConfig, String> {
+    info!("get_api_keys_config called");
+
+    let gemini_configured = api_keys::has_api_key(Provider::Gemini).map_err(|e| e.to_string())?;
+    let openai_configured = api_keys::has_api_key(Provider::OpenAI).map_err(|e| e.to_string())?;
+
+    // Load config to get active provider preference
+    let config = Config::load().map_err(|e| e.to_string())?;
+    let active_provider = config.llm.active_provider.clone();
+
+    // Determine effective active provider
+    let effective_provider = match &active_provider {
+        Some(p) => {
+            // Verify the configured provider actually has a key
+            let has_key = match p.as_str() {
+                "gemini" => gemini_configured,
+                "openai" => openai_configured,
+                _ => false,
+            };
+            if has_key {
+                Some(p.clone())
+            } else {
+                // Fall back to auto-selection
+                None
+            }
+        }
+        None => None,
+    };
+
+    // Auto-select if no explicit preference or preference invalid
+    let final_provider = effective_provider.or_else(|| {
+        if gemini_configured {
+            Some("gemini".to_string())
+        } else if openai_configured {
+            Some("openai".to_string())
+        } else {
+            None
+        }
+    });
+
+    Ok(ApiKeysConfig {
+        gemini_configured,
+        openai_configured,
+        active_provider: final_provider,
+    })
+}
+
+/// Set the active LLM provider
+#[tauri::command]
+async fn set_active_provider(provider: Option<String>) -> Result<(), String> {
+    info!("set_active_provider called: {:?}", provider);
+
+    // Validate provider if provided
+    if let Some(ref p) = provider {
+        if !LlmConfig::is_valid_provider(p) {
+            return Err(format!("Invalid provider: {}. Must be 'gemini' or 'openai'", p));
+        }
+    }
+
+    // Load, update, and save config
+    let mut config = Config::load().map_err(|e| e.to_string())?;
+    config.llm.set_active_provider(provider).map_err(|e| e.to_string())?;
+    config.save().map_err(|e| e.to_string())?;
+
+    info!("Active provider updated to: {:?}", config.llm.active_provider);
+    Ok(())
+}
+
 fn main() {
     // Initialize logging - use fallback if file logging fails
     let file_logging_result = (|| -> anyhow::Result<()> {
@@ -202,6 +334,12 @@ fn main() {
             close_installer_window,
             get_log_path,
             quit_app,
+            // API Key Management
+            get_api_key_status,
+            validate_and_save_api_key,
+            remove_api_key,
+            get_api_keys_config,
+            set_active_provider,
         ])
         .setup(|app| {
             let app_handle = app.handle();
@@ -552,4 +690,123 @@ fn cleanup_old_logs(log_dir: &std::path::Path, base_name: &str, days_to_keep: u6
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Tests for API key command logic
+    // These test the underlying functions that the Tauri commands use
+
+    #[test]
+    fn test_provider_parsing_valid() {
+        assert!(Provider::from_str("gemini").is_some());
+        assert!(Provider::from_str("openai").is_some());
+        assert!(Provider::from_str("GEMINI").is_some());
+        assert!(Provider::from_str("OpenAI").is_some());
+    }
+
+    #[test]
+    fn test_provider_parsing_invalid() {
+        assert!(Provider::from_str("invalid").is_none());
+        assert!(Provider::from_str("").is_none());
+        assert!(Provider::from_str("gpt4").is_none());
+    }
+
+    #[test]
+    fn test_llm_config_provider_validation() {
+        assert!(LlmConfig::is_valid_provider("gemini"));
+        assert!(LlmConfig::is_valid_provider("openai"));
+        assert!(!LlmConfig::is_valid_provider("invalid"));
+    }
+
+    #[test]
+    fn test_api_keys_config_serialization() {
+        let config = ApiKeysConfig {
+            gemini_configured: true,
+            openai_configured: false,
+            active_provider: Some("gemini".to_string()),
+        };
+
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("gemini_configured"));
+        assert!(json.contains("openai_configured"));
+        assert!(json.contains("active_provider"));
+    }
+
+    #[test]
+    fn test_api_keys_config_auto_select_gemini() {
+        // When both are configured, prefer gemini
+        let config = ApiKeysConfig {
+            gemini_configured: true,
+            openai_configured: true,
+            active_provider: Some("gemini".to_string()),
+        };
+        assert_eq!(config.active_provider, Some("gemini".to_string()));
+    }
+
+    #[test]
+    fn test_api_keys_config_none_when_unconfigured() {
+        let config = ApiKeysConfig {
+            gemini_configured: false,
+            openai_configured: false,
+            active_provider: None,
+        };
+        assert!(config.active_provider.is_none());
+    }
+
+    // Integration tests for command error handling
+    #[tokio::test]
+    async fn test_get_api_key_status_invalid_provider() {
+        let result = get_api_key_status("invalid_provider".to_string()).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid provider"));
+    }
+
+    #[tokio::test]
+    async fn test_validate_and_save_invalid_provider() {
+        let result = validate_and_save_api_key(
+            "invalid_provider".to_string(),
+            "some-key".to_string(),
+        ).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid provider"));
+    }
+
+    #[tokio::test]
+    async fn test_remove_api_key_invalid_provider() {
+        let result = remove_api_key("invalid_provider".to_string()).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid provider"));
+    }
+
+    #[tokio::test]
+    async fn test_set_active_provider_invalid() {
+        let result = set_active_provider(Some("invalid".to_string())).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid provider"));
+    }
+
+    #[tokio::test]
+    async fn test_validate_and_save_empty_key() {
+        // Empty key should be rejected at validation level
+        let result = validate_and_save_api_key(
+            "gemini".to_string(),
+            "".to_string(),
+        ).await;
+        assert!(result.is_ok());
+        let validation = result.unwrap();
+        assert!(!validation.valid);
+        assert!(validation.message.contains("empty"));
+    }
+
+    #[tokio::test]
+    async fn test_get_api_key_status_valid_provider() {
+        // Should succeed for valid provider (even if no key configured)
+        let result = get_api_key_status("gemini".to_string()).await;
+        assert!(result.is_ok());
+        let status = result.unwrap();
+        assert_eq!(status.provider, "gemini");
+    }
 }
