@@ -1,5 +1,49 @@
-//! Screen capture module with platform abstraction for testability
-//! Handles monitor detection, DPI scaling, and screen region capture
+//! Screen capture module with platform abstraction for testability.
+//! Handles monitor detection, DPI scaling, and screen region capture.
+//!
+//! # Platform Support
+//!
+//! **IMPORTANT**: Actual screen capture functionality is only available on Windows.
+//!
+//! | Platform | Status | Implementation |
+//! |----------|--------|----------------|
+//! | Windows  | ✅ Full support | Windows GDI API (GetDC, BitBlt, GetDIBits) |
+//! | macOS    | ❌ Mock only | MockScreenBackend for testing |
+//! | Linux    | ❌ Mock only | MockScreenBackend for testing |
+//!
+//! On non-Windows platforms, the module compiles and can be tested using `MockScreenBackend`,
+//! but actual screen capture will not work. The mock backend generates a solid color test image
+//! instead of capturing the screen.
+//!
+//! # Architecture
+//!
+//! The module uses a trait-based abstraction (`ScreenBackend`) to separate capture logic from
+//! platform-specific implementation, allowing for easy testing and potential future platform support.
+//!
+//! # Usage
+//!
+//! ```rust
+//! use porua_wrapper::capture::{ScreenCapture, MockScreenBackend, Rect};
+//! use std::path::PathBuf;
+//!
+//! // Create a capture instance with mock backend (works on all platforms)
+//! let temp_dir = std::env::temp_dir().join("capture_test");
+//! let capture = ScreenCapture::with_backend(MockScreenBackend::new(), temp_dir);
+//!
+//! // Check monitors
+//! let monitors = capture.get_monitors().unwrap();
+//! assert!(!monitors.is_empty());
+//!
+//! // Capture a region
+//! let rect = Rect::new(0, 0, 100, 100);
+//! let result = capture.capture_region(rect).unwrap();
+//! assert!(!result.file_path.is_empty());
+//! ```
+//!
+//! # Future Work
+//!
+//! - macOS: Could implement using Core Graphics (CGWindowListCreateImage)
+//! - Linux: Could implement using X11 (XGetImage) or Wayland protocols
 
 use anyhow::Result;
 use image::{ImageBuffer, Rgba};
@@ -137,6 +181,12 @@ mod windows_backend {
             let mut monitors: Vec<MonitorInfo> = Vec::new();
             let monitors_ptr = &mut monitors as *mut Vec<MonitorInfo>;
 
+            // SAFETY: EnumDisplayMonitors is a Windows API that iterates over all display monitors.
+            // - We pass a valid callback function (enum_monitor_callback) that matches the expected signature.
+            // - The LPARAM contains a pointer to our Vec which remains valid for the duration of the call
+            //   since we don't return until EnumDisplayMonitors completes synchronously.
+            // - The callback properly casts the LPARAM back to &mut Vec<MonitorInfo> and appends to it.
+            // - HDC::default() (null) is valid for EnumDisplayMonitors, meaning enumerate all monitors.
             unsafe {
                 let result = EnumDisplayMonitors(
                     HDC::default(),
@@ -166,6 +216,10 @@ mod windows_backend {
         }
 
         fn get_virtual_screen_bounds(&self) -> Rect {
+            // SAFETY: GetSystemMetrics is a safe Windows API that retrieves system metrics.
+            // - These specific metrics (SM_XVIRTUALSCREEN, etc.) return screen dimensions.
+            // - The function has no side effects and cannot cause undefined behavior.
+            // - Return values are plain integers that are always valid.
             unsafe {
                 let x = GetSystemMetrics(SM_XVIRTUALSCREEN);
                 let y = GetSystemMetrics(SM_YVIRTUALSCREEN);
@@ -182,6 +236,11 @@ mod windows_backend {
         }
 
         fn get_dpi_scale_at_point(&self, x: i32, y: i32) -> f64 {
+            // SAFETY: MonitorFromPoint and GetDpiForMonitor are safe Windows APIs.
+            // - MonitorFromPoint returns a valid HMONITOR handle for any point (uses MONITOR_DEFAULTTONEAREST).
+            // - GetDpiForMonitor writes to our stack-allocated u32 variables which are properly aligned.
+            // - Even if GetDpiForMonitor fails, we have initialized dpi_x/dpi_y to 96 (default DPI).
+            // - No resources need cleanup; HMONITOR handles don't require explicit release.
             unsafe {
                 let point = POINT { x, y };
                 let monitor = MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST);
@@ -196,6 +255,19 @@ mod windows_backend {
         }
 
         fn capture_region_pixels(&self, rect: Rect) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>, CaptureError> {
+            // SAFETY: This function uses Windows GDI APIs to capture screen content.
+            // All GDI resources are properly managed with cleanup on all code paths:
+            // - screen_dc: Released via ReleaseDC on all error paths and success path
+            // - capture_dc: Deleted via DeleteDC on all error paths and success path
+            // - bitmap: Deleted via DeleteObject on all error paths and success path
+            // - old_bitmap: Restored via SelectObject before bitmap deletion
+            //
+            // The buffer passed to GetDIBits is:
+            // - Properly sized: width * height * 4 bytes (32-bit BGRA)
+            // - Properly aligned: Vec<u8> guarantees alignment for u8
+            // - Valid for the duration of the call
+            //
+            // HWND::default() (null) is valid for GetDC, meaning the entire screen.
             unsafe {
                 // Get screen device context
                 let screen_dc = GetDC(HWND::default());
@@ -281,7 +353,7 @@ mod windows_backend {
                     DIB_RGB_COLORS,
                 );
 
-                // Cleanup GDI resources
+                // Cleanup GDI resources in reverse order of acquisition
                 SelectObject(capture_dc, old_bitmap);
                 DeleteObject(bitmap);
                 DeleteDC(capture_dc);
@@ -307,6 +379,11 @@ mod windows_backend {
         }
 
         fn check_permission(&self) -> Result<bool, CaptureError> {
+            // SAFETY: GetDC and ReleaseDC are safe Windows APIs.
+            // - GetDC(null) returns a DC for the entire screen, which we use to test access.
+            // - We immediately release the DC after checking if it's valid.
+            // - If GetDC fails (returns invalid), we don't call ReleaseDC.
+            // - No other resources are allocated.
             unsafe {
                 let screen_dc = GetDC(HWND::default());
                 if screen_dc.is_invalid() {
@@ -319,12 +396,21 @@ mod windows_backend {
     }
 
     /// Callback function for EnumDisplayMonitors
+    ///
+    /// # Safety
+    /// This function is called by Windows during EnumDisplayMonitors enumeration.
+    /// - `monitor` is a valid HMONITOR handle provided by Windows
+    /// - `lparam` must contain a valid pointer to a `Vec<MonitorInfo>` that outlives the enumeration
+    /// - The caller (get_monitors) ensures lparam points to a valid, properly aligned Vec
+    /// - This callback is synchronous and completes before get_monitors returns
     unsafe extern "system" fn enum_monitor_callback(
         monitor: windows::Win32::Graphics::Gdi::HMONITOR,
         _hdc: HDC,
         _rect: *mut RECT,
         lparam: LPARAM,
     ) -> BOOL {
+        // SAFETY: lparam was set by get_monitors to point to a valid Vec<MonitorInfo>
+        // that remains valid for the duration of the EnumDisplayMonitors call.
         let monitors = &mut *(lparam.0 as *mut Vec<MonitorInfo>);
 
         let mut monitor_info = MONITORINFOEXW {
@@ -530,6 +616,55 @@ impl<B: ScreenBackend> ScreenCapture<B> {
             (rect.width as f64 * scale) as u32,
             (rect.height as f64 * scale) as u32,
         )
+    }
+
+    /// Clean up old capture files from the temp directory
+    /// Removes files older than `max_age_hours` hours
+    /// Returns the number of files deleted
+    pub fn cleanup_old_captures(&self, max_age_hours: u64) -> Result<usize, CaptureError> {
+        use std::time::{Duration, SystemTime};
+
+        if !self.temp_dir.exists() {
+            return Ok(0);
+        }
+
+        let max_age = Duration::from_secs(max_age_hours * 60 * 60);
+        let cutoff_time = SystemTime::now()
+            .checked_sub(max_age)
+            .unwrap_or(SystemTime::UNIX_EPOCH);
+
+        let mut deleted_count = 0;
+
+        let entries = std::fs::read_dir(&self.temp_dir).map_err(|e| {
+            CaptureError::SaveFailure(format!("Failed to read capture directory: {}", e))
+        })?;
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+
+            // Only delete .png files that match our capture filename pattern
+            if let Some(filename) = path.file_name().and_then(|n| n.to_str()) {
+                if filename.starts_with("capture_") && filename.ends_with(".png") {
+                    // Check file modification time
+                    if let Ok(metadata) = std::fs::metadata(&path) {
+                        if let Ok(modified) = metadata.modified() {
+                            if modified < cutoff_time {
+                                if std::fs::remove_file(&path).is_ok() {
+                                    debug!("Deleted old capture: {:?}", path);
+                                    deleted_count += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if deleted_count > 0 {
+            info!("Cleaned up {} old capture files", deleted_count);
+        }
+
+        Ok(deleted_count)
     }
 
     /// Capture a region of the screen and save to file
@@ -1061,5 +1196,194 @@ mod tests {
         assert_eq!(backend.dpi_scale, 1.5);
         assert_eq!(backend.virtual_bounds.width, 3840);
         assert!(!backend.permission_granted);
+    }
+
+    // ==================== Integration Tests ====================
+    // These tests verify the complete capture workflow end-to-end
+
+    #[test]
+    fn test_integration_complete_capture_workflow() {
+        // This test simulates the complete capture workflow from selection to save
+        let temp_dir = TempDir::new().unwrap();
+        let backend = MockScreenBackend::new()
+            .with_monitors(vec![
+                MonitorInfo {
+                    id: 0,
+                    name: "Primary".to_string(),
+                    x: 0,
+                    y: 0,
+                    width: 1920,
+                    height: 1080,
+                    dpi_scale: 1.0,
+                    is_primary: true,
+                },
+            ])
+            .with_virtual_bounds(Rect::new(0, 0, 1920, 1080))
+            .with_permission(true);
+
+        let capture = ScreenCapture::with_backend(backend, temp_dir.path().to_path_buf());
+
+        // 1. Check permission first (as the overlay would)
+        let has_permission = capture.check_permission();
+        assert!(has_permission.is_ok());
+        assert!(has_permission.unwrap());
+
+        // 2. Get monitor info (as the overlay would for positioning)
+        let monitors = capture.get_monitors();
+        assert!(monitors.is_ok());
+        assert_eq!(monitors.unwrap().len(), 1);
+
+        // 3. Simulate user making a selection (300x200 region)
+        let user_selection = Rect::from_points(100, 100, 400, 300);
+        assert_eq!(user_selection.width, 300);
+        assert_eq!(user_selection.height, 200);
+
+        // 4. Validate the selection
+        let validated = capture.validate_selection(user_selection);
+        assert!(validated.is_ok());
+
+        // 5. Capture the region
+        let result = capture.capture_region(user_selection);
+        assert!(result.is_ok());
+
+        let capture_result = result.unwrap();
+
+        // 6. Verify the result
+        assert!(!capture_result.file_path.is_empty());
+        assert!(!capture_result.timestamp.is_empty());
+        assert_eq!(capture_result.width, 300);
+        assert_eq!(capture_result.height, 200);
+
+        // 7. Verify the file exists and is valid
+        let path = std::path::Path::new(&capture_result.file_path);
+        assert!(path.exists(), "Captured file should exist at: {}", capture_result.file_path);
+        assert!(path.extension().map_or(false, |ext| ext == "png"));
+
+        // 8. Verify the image can be loaded
+        let loaded = image::open(path);
+        assert!(loaded.is_ok(), "Image should be loadable");
+
+        let img = loaded.unwrap();
+        assert_eq!(img.width(), 300);
+        assert_eq!(img.height(), 200);
+    }
+
+    #[test]
+    fn test_integration_capture_with_dpi_scaling() {
+        // Test that captures work correctly with high DPI displays
+        let temp_dir = TempDir::new().unwrap();
+        let backend = MockScreenBackend::new()
+            .with_dpi_scale(2.0) // Retina display
+            .with_permission(true);
+
+        let capture = ScreenCapture::with_backend(backend, temp_dir.path().to_path_buf());
+
+        // Capture a 100x100 logical region
+        let selection = Rect::new(0, 0, 100, 100);
+        let result = capture.capture_region(selection).unwrap();
+
+        // With 2x DPI, physical pixels should be 200x200
+        assert_eq!(result.width, 200);
+        assert_eq!(result.height, 200);
+
+        // Verify the actual image dimensions
+        let img = image::open(&result.file_path).unwrap();
+        assert_eq!(img.width(), 200);
+        assert_eq!(img.height(), 200);
+    }
+
+    #[test]
+    fn test_integration_capture_cleanup_workflow() {
+        use std::fs::File;
+        use std::io::Write;
+
+        let temp_dir = TempDir::new().unwrap();
+        let capture_dir = temp_dir.path().join("captures");
+        std::fs::create_dir_all(&capture_dir).unwrap();
+
+        // Create some old capture files (simulated)
+        let old_file = capture_dir.join("capture_20230101_120000_abc123.png");
+        let mut f = File::create(&old_file).unwrap();
+        f.write_all(b"fake png data").unwrap();
+
+        // Create a new capture file
+        let new_file = capture_dir.join("capture_20991231_235959_xyz789.png");
+        let mut f = File::create(&new_file).unwrap();
+        f.write_all(b"fake png data").unwrap();
+
+        let capture = ScreenCapture::with_backend(
+            MockScreenBackend::new(),
+            capture_dir.clone(),
+        );
+
+        // Cleanup files older than 0 hours (all files)
+        let deleted = capture.cleanup_old_captures(0).unwrap();
+        assert_eq!(deleted, 2, "Both files should be deleted with 0 hour max age");
+
+        // Verify files are deleted
+        assert!(!old_file.exists());
+        assert!(!new_file.exists());
+    }
+
+    #[test]
+    fn test_integration_multi_capture_session() {
+        // Test multiple captures in sequence (as a user would do)
+        let temp_dir = TempDir::new().unwrap();
+        let capture = ScreenCapture::with_backend(
+            MockScreenBackend::new(),
+            temp_dir.path().to_path_buf(),
+        );
+
+        let mut file_paths = Vec::new();
+
+        // Capture 5 different regions
+        for i in 0..5 {
+            let rect = Rect::new(i * 10, i * 10, 50 + i as u32 * 10, 50 + i as u32 * 10);
+            let result = capture.capture_region(rect).expect("Each capture should succeed");
+            file_paths.push(result.file_path);
+        }
+
+        // Verify all files are unique
+        let unique_paths: std::collections::HashSet<_> = file_paths.iter().collect();
+        assert_eq!(unique_paths.len(), 5, "All capture files should have unique paths");
+
+        // Verify all files exist
+        for path in &file_paths {
+            assert!(std::path::Path::new(path).exists(), "File should exist: {}", path);
+        }
+    }
+
+    #[test]
+    fn test_integration_permission_denied_blocks_capture() {
+        let temp_dir = TempDir::new().unwrap();
+        let backend = MockScreenBackend::new().with_permission(false);
+        let capture = ScreenCapture::with_backend(backend, temp_dir.path().to_path_buf());
+
+        // First check should return permission denied
+        let permission = capture.check_permission();
+        assert!(matches!(permission, Err(CaptureError::PermissionDenied)));
+
+        // Note: In the real app, UI would block capture attempt after permission check
+        // The capture_region itself doesn't check permission - that's the UI's job
+    }
+
+    #[test]
+    fn test_integration_edge_selection_at_screen_boundary() {
+        let temp_dir = TempDir::new().unwrap();
+        let backend = MockScreenBackend::new()
+            .with_virtual_bounds(Rect::new(0, 0, 1920, 1080));
+        let capture = ScreenCapture::with_backend(backend, temp_dir.path().to_path_buf());
+
+        // Selection that extends past the screen edge
+        let selection = Rect::new(1800, 900, 200, 200); // Extends 80px past right, 20px past bottom
+
+        // Should clamp to screen bounds
+        let validated = capture.validate_selection(selection).unwrap();
+        assert!(validated.x + validated.width as i32 <= 1920);
+        assert!(validated.y + validated.height as i32 <= 1080);
+
+        // Capture should still succeed
+        let result = capture.capture_region(selection);
+        assert!(result.is_ok());
     }
 }

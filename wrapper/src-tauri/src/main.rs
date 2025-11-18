@@ -325,6 +325,24 @@ fn get_virtual_screen_bounds() -> Rect {
     get_virtual_screen_bounds_native()
 }
 
+#[tauri::command]
+async fn cleanup_old_captures() -> Result<usize, String> {
+    info!("cleanup_old_captures command called");
+
+    let temp_dir = paths::get_app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("captures");
+
+    #[cfg(target_os = "windows")]
+    let capture = crate::capture::create_screen_capture(temp_dir);
+
+    #[cfg(not(target_os = "windows"))]
+    let capture = ScreenCapture::with_backend(MockScreenBackend::new(), temp_dir);
+
+    // Clean up captures older than 24 hours
+    capture.cleanup_old_captures(24).map_err(|e| e.to_string())
+}
+
 fn main() {
     // Initialize logging - use fallback if file logging fails
     let file_logging_result = (|| -> anyhow::Result<()> {
@@ -405,6 +423,7 @@ fn main() {
             save_captured_image,
             check_capture_permission,
             get_virtual_screen_bounds,
+            cleanup_old_captures,
         ])
         .setup(|app| {
             let app_handle = app.handle();
@@ -489,6 +508,22 @@ async fn setup_app(app_handle: tauri::AppHandle) -> anyhow::Result<()> {
     }
 
     // Already installed - proceed normally
+
+    // Clean up old capture files on startup (captures older than 24 hours)
+    let temp_dir = paths::get_app_data_dir()?.join("captures");
+    if temp_dir.exists() {
+        #[cfg(target_os = "windows")]
+        let capture = crate::capture::create_screen_capture(temp_dir.clone());
+
+        #[cfg(not(target_os = "windows"))]
+        let capture = ScreenCapture::with_backend(MockScreenBackend::new(), temp_dir.clone());
+
+        match capture.cleanup_old_captures(24) {
+            Ok(count) if count > 0 => info!("Cleaned up {} old capture files on startup", count),
+            Ok(_) => {}
+            Err(e) => error!("Failed to cleanup old captures on startup: {}", e),
+        }
+    }
 
     // Load configuration
     let config = Config::load()?;

@@ -134,6 +134,11 @@ html, body {
     opacity: 0;
     transition: opacity 0.3s ease, transform 0.3s ease;
     pointer-events: none;
+    cursor: pointer;
+}
+
+.toast.visible {
+    pointer-events: auto;
 }
 
 .toast.hidden {

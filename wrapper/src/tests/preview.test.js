@@ -15,18 +15,12 @@ const {
     DEFAULT_ZOOM
 } = require('../preview.js');
 
+const { resetPreviewState } = require('./test-helpers.js');
+
 describe('Preview Window Logic', () => {
 
     beforeEach(() => {
-        // Reset state before each test
-        state.imagePath = null;
-        state.imageWidth = 0;
-        state.imageHeight = 0;
-        state.fileSize = 0;
-        state.zoom = DEFAULT_ZOOM;
-        state.isPanning = false;
-        state.panStart = { x: 0, y: 0 };
-        state.scrollStart = { x: 0, y: 0 };
+        resetPreviewState();
     });
 
     describe('formatFileSize', () => {

@@ -3,25 +3,17 @@
  * Comprehensive tests verifying the complete capture workflow
  */
 
-const overlay = require('../overlay.js');
-const preview = require('../preview.js');
+const {
+    overlay,
+    preview,
+    resetAllStates,
+    simulateMouseDrag
+} = require('./test-helpers.js');
 
 describe('Complete Capture Workflow', () => {
 
     beforeEach(() => {
-        // Reset overlay state
-        overlay.state.isSelecting = false;
-        overlay.state.isDragging = false;
-        overlay.state.startPoint = null;
-        overlay.state.currentPoint = null;
-        overlay.state.selectionRect = null;
-        overlay.state.permissionChecked = false;
-        overlay.state.hasPermission = true;
-
-        // Reset preview state
-        preview.state.zoom = preview.DEFAULT_ZOOM;
-        preview.state.imagePath = null;
-        preview.state.isPanning = false;
+        resetAllStates();
     });
 
     describe('Selection to Capture Flow', () => {

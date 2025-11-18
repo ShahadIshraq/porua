@@ -14,6 +14,8 @@ const {
     ErrorType
 } = require('../overlay.js');
 
+const { resetOverlayState } = require('./test-helpers.js');
+
 describe('Selection Validation', () => {
 
     describe('isSelectionValid', () => {
@@ -255,14 +257,7 @@ describe('Selection Calculation Edge Cases', () => {
 describe('State Management Edge Cases', () => {
 
     beforeEach(() => {
-        // Reset state
-        state.isSelecting = false;
-        state.isDragging = false;
-        state.startPoint = null;
-        state.currentPoint = null;
-        state.selectionRect = null;
-        state.permissionChecked = false;
-        state.hasPermission = true;
+        resetOverlayState();
     });
 
     test('state has permission tracking properties', () => {

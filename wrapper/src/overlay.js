@@ -281,9 +281,7 @@ async function completeSelection(rect) {
         });
 
     } catch (error) {
-        console.error('Capture failed:', error);
-        const parsed = parseErrorMessage(error);
-        showError(parsed.message);
+        handleError(error, 'completeSelection');
         resetSelectionState();
     }
 }
@@ -464,16 +462,45 @@ function updateTooltip(mouseX, mouseY, rect) {
     dimensionTooltip.style.top = tooltipY + 'px';
 }
 
-function showError(message) {
+/**
+ * Show error toast with user-friendly message
+ * Errors are auto-hidden after a delay and can be dismissed by clicking
+ */
+function showError(message, persistent = false) {
     toastMessage.textContent = message;
     errorToast.classList.remove('hidden');
     errorToast.classList.add('visible');
 
-    // Auto-hide after 3 seconds
+    // Make toast clickable to dismiss
+    const dismissHandler = () => {
+        errorToast.classList.remove('visible');
+        errorToast.classList.add('hidden');
+        errorToast.removeEventListener('click', dismissHandler);
+    };
+    errorToast.addEventListener('click', dismissHandler);
+
+    // Auto-hide after delay (longer for permission errors)
+    const hideDelay = persistent ? 6000 : 3000;
     setTimeout(() => {
         errorToast.classList.remove('visible');
         errorToast.classList.add('hidden');
-    }, 3000);
+        errorToast.removeEventListener('click', dismissHandler);
+    }, hideDelay);
+}
+
+/**
+ * Log error details to console for debugging
+ * while showing user-friendly message
+ */
+function handleError(error, context = '') {
+    console.error(`[Screen Capture${context ? ': ' + context : ''}]`, error);
+    const parsed = parseErrorMessage(error);
+
+    // Permission errors need longer display time
+    const persistent = parsed.type === ErrorType.PERMISSION_DENIED;
+    showError(parsed.message, persistent);
+
+    return parsed;
 }
 
 // ==================== Exports for Testing ====================
@@ -486,6 +513,8 @@ if (typeof module !== 'undefined' && module.exports) {
         isSelectionValid,
         isJustAClick,
         parseErrorMessage,
+        handleError,
+        showError,
         state,
         MIN_SELECTION_SIZE,
         ErrorType
