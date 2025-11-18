@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Porua Settings</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="settings-body">
+    <div id="settings-app">
+        <div class="settings-header">
+            <h1>Settings</h1>
+        </div>
+
+        <div class="settings-content">
+            <!-- API Keys Section -->
+            <section class="settings-section">
+                <h2 class="section-title">API Keys</h2>
+                <p class="section-description">
+                    Configure API keys for LLM providers used by vision features.
+                </p>
+
+                <!-- Provider Selection -->
+                <div class="provider-selection">
+                    <label class="field-label">Active Provider</label>
+                    <div class="radio-group" id="provider-radio-group">
+                        <label class="radio-option" id="gemini-radio-label">
+                            <input type="radio" name="provider" value="gemini" id="provider-gemini">
+                            <span class="radio-custom"></span>
+                            <span class="radio-text">Google Gemini</span>
+                            <span class="key-status" id="gemini-status"></span>
+                        </label>
+                        <label class="radio-option" id="openai-radio-label">
+                            <input type="radio" name="provider" value="openai" id="provider-openai">
+                            <span class="radio-custom"></span>
+                            <span class="radio-text">OpenAI</span>
+                            <span class="key-status" id="openai-status"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Gemini API Key -->
+                <div class="api-key-card" id="gemini-card">
+                    <div class="card-header">
+                        <span class="card-title">Google Gemini API Key</span>
+                        <span class="card-badge" id="gemini-badge">Not configured</span>
+                    </div>
+                    <div class="card-content">
+                        <div class="key-display" id="gemini-key-display">
+                            <span class="masked-key" id="gemini-masked-key">No key configured</span>
+                        </div>
+                        <div class="key-input-group" id="gemini-input-group" style="display: none;">
+                            <input type="password"
+                                   id="gemini-key-input"
+                                   class="key-input"
+                                   placeholder="Enter your Gemini API key"
+                                   autocomplete="off">
+                            <button class="icon-btn toggle-visibility" data-target="gemini-key-input" title="Toggle visibility">
+                                <span class="eye-icon">👁</span>
+                            </button>
+                        </div>
+                        <div class="validation-message" id="gemini-validation"></div>
+                        <div class="card-actions">
+                            <button class="action-btn edit-btn" id="gemini-edit-btn">Edit</button>
+                            <button class="action-btn save-btn" id="gemini-save-btn" style="display: none;">Save</button>
+                            <button class="action-btn cancel-btn" id="gemini-cancel-btn" style="display: none;">Cancel</button>
+                            <button class="action-btn remove-btn" id="gemini-remove-btn" style="display: none;">Remove</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- OpenAI API Key -->
+                <div class="api-key-card" id="openai-card">
+                    <div class="card-header">
+                        <span class="card-title">OpenAI API Key</span>
+                        <span class="card-badge" id="openai-badge">Not configured</span>
+                    </div>
+                    <div class="card-content">
+                        <div class="key-display" id="openai-key-display">
+                            <span class="masked-key" id="openai-masked-key">No key configured</span>
+                        </div>
+                        <div class="key-input-group" id="openai-input-group" style="display: none;">
+                            <input type="password"
+                                   id="openai-key-input"
+                                   class="key-input"
+                                   placeholder="Enter your OpenAI API key"
+                                   autocomplete="off">
+                            <button class="icon-btn toggle-visibility" data-target="openai-key-input" title="Toggle visibility">
+                                <span class="eye-icon">👁</span>
+                            </button>
+                        </div>
+                        <div class="validation-message" id="openai-validation"></div>
+                        <div class="card-actions">
+                            <button class="action-btn edit-btn" id="openai-edit-btn">Edit</button>
+                            <button class="action-btn save-btn" id="openai-save-btn" style="display: none;">Save</button>
+                            <button class="action-btn cancel-btn" id="openai-cancel-btn" style="display: none;">Cancel</button>
+                            <button class="action-btn remove-btn" id="openai-remove-btn" style="display: none;">Remove</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Help Text -->
+                <div class="help-text">
+                    <p><strong>Note:</strong> API keys are stored securely in your system's keychain.</p>
+                    <p>Keys are validated before being saved to ensure they work correctly.</p>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script src="settings.js"></script>
+</body>
+</html>

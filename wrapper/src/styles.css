@@ -524,3 +524,366 @@ button {
         font-size: 60px;
     }
 }
+
+/* ============================================
+   Settings Page Styles
+   ============================================ */
+
+.settings-body {
+    background: #f7fafc;
+    min-height: 100vh;
+    display: block;
+    overflow-y: auto;
+}
+
+#settings-app {
+    width: 100%;
+    min-height: 100vh;
+    background: white;
+}
+
+.settings-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 24px 30px;
+    color: white;
+}
+
+.settings-header h1 {
+    color: white;
+    font-size: 24px;
+    margin: 0;
+}
+
+.settings-content {
+    padding: 20px 30px;
+}
+
+/* Settings Section */
+.settings-section {
+    margin-bottom: 30px;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #2d3748;
+    margin: 0 0 8px 0;
+}
+
+.section-description {
+    font-size: 14px;
+    color: #718096;
+    margin: 0 0 20px 0;
+}
+
+/* Provider Selection Radio Group */
+.provider-selection {
+    margin-bottom: 20px;
+}
+
+.field-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: #4a5568;
+    margin-bottom: 10px;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.radio-option {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: #f7fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.radio-option:hover:not(.disabled) {
+    border-color: #667eea;
+    background: #f0f4ff;
+}
+
+.radio-option.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.radio-option input[type="radio"] {
+    display: none;
+}
+
+.radio-custom {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #cbd5e0;
+    border-radius: 50%;
+    margin-right: 12px;
+    position: relative;
+    transition: all 0.2s ease;
+}
+
+.radio-option input[type="radio"]:checked + .radio-custom {
+    border-color: #667eea;
+}
+
+.radio-option input[type="radio"]:checked + .radio-custom::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px;
+    height: 10px;
+    background: #667eea;
+    border-radius: 50%;
+}
+
+.radio-text {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    color: #2d3748;
+}
+
+.key-status {
+    font-size: 12px;
+    color: #718096;
+    font-weight: normal;
+}
+
+.key-status.configured {
+    color: #48bb78;
+}
+
+/* API Key Card */
+.api-key-card {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 16px;
+    background: #edf2f7;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #2d3748;
+}
+
+.card-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.card-badge.configured {
+    background: #c6f6d5;
+    color: #22543d;
+}
+
+.card-badge.not-configured {
+    background: #fed7d7;
+    color: #742a2a;
+}
+
+.card-content {
+    padding: 16px;
+}
+
+/* Key Display */
+.key-display {
+    margin-bottom: 12px;
+}
+
+.masked-key {
+    font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+    font-size: 13px;
+    color: #4a5568;
+    background: white;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    display: block;
+    word-break: break-all;
+}
+
+/* Key Input Group */
+.key-input-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.key-input {
+    flex: 1;
+    font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
+    font-size: 13px;
+    padding: 10px 12px;
+    border: 2px solid #e2e8f0;
+    border-radius: 6px;
+    outline: none;
+    transition: border-color 0.2s ease;
+}
+
+.key-input:focus {
+    border-color: #667eea;
+}
+
+.icon-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #edf2f7;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+    background: #e2e8f0;
+}
+
+.eye-icon {
+    font-size: 16px;
+}
+
+/* Validation Message */
+.validation-message {
+    font-size: 13px;
+    min-height: 20px;
+    margin-bottom: 12px;
+}
+
+.validation-message.error {
+    color: #e53e3e;
+}
+
+.validation-message.success {
+    color: #38a169;
+}
+
+/* Card Actions */
+.card-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.action-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.edit-btn {
+    background: #667eea;
+    color: white;
+}
+
+.edit-btn:hover {
+    background: #5a67d8;
+}
+
+.save-btn {
+    background: #48bb78;
+    color: white;
+}
+
+.save-btn:hover {
+    background: #38a169;
+}
+
+.save-btn:disabled {
+    background: #a0aec0;
+    cursor: not-allowed;
+}
+
+.cancel-btn {
+    background: #e2e8f0;
+    color: #4a5568;
+}
+
+.cancel-btn:hover {
+    background: #cbd5e0;
+}
+
+.remove-btn {
+    background: #fc8181;
+    color: white;
+}
+
+.remove-btn:hover {
+    background: #f56565;
+}
+
+/* Help Text */
+.help-text {
+    margin-top: 20px;
+    padding: 16px;
+    background: #f0f4ff;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.help-text p {
+    font-size: 13px;
+    color: #4a5568;
+    margin: 0 0 8px 0;
+}
+
+.help-text p:last-child {
+    margin-bottom: 0;
+}
+
+.help-text strong {
+    color: #2d3748;
+}
+
+/* Settings Responsive */
+@media (max-width: 500px) {
+    .settings-content {
+        padding: 16px 20px;
+    }
+
+    .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .card-actions {
+        flex-direction: column;
+    }
+
+    .action-btn {
+        width: 100%;
+        text-align: center;
+    }
+}

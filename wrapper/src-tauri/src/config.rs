@@ -9,6 +9,10 @@ pub struct Config {
     pub version: String,
     pub paths: PathsConfig,
     pub server: ServerConfig,
+    /// LLM configuration for vision features
+    /// Uses serde default for backward compatibility with existing configs
+    #[serde(default)]
+    pub llm: LlmConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,6 +41,43 @@ impl Default for ServerConfig {
     }
 }
 
+/// LLM configuration for vision/AI features
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmConfig {
+    /// Active LLM provider: "gemini" or "openai"
+    /// None means auto-select based on configured keys (prefer gemini)
+    pub active_provider: Option<String>,
+}
+
+impl Default for LlmConfig {
+    fn default() -> Self {
+        Self {
+            active_provider: None,
+        }
+    }
+}
+
+impl LlmConfig {
+    /// Validate that the provider is a valid option
+    pub fn is_valid_provider(provider: &str) -> bool {
+        matches!(provider.to_lowercase().as_str(), "gemini" | "openai")
+    }
+
+    /// Set the active provider with validation
+    pub fn set_active_provider(&mut self, provider: Option<String>) -> Result<()> {
+        if let Some(ref p) = provider {
+            if !Self::is_valid_provider(p) {
+                return Err(anyhow::anyhow!(
+                    "Invalid provider '{}'. Must be 'gemini' or 'openai'",
+                    p
+                ));
+            }
+        }
+        self.active_provider = provider.map(|p| p.to_lowercase());
+        Ok(())
+    }
+}
+
 impl Config {
     /// Create a new config with default values and platform-specific paths
     pub fn new() -> Result<Self> {
@@ -50,6 +91,7 @@ impl Config {
                 log_dir: paths::get_logs_dir()?,
             },
             server: ServerConfig::default(),
+            llm: LlmConfig::default(),
         })
     }
 
@@ -156,5 +198,174 @@ mod tests {
         assert_eq!(config.server.port, 3000);
         assert_eq!(config.server.pool_size, 2);
         assert_eq!(config.server.log_level, "info");
+    }
+
+    // Phase 2 tests for LlmConfig
+
+    #[test]
+    fn test_llm_config_default() {
+        let llm_config = LlmConfig::default();
+        assert!(llm_config.active_provider.is_none());
+    }
+
+    #[test]
+    fn test_llm_config_valid_providers() {
+        assert!(LlmConfig::is_valid_provider("gemini"));
+        assert!(LlmConfig::is_valid_provider("openai"));
+        assert!(LlmConfig::is_valid_provider("GEMINI"));
+        assert!(LlmConfig::is_valid_provider("OpenAI"));
+        assert!(LlmConfig::is_valid_provider("Gemini"));
+    }
+
+    #[test]
+    fn test_llm_config_invalid_providers() {
+        assert!(!LlmConfig::is_valid_provider("claude"));
+        assert!(!LlmConfig::is_valid_provider("gpt4"));
+        assert!(!LlmConfig::is_valid_provider(""));
+        assert!(!LlmConfig::is_valid_provider("invalid"));
+    }
+
+    #[test]
+    fn test_llm_config_set_active_provider_valid() {
+        let mut llm_config = LlmConfig::default();
+
+        // Set to gemini
+        let result = llm_config.set_active_provider(Some("gemini".to_string()));
+        assert!(result.is_ok());
+        assert_eq!(llm_config.active_provider, Some("gemini".to_string()));
+
+        // Set to openai
+        let result = llm_config.set_active_provider(Some("OpenAI".to_string()));
+        assert!(result.is_ok());
+        assert_eq!(llm_config.active_provider, Some("openai".to_string())); // Normalized to lowercase
+
+        // Set to None
+        let result = llm_config.set_active_provider(None);
+        assert!(result.is_ok());
+        assert!(llm_config.active_provider.is_none());
+    }
+
+    #[test]
+    fn test_llm_config_set_active_provider_invalid() {
+        let mut llm_config = LlmConfig::default();
+
+        let result = llm_config.set_active_provider(Some("invalid".to_string()));
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Invalid provider"));
+    }
+
+    #[test]
+    fn test_config_includes_llm_field() {
+        let config = Config::new().unwrap();
+        assert!(config.llm.active_provider.is_none());
+    }
+
+    #[test]
+    fn test_config_serialization_includes_llm() {
+        let config = Config::new().unwrap();
+        let json = serde_json::to_string(&config).unwrap();
+
+        // Verify llm field is in serialized output
+        assert!(json.contains("\"llm\""));
+        assert!(json.contains("\"active_provider\""));
+    }
+
+    #[test]
+    fn test_config_deserialization_without_llm_field() {
+        // Simulate an old config file without the llm field
+        // This tests backward compatibility
+        let old_config_json = r#"{
+            "version": "0.1.0",
+            "paths": {
+                "server_binary": "/tmp/server",
+                "model_dir": "/tmp/models",
+                "samples_dir": "/tmp/samples",
+                "espeak_data_dir": "/tmp/espeak",
+                "log_dir": "/tmp/logs"
+            },
+            "server": {
+                "port": 3000,
+                "pool_size": 2,
+                "log_level": "info"
+            }
+        }"#;
+
+        let config: Result<Config, _> = serde_json::from_str(old_config_json);
+        assert!(config.is_ok(), "Failed to deserialize old config: {:?}", config.err());
+
+        let config = config.unwrap();
+        // llm should use default values
+        assert!(config.llm.active_provider.is_none());
+    }
+
+    #[test]
+    fn test_config_deserialization_with_llm_field() {
+        let config_json = r#"{
+            "version": "0.1.0",
+            "paths": {
+                "server_binary": "/tmp/server",
+                "model_dir": "/tmp/models",
+                "samples_dir": "/tmp/samples",
+                "espeak_data_dir": "/tmp/espeak",
+                "log_dir": "/tmp/logs"
+            },
+            "server": {
+                "port": 3000,
+                "pool_size": 2,
+                "log_level": "info"
+            },
+            "llm": {
+                "active_provider": "gemini"
+            }
+        }"#;
+
+        let config: Result<Config, _> = serde_json::from_str(config_json);
+        assert!(config.is_ok(), "Failed to deserialize config with llm: {:?}", config.err());
+
+        let config = config.unwrap();
+        assert_eq!(config.llm.active_provider, Some("gemini".to_string()));
+    }
+
+    #[test]
+    fn test_config_deserialization_with_null_provider() {
+        let config_json = r#"{
+            "version": "0.1.0",
+            "paths": {
+                "server_binary": "/tmp/server",
+                "model_dir": "/tmp/models",
+                "samples_dir": "/tmp/samples",
+                "espeak_data_dir": "/tmp/espeak",
+                "log_dir": "/tmp/logs"
+            },
+            "server": {
+                "port": 3000,
+                "pool_size": 2,
+                "log_level": "info"
+            },
+            "llm": {
+                "active_provider": null
+            }
+        }"#;
+
+        let config: Result<Config, _> = serde_json::from_str(config_json);
+        assert!(config.is_ok());
+
+        let config = config.unwrap();
+        assert!(config.llm.active_provider.is_none());
+    }
+
+    #[test]
+    fn test_llm_config_roundtrip_serialization() {
+        let mut llm_config = LlmConfig::default();
+        llm_config.set_active_provider(Some("openai".to_string())).unwrap();
+
+        // Serialize
+        let json = serde_json::to_string(&llm_config).unwrap();
+
+        // Deserialize
+        let deserialized: LlmConfig = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(llm_config.active_provider, deserialized.active_provider);
     }
 }

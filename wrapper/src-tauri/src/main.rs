@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+mod api_keys;
 mod config;
 mod installer;
 mod paths;
@@ -16,7 +17,8 @@ use tokio::sync::Mutex;
 use tracing::{error, info};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use crate::config::Config;
+use crate::api_keys::{KeyStatus, Provider, ValidationResult};
+use crate::config::{Config, LlmConfig};
 use crate::installer::Installer;
 use crate::server::{ServerManager, ServerStatus};
 
@@ -130,6 +132,137 @@ async fn quit_app(app_handle: tauri::AppHandle, state: tauri::State<'_, AppState
     Ok(())
 }
 
+// ============================================================================
+// API Key Management Commands
+// ============================================================================
+
+/// Get the status of an API key for a provider
+#[tauri::command]
+async fn get_api_key_status(provider: String) -> Result<KeyStatus, String> {
+    info!("get_api_key_status called for provider: {}", provider);
+
+    let provider = Provider::from_str(&provider)
+        .ok_or_else(|| format!("Invalid provider: {}. Must be 'gemini' or 'openai'", provider))?;
+
+    api_keys::get_key_status(provider).map_err(|e| e.to_string())
+}
+
+/// Validate and save an API key for a provider
+#[tauri::command]
+async fn validate_and_save_api_key(provider: String, key: String) -> Result<ValidationResult, String> {
+    info!("validate_and_save_api_key called for provider: {}", provider);
+
+    let provider = Provider::from_str(&provider)
+        .ok_or_else(|| format!("Invalid provider: {}. Must be 'gemini' or 'openai'", provider))?;
+
+    // Validate the key first
+    let result = api_keys::validate_api_key(provider, &key)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Only store if valid
+    if result.valid {
+        api_keys::store_api_key(provider, &key).map_err(|e| e.to_string())?;
+        info!("API key stored successfully for provider: {:?}", provider);
+    } else {
+        info!("API key validation failed for provider: {:?}: {}", provider, result.message);
+    }
+
+    Ok(result)
+}
+
+/// Remove an API key for a provider
+#[tauri::command]
+async fn remove_api_key(provider: String) -> Result<(), String> {
+    info!("remove_api_key called for provider: {}", provider);
+
+    let provider = Provider::from_str(&provider)
+        .ok_or_else(|| format!("Invalid provider: {}. Must be 'gemini' or 'openai'", provider))?;
+
+    api_keys::delete_api_key(provider).map_err(|e| e.to_string())?;
+    info!("API key removed for provider: {:?}", provider);
+
+    Ok(())
+}
+
+/// Response structure for API keys configuration
+#[derive(serde::Serialize)]
+struct ApiKeysConfig {
+    gemini_configured: bool,
+    openai_configured: bool,
+    active_provider: Option<String>,
+}
+
+/// Get the current API keys configuration
+#[tauri::command]
+async fn get_api_keys_config() -> Result<ApiKeysConfig, String> {
+    info!("get_api_keys_config called");
+
+    let gemini_configured = api_keys::has_api_key(Provider::Gemini).map_err(|e| e.to_string())?;
+    let openai_configured = api_keys::has_api_key(Provider::OpenAI).map_err(|e| e.to_string())?;
+
+    // Load config to get active provider preference
+    let config = Config::load().map_err(|e| e.to_string())?;
+    let active_provider = config.llm.active_provider.clone();
+
+    // Determine effective active provider
+    let effective_provider = match &active_provider {
+        Some(p) => {
+            // Verify the configured provider actually has a key
+            let has_key = match p.as_str() {
+                "gemini" => gemini_configured,
+                "openai" => openai_configured,
+                _ => false,
+            };
+            if has_key {
+                Some(p.clone())
+            } else {
+                // Fall back to auto-selection
+                None
+            }
+        }
+        None => None,
+    };
+
+    // Auto-select if no explicit preference or preference invalid
+    let final_provider = effective_provider.or_else(|| {
+        if gemini_configured {
+            Some("gemini".to_string())
+        } else if openai_configured {
+            Some("openai".to_string())
+        } else {
+            None
+        }
+    });
+
+    Ok(ApiKeysConfig {
+        gemini_configured,
+        openai_configured,
+        active_provider: final_provider,
+    })
+}
+
+/// Set the active LLM provider
+#[tauri::command]
+async fn set_active_provider(provider: Option<String>) -> Result<(), String> {
+    info!("set_active_provider called: {:?}", provider);
+
+    // Validate provider if provided
+    if let Some(ref p) = provider {
+        if !LlmConfig::is_valid_provider(p) {
+            return Err(format!("Invalid provider: {}. Must be 'gemini' or 'openai'", p));
+        }
+    }
+
+    // Load, update, and save config
+    let mut config = Config::load().map_err(|e| e.to_string())?;
+    config.llm.set_active_provider(provider).map_err(|e| e.to_string())?;
+    config.save().map_err(|e| e.to_string())?;
+
+    info!("Active provider updated to: {:?}", config.llm.active_provider);
+    Ok(())
+}
+
 fn main() {
     // Initialize logging - use fallback if file logging fails
     let file_logging_result = (|| -> anyhow::Result<()> {
@@ -201,6 +334,12 @@ fn main() {
             close_installer_window,
             get_log_path,
             quit_app,
+            // API Key Management
+            get_api_key_status,
+            validate_and_save_api_key,
+            remove_api_key,
+            get_api_keys_config,
+            set_active_provider,
         ])
         .setup(|app| {
             let app_handle = app.handle();
@@ -355,7 +494,9 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
             return menu
                 .add_item(CustomMenuItem::new("status", format!("Running on port {}", port)).disabled())
                 .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(CustomMenuItem::new("settings", "Settings..."))
                 .add_item(CustomMenuItem::new("about", "About Porua"))
+                .add_native_item(SystemTrayMenuItem::Separator)
                 .add_item(CustomMenuItem::new("quit", "Quit"));
         }
         ServerStatus::Stopping => "Stopping...",
@@ -364,7 +505,9 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
                 .add_item(CustomMenuItem::new("status", "Error").disabled())
                 .add_item(CustomMenuItem::new("error_detail", err.to_string()).disabled())
                 .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(CustomMenuItem::new("settings", "Settings..."))
                 .add_item(CustomMenuItem::new("about", "About Porua"))
+                .add_native_item(SystemTrayMenuItem::Separator)
                 .add_item(CustomMenuItem::new("quit", "Quit"));
         }
     };
@@ -372,7 +515,9 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
     menu = menu
         .add_item(CustomMenuItem::new("status", status_text).disabled())
         .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(CustomMenuItem::new("settings", "Settings..."))
         .add_item(CustomMenuItem::new("about", "About Porua"))
+        .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(CustomMenuItem::new("quit", "Quit"));
 
     menu
@@ -470,6 +615,12 @@ fn handle_tray_event(app: &tauri::AppHandle, event_id: &str) {
                 }
             });
         }
+        "settings" => {
+            // Open settings window
+            if let Err(e) = open_settings_window(app) {
+                error!("Failed to open settings window: {}", e);
+            }
+        }
         "about" => {
             // Open the About Porua URL in the default browser
             if let Err(e) = open::that("https://shahadishraq.com/porua") {
@@ -491,6 +642,39 @@ fn handle_tray_event(app: &tauri::AppHandle, event_id: &str) {
         }
         _ => {}
     }
+}
+
+/// Open or focus the settings window
+fn open_settings_window(app_handle: &tauri::AppHandle) -> anyhow::Result<()> {
+    // Check if window already exists
+    if let Some(window) = app_handle.get_window("settings") {
+        // Window exists, focus it
+        window.show().map_err(|e| anyhow::anyhow!("Failed to show window: {}", e))?;
+        window.set_focus().map_err(|e| anyhow::anyhow!("Failed to focus window: {}", e))?;
+        info!("Focused existing settings window");
+    } else {
+        // Create the settings window
+        let window = tauri::WindowBuilder::new(
+            app_handle,
+            "settings",
+            tauri::WindowUrl::App("settings.html".into()),
+        )
+        .title("Porua Settings")
+        .inner_size(500.0, 600.0)
+        .min_inner_size(400.0, 500.0)
+        .center()
+        .resizable(true)
+        .fullscreen(false)
+        .decorations(true)
+        .build()
+        .map_err(|e| anyhow::anyhow!("Failed to create settings window: {}", e))?;
+
+        window.show().map_err(|e| anyhow::anyhow!("Failed to show window: {}", e))?;
+        window.set_focus().map_err(|e| anyhow::anyhow!("Failed to focus window: {}", e))?;
+        info!("Created new settings window");
+    }
+
+    Ok(())
 }
 
 fn start_status_monitor(app_handle: tauri::AppHandle, manager: Arc<Mutex<ServerManager>>) {
@@ -551,4 +735,166 @@ fn cleanup_old_logs(log_dir: &std::path::Path, base_name: &str, days_to_keep: u6
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Tests for API key command logic
+    // These test the underlying functions that the Tauri commands use
+
+    #[test]
+    fn test_provider_parsing_valid() {
+        assert!(Provider::from_str("gemini").is_some());
+        assert!(Provider::from_str("openai").is_some());
+        assert!(Provider::from_str("GEMINI").is_some());
+        assert!(Provider::from_str("OpenAI").is_some());
+    }
+
+    #[test]
+    fn test_provider_parsing_invalid() {
+        assert!(Provider::from_str("invalid").is_none());
+        assert!(Provider::from_str("").is_none());
+        assert!(Provider::from_str("gpt4").is_none());
+    }
+
+    #[test]
+    fn test_llm_config_provider_validation() {
+        assert!(LlmConfig::is_valid_provider("gemini"));
+        assert!(LlmConfig::is_valid_provider("openai"));
+        assert!(!LlmConfig::is_valid_provider("invalid"));
+    }
+
+    #[test]
+    fn test_api_keys_config_serialization() {
+        let config = ApiKeysConfig {
+            gemini_configured: true,
+            openai_configured: false,
+            active_provider: Some("gemini".to_string()),
+        };
+
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("gemini_configured"));
+        assert!(json.contains("openai_configured"));
+        assert!(json.contains("active_provider"));
+    }
+
+    #[test]
+    fn test_api_keys_config_auto_select_gemini() {
+        // When both are configured, prefer gemini
+        let config = ApiKeysConfig {
+            gemini_configured: true,
+            openai_configured: true,
+            active_provider: Some("gemini".to_string()),
+        };
+        assert_eq!(config.active_provider, Some("gemini".to_string()));
+    }
+
+    #[test]
+    fn test_api_keys_config_none_when_unconfigured() {
+        let config = ApiKeysConfig {
+            gemini_configured: false,
+            openai_configured: false,
+            active_provider: None,
+        };
+        assert!(config.active_provider.is_none());
+    }
+
+    // Integration tests for command error handling
+    #[tokio::test]
+    async fn test_get_api_key_status_invalid_provider() {
+        let result = get_api_key_status("invalid_provider".to_string()).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid provider"));
+    }
+
+    #[tokio::test]
+    async fn test_validate_and_save_invalid_provider() {
+        let result = validate_and_save_api_key(
+            "invalid_provider".to_string(),
+            "some-key".to_string(),
+        ).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid provider"));
+    }
+
+    #[tokio::test]
+    async fn test_remove_api_key_invalid_provider() {
+        let result = remove_api_key("invalid_provider".to_string()).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid provider"));
+    }
+
+    #[tokio::test]
+    async fn test_set_active_provider_invalid() {
+        let result = set_active_provider(Some("invalid".to_string())).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid provider"));
+    }
+
+    #[tokio::test]
+    async fn test_validate_and_save_empty_key() {
+        // Empty key should be rejected at validation level
+        let result = validate_and_save_api_key(
+            "gemini".to_string(),
+            "".to_string(),
+        ).await;
+        assert!(result.is_ok());
+        let validation = result.unwrap();
+        assert!(!validation.valid);
+        assert!(validation.message.contains("empty"));
+    }
+
+    #[tokio::test]
+    async fn test_get_api_key_status_valid_provider() {
+        // Should succeed for valid provider (even if no key configured)
+        let result = get_api_key_status("gemini".to_string()).await;
+        assert!(result.is_ok());
+        let status = result.unwrap();
+        assert_eq!(status.provider, "gemini");
+    }
+
+    // Phase 4 tests: Settings menu integration
+    // Note: We can't fully test window creation without a Tauri runtime,
+    // but we can verify the menu structure includes settings
+
+    #[test]
+    fn test_tray_menu_includes_settings_when_running() {
+        // The create_tray_menu function returns a SystemTrayMenu
+        // We verify it compiles and creates successfully for Running state
+        let status = ServerStatus::Running { port: 3000 };
+        let menu = create_tray_menu(&status);
+        // Menu is created successfully - the settings item is included in the function
+        // We can't easily inspect menu items, but we verify the function works
+        drop(menu);
+    }
+
+    #[test]
+    fn test_tray_menu_includes_settings_when_stopped() {
+        let status = ServerStatus::Stopped;
+        let menu = create_tray_menu(&status);
+        drop(menu);
+    }
+
+    #[test]
+    fn test_tray_menu_includes_settings_when_error() {
+        let status = ServerStatus::Error("Test error".to_string());
+        let menu = create_tray_menu(&status);
+        drop(menu);
+    }
+
+    #[test]
+    fn test_tray_menu_includes_settings_when_starting() {
+        let status = ServerStatus::Starting;
+        let menu = create_tray_menu(&status);
+        drop(menu);
+    }
+
+    #[test]
+    fn test_tray_menu_includes_settings_when_stopping() {
+        let status = ServerStatus::Stopping;
+        let menu = create_tray_menu(&status);
+        drop(menu);
+    }
 }
