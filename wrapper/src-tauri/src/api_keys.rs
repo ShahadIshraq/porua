@@ -10,6 +10,15 @@ const SERVICE_NAME: &str = "com.porua.app.test";
 const GEMINI_KEY_ID: &str = "porua.api.gemini";
 const OPENAI_KEY_ID: &str = "porua.api.openai";
 
+// Gemini API key validation constants
+const GEMINI_KEY_PREFIX: &str = "AIza";
+const GEMINI_KEY_LENGTH: usize = 39;
+
+// OpenAI API key validation constants
+const OPENAI_KEY_PREFIX: &str = "sk-";
+const OPENAI_KEY_MIN_LENGTH: usize = 40;
+const OPENAI_KEY_MAX_LENGTH: usize = 200;
+
 #[derive(Debug, Error)]
 pub enum ApiKeyError {
     #[error("Storage error: {0}")]
@@ -186,15 +195,15 @@ impl ApiKeyManager {
         let trimmed_key = key.trim();
 
         // Gemini API keys typically start with "AIza" and are 39 characters
-        if !trimmed_key.starts_with("AIza") {
+        if !trimmed_key.starts_with(GEMINI_KEY_PREFIX) {
             return Err(ApiKeyError::InvalidFormat(
-                "Invalid Gemini key format (should start with 'AIza')".to_string(),
+                format!("Invalid Gemini key format (should start with '{}')", GEMINI_KEY_PREFIX),
             ));
         }
 
-        if trimmed_key.len() != 39 {
+        if trimmed_key.len() != GEMINI_KEY_LENGTH {
             return Err(ApiKeyError::InvalidFormat(
-                "Invalid Gemini key length (should be 39 characters)".to_string(),
+                format!("Invalid Gemini key length (should be {} characters)", GEMINI_KEY_LENGTH),
             ));
         }
 
@@ -238,16 +247,22 @@ impl ApiKeyManager {
         let trimmed_key = key.trim();
 
         // OpenAI API keys typically start with "sk-"
-        if !trimmed_key.starts_with("sk-") {
+        if !trimmed_key.starts_with(OPENAI_KEY_PREFIX) {
             return Err(ApiKeyError::InvalidFormat(
-                "Invalid OpenAI key format (should start with 'sk-')".to_string(),
+                format!("Invalid OpenAI key format (should start with '{}')", OPENAI_KEY_PREFIX),
             ));
         }
 
-        // OpenAI keys are typically longer than 40 characters
-        if trimmed_key.len() < 40 {
+        // OpenAI keys are typically between 40 and 200 characters
+        if trimmed_key.len() < OPENAI_KEY_MIN_LENGTH {
             return Err(ApiKeyError::InvalidFormat(
-                "Invalid OpenAI key length (too short)".to_string(),
+                format!("Invalid OpenAI key length (too short, minimum {} characters)", OPENAI_KEY_MIN_LENGTH),
+            ));
+        }
+
+        if trimmed_key.len() > OPENAI_KEY_MAX_LENGTH {
+            return Err(ApiKeyError::InvalidFormat(
+                format!("Invalid OpenAI key length (too long, maximum {} characters)", OPENAI_KEY_MAX_LENGTH),
             ));
         }
 
