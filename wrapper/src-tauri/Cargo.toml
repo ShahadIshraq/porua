@@ -11,7 +11,7 @@ edition = "2021"
 tauri-build = { version = "1.5", features = [] }
 
 [dependencies]
-tauri = { version = "1.5", features = [ "fs-read-dir", "shell-execute", "shell-open", "fs-exists", "fs-create-dir", "http-request", "fs-read-file", "path-all", "notification-all", "fs-copy-file", "fs-write-file", "system-tray", "notification"] }
+tauri = { version = "1.5", features = [ "fs-read-dir", "shell-execute", "shell-open", "fs-exists", "fs-create-dir", "http-request", "fs-read-file", "path-all", "notification-all", "fs-copy-file", "fs-write-file", "system-tray", "notification", "dialog-save", "global-shortcut-all", "window-all", "macos-private-api"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1", features = ["full"] }
@@ -25,6 +25,20 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 image = "0.24"
 open = "5.0"
+uuid = { version = "1.0", features = ["v4"] }
+chrono = "0.4"
+
+[target."cfg(windows)".dependencies]
+windows = { version = "0.52", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_HiDpi",
+    "Win32_System_SystemInformation"
+]}
+
+[dev-dependencies]
+tempfile = "3.0"
 
 [features]
 default = ["custom-protocol"]

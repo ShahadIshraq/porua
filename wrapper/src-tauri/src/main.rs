@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+mod capture;
 mod config;
 mod installer;
 mod paths;
@@ -16,6 +17,7 @@ use tokio::sync::Mutex;
 use tracing::{error, info};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
+use crate::capture::{CaptureResult, MonitorInfo, Rect, ScreenCapture};
 use crate::config::Config;
 use crate::installer::Installer;
 use crate::server::{ServerManager, ServerStatus};
@@ -130,6 +132,189 @@ async fn quit_app(app_handle: tauri::AppHandle, state: tauri::State<'_, AppState
     Ok(())
 }
 
+// ==================== Screen Capture Commands ====================
+
+#[tauri::command]
+async fn get_monitors_info() -> Result<Vec<MonitorInfo>, String> {
+    info!("get_monitors_info command called");
+    ScreenCapture::get_monitors().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn start_capture_mode(app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("start_capture_mode command called");
+
+    // Hide main window if it exists
+    if let Some(window) = app_handle.get_window("main") {
+        let _ = window.hide();
+    }
+
+    // Check if overlay already exists
+    if app_handle.get_window("capture-overlay").is_some() {
+        info!("Capture overlay already exists");
+        return Ok(());
+    }
+
+    // Create the overlay window
+    let overlay = tauri::WindowBuilder::new(
+        &app_handle,
+        "capture-overlay",
+        tauri::WindowUrl::App("overlay.html".into()),
+    )
+    .title("Screen Capture")
+    .fullscreen(true)
+    .transparent(true)
+    .decorations(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .build()
+    .map_err(|e| format!("Failed to create overlay window: {}", e))?;
+
+    overlay.show().map_err(|e| e.to_string())?;
+    overlay.set_focus().map_err(|e| e.to_string())?;
+
+    info!("Capture overlay window created");
+    Ok(())
+}
+
+#[tauri::command]
+async fn cancel_capture(app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("cancel_capture command called");
+
+    // Close overlay window
+    if let Some(overlay) = app_handle.get_window("capture-overlay") {
+        overlay.close().map_err(|e| e.to_string())?;
+    }
+
+    // Show main window again if it exists
+    if let Some(main_window) = app_handle.get_window("main") {
+        let _ = main_window.show();
+        let _ = main_window.set_focus();
+    }
+
+    info!("Capture cancelled");
+    Ok(())
+}
+
+#[tauri::command]
+async fn capture_screen_region(
+    app_handle: tauri::AppHandle,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<CaptureResult, String> {
+    info!(
+        "capture_screen_region command called: x={}, y={}, width={}, height={}",
+        x, y, width, height
+    );
+
+    // Get temp directory for captures
+    let temp_dir = paths::get_app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("captures");
+
+    let capture = ScreenCapture::new(temp_dir);
+    let rect = Rect::new(x, y, width, height);
+
+    // Close overlay window before capturing
+    if let Some(overlay) = app_handle.get_window("capture-overlay") {
+        overlay.close().map_err(|e| e.to_string())?;
+    }
+
+    // Small delay to ensure overlay is fully closed
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Perform capture
+    let result = capture.capture_region(rect).map_err(|e| e.to_string())?;
+
+    info!("Screen region captured successfully: {:?}", result.file_path);
+    Ok(result)
+}
+
+#[tauri::command]
+async fn open_preview_window(
+    app_handle: tauri::AppHandle,
+    image_path: String,
+    timestamp: String,
+) -> Result<(), String> {
+    info!("open_preview_window command called: {}", image_path);
+
+    // Check if preview window already exists
+    if let Some(existing) = app_handle.get_window("capture-preview") {
+        existing.close().map_err(|e| e.to_string())?;
+    }
+
+    // Create preview window
+    let preview = tauri::WindowBuilder::new(
+        &app_handle,
+        "capture-preview",
+        tauri::WindowUrl::App("preview.html".into()),
+    )
+    .title(format!("Capture - {}", timestamp))
+    .inner_size(800.0, 600.0)
+    .min_inner_size(400.0, 300.0)
+    .resizable(true)
+    .center()
+    .build()
+    .map_err(|e| format!("Failed to create preview window: {}", e))?;
+
+    preview.show().map_err(|e| e.to_string())?;
+    preview.set_focus().map_err(|e| e.to_string())?;
+
+    // Emit the image path to the preview window
+    preview
+        .emit("load-image", &image_path)
+        .map_err(|e| e.to_string())?;
+
+    info!("Preview window opened");
+    Ok(())
+}
+
+#[tauri::command]
+async fn save_captured_image(
+    app_handle: tauri::AppHandle,
+    source_path: String,
+) -> Result<String, String> {
+    info!("save_captured_image command called: {}", source_path);
+
+    use tauri::api::dialog::blocking::FileDialogBuilder;
+
+    // Show save dialog
+    let save_path = FileDialogBuilder::new()
+        .add_filter("PNG Image", &["png"])
+        .set_file_name("capture.png")
+        .save_file();
+
+    match save_path {
+        Some(path) => {
+            // Copy file to selected location
+            std::fs::copy(&source_path, &path).map_err(|e| {
+                error!("Failed to save image: {}", e);
+                format!("Failed to save image: {}", e)
+            })?;
+
+            info!("Image saved to: {:?}", path);
+            Ok(path.to_string_lossy().to_string())
+        }
+        None => {
+            info!("Save dialog cancelled");
+            Err("Save cancelled".to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn check_capture_permission() -> Result<bool, String> {
+    info!("check_capture_permission command called");
+    ScreenCapture::check_permission().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_virtual_screen_bounds() -> Rect {
+    ScreenCapture::get_virtual_screen_bounds()
+}
+
 fn main() {
     // Initialize logging - use fallback if file logging fails
     let file_logging_result = (|| -> anyhow::Result<()> {
@@ -201,6 +386,15 @@ fn main() {
             close_installer_window,
             get_log_path,
             quit_app,
+            // Screen capture commands
+            get_monitors_info,
+            start_capture_mode,
+            cancel_capture,
+            capture_screen_region,
+            open_preview_window,
+            save_captured_image,
+            check_capture_permission,
+            get_virtual_screen_bounds,
         ])
         .setup(|app| {
             let app_handle = app.handle();

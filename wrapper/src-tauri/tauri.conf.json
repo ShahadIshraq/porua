@@ -45,6 +45,20 @@
       },
       "path": {
         "all": true
+      },
+      "dialog": {
+        "all": false,
+        "save": true,
+        "open": false,
+        "message": false,
+        "ask": false,
+        "confirm": false
+      },
+      "window": {
+        "all": true
+      },
+      "globalShortcut": {
+        "all": true
       }
     },
     "bundle": {
@@ -111,6 +125,7 @@
     "updater": {
       "active": false
     },
-    "windows": []
+    "windows": [],
+    "macOSPrivateApi": true
   }
 }
