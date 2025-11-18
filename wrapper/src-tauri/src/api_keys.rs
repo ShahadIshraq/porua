@@ -547,3 +547,8 @@ mod validation_tests {
         }
     }
 }
+
+// Include edge case and error handling tests
+#[cfg(test)]
+#[path = "api_keys_edge_case_tests.rs"]
+mod edge_case_tests;
