@@ -48,6 +48,10 @@
       },
       "window": {
         "all": true
+      },
+      "dialog": {
+        "all": false,
+        "save": true
       }
     },
     "bundle": {

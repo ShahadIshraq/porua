@@ -171,7 +171,43 @@ async fn capture_region(
     capture::overlay::close_overlay_window(&app_handle).await?;
 
     info!("Capture successful: {}", image_path);
+
+    // Open preview window
+    open_preview_window(app_handle.clone(), image_path.clone()).await?;
+
     Ok(image_path)
+}
+
+#[tauri::command]
+async fn open_preview_window(app_handle: tauri::AppHandle, image_path: String) -> Result<(), String> {
+    info!("Opening preview window for: {}", image_path);
+
+    // Close any existing preview window
+    if let Some(window) = app_handle.get_window("preview") {
+        let _ = window.close();
+    }
+
+    // Create preview window with image path as URL parameter
+    let window_url = format!("preview.html?path={}", urlencoding::encode(&image_path));
+
+    let window = tauri::WindowBuilder::new(
+        &app_handle,
+        "preview",
+        tauri::WindowUrl::App(window_url.into()),
+    )
+    .title("Captured Screenshot")
+    .inner_size(800.0, 600.0)
+    .min_inner_size(400.0, 300.0)
+    .center()
+    .resizable(true)
+    .decorations(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    window.show().map_err(|e| e.to_string())?;
+    window.set_focus().map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -270,6 +306,7 @@ fn main() {
             cancel_capture,
             get_monitor_info,
             save_capture_as,
+            open_preview_window,
         ])
         .setup(|app| {
             let app_handle = app.handle();

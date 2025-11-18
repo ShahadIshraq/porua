@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Captured Screenshot</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="preview.css">
+</head>
+<body>
+    <div id="preview-container">
+        <!-- Image display area -->
+        <div id="image-container">
+            <img id="captured-image" alt="Captured Screenshot">
+        </div>
+
+        <!-- Control buttons -->
+        <div id="controls">
+            <button id="recapture-btn" class="control-btn secondary">
+                <span class="btn-icon">↻</span>
+                Recapture
+            </button>
+            <button id="save-btn" class="control-btn primary">
+                <span class="btn-icon">💾</span>
+                Save As...
+            </button>
+            <button id="close-btn" class="control-btn secondary">
+                <span class="btn-icon">✕</span>
+                Close
+            </button>
+        </div>
+
+        <!-- Image info -->
+        <div id="image-info">
+            <span id="dimensions-info">Loading...</span>
+            <span id="file-info"></span>
+        </div>
+    </div>
+
+    <script src="preview.js"></script>
+</body>
+</html>
