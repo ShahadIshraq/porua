@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+mod capture;
 mod config;
 mod installer;
 mod paths;
@@ -10,7 +11,7 @@ mod server;
 
 use std::sync::Arc;
 use tauri::{
-    CustomMenuItem, Icon, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
+    CustomMenuItem, GlobalShortcutManager, Icon, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
 };
 use tokio::sync::Mutex;
 use tracing::{error, info};
@@ -130,6 +131,156 @@ async fn quit_app(app_handle: tauri::AppHandle, state: tauri::State<'_, AppState
     Ok(())
 }
 
+// Screen capture commands
+
+#[tauri::command]
+async fn start_screen_capture(app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("Starting screen capture overlay");
+    capture::overlay::create_overlay_window(&app_handle).await?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn capture_region(
+    app_handle: tauri::AppHandle,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<String, String> {
+    info!("Capturing region: x={}, y={}, w={}, h={}", x, y, width, height);
+
+    // Get virtual screen bounds for validation
+    let (vx, vy, vw, vh) = capture::monitors::get_virtual_screen_bounds();
+
+    // Clamp selection to screen bounds
+    let (clamped_x, clamped_y, clamped_w, clamped_h) =
+        capture::overlay::clamp_selection_to_bounds(x, y, width, height, (vx, vy, vw, vh));
+
+    // Validate selection meets minimum requirements
+    if !capture::overlay::is_selection_valid(clamped_w, clamped_h) {
+        return Err("Selection is too small (minimum 10x10 pixels)".to_string());
+    }
+
+    // Capture the screen region
+    let image_path = capture::screenshot::capture_screen_region(
+        clamped_x, clamped_y, clamped_w, clamped_h
+    ).await?;
+
+    // Close the overlay window
+    capture::overlay::close_overlay_window(&app_handle).await?;
+
+    info!("Capture successful: {}", image_path);
+
+    // Open preview window
+    open_preview_window(app_handle.clone(), image_path.clone()).await?;
+
+    Ok(image_path)
+}
+
+#[tauri::command]
+async fn open_preview_window(app_handle: tauri::AppHandle, image_path: String) -> Result<(), String> {
+    info!("Opening preview window for: {}", image_path);
+
+    // Close any existing preview window
+    if let Some(window) = app_handle.get_window("preview") {
+        let _ = window.close();
+    }
+
+    // Create preview window with image path as URL parameter
+    let window_url = format!("preview.html?path={}", urlencoding::encode(&image_path));
+
+    let window = tauri::WindowBuilder::new(
+        &app_handle,
+        "preview",
+        tauri::WindowUrl::App(window_url.into()),
+    )
+    .title("Captured Screenshot")
+    .inner_size(800.0, 600.0)
+    .min_inner_size(400.0, 300.0)
+    .center()
+    .resizable(true)
+    .decorations(true)
+    .build()
+    .map_err(|e| e.to_string())?;
+
+    window.show().map_err(|e| e.to_string())?;
+    window.set_focus().map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn cancel_capture(app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("Cancelling screen capture");
+    capture::overlay::close_overlay_window(&app_handle).await
+}
+
+#[tauri::command]
+async fn get_monitor_info() -> Result<Vec<capture::monitors::MonitorInfo>, String> {
+    info!("Getting monitor information");
+    Ok(capture::monitors::get_all_monitors_sync())
+}
+
+#[tauri::command]
+async fn save_capture_as(source_path: String, destination_path: String) -> Result<(), String> {
+    info!("Saving capture from {} to {}", source_path, destination_path);
+
+    // Validate source path is a temp capture file
+    let source = std::path::Path::new(&source_path);
+    let temp_dir = std::env::temp_dir();
+
+    // Ensure source is in temp directory and has expected filename pattern
+    if let Some(parent) = source.parent() {
+        if parent != temp_dir {
+            return Err("Invalid source path: must be a temporary capture file".to_string());
+        }
+    } else {
+        return Err("Invalid source path".to_string());
+    }
+
+    // Validate source filename pattern (porua_capture_*)
+    if let Some(filename) = source.file_name().and_then(|n| n.to_str()) {
+        if !filename.starts_with("porua_capture_") || !filename.ends_with(".png") {
+            return Err("Invalid source file: not a valid capture file".to_string());
+        }
+    } else {
+        return Err("Invalid source filename".to_string());
+    }
+
+    // Validate destination path
+    let dest = std::path::Path::new(&destination_path);
+
+    // Canonicalize destination to resolve any .. or . components
+    // This prevents path traversal attacks
+    let dest_canonical = match dest.parent() {
+        Some(parent) => {
+            // Check if parent directory exists
+            if !parent.exists() {
+                return Err("Destination directory does not exist".to_string());
+            }
+            // Get canonical path of parent
+            match parent.canonicalize() {
+                Ok(canonical_parent) => canonical_parent.join(dest.file_name().unwrap()),
+                Err(_) => return Err("Invalid destination path".to_string()),
+            }
+        }
+        None => return Err("Invalid destination path".to_string()),
+    };
+
+    // Ensure destination has .png extension
+    if dest_canonical.extension().and_then(|e| e.to_str()) != Some("png") {
+        return Err("Destination must be a .png file".to_string());
+    }
+
+    // Perform the copy with validated paths
+    std::fs::copy(&source_path, &dest_canonical)
+        .map_err(|e| format!("Failed to save file: {}", e))?;
+
+    info!("Successfully saved to {}", dest_canonical.display());
+    Ok(())
+}
+
 fn main() {
     // Initialize logging - use fallback if file logging fails
     let file_logging_result = (|| -> anyhow::Result<()> {
@@ -201,9 +352,32 @@ fn main() {
             close_installer_window,
             get_log_path,
             quit_app,
+            start_screen_capture,
+            capture_region,
+            cancel_capture,
+            get_monitor_info,
+            save_capture_as,
+            open_preview_window,
         ])
         .setup(|app| {
             let app_handle = app.handle();
+
+            // Register global shortcut for screen capture (Ctrl+Shift+S)
+            let shortcut_app_handle = app_handle.clone();
+            let mut shortcut_manager = app.global_shortcut_manager();
+            match shortcut_manager.register("Ctrl+Shift+S", move || {
+                info!("Global shortcut triggered: Ctrl+Shift+S");
+                let app = shortcut_app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    match capture::overlay::create_overlay_window(&app).await {
+                        Ok(_) => info!("Screen capture overlay opened from shortcut"),
+                        Err(e) => error!("Failed to open capture overlay from shortcut: {}", e),
+                    }
+                });
+            }) {
+                Ok(_) => info!("Global shortcut Ctrl+Shift+S registered successfully"),
+                Err(e) => error!("Failed to register global shortcut: {}", e),
+            }
 
             // Check if already installed - if so, set activation policy immediately
             #[cfg(target_os = "macos")]
@@ -355,6 +529,8 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
             return menu
                 .add_item(CustomMenuItem::new("status", format!("Running on port {}", port)).disabled())
                 .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(CustomMenuItem::new("capture_screen", "Capture Screen Area"))
+                .add_native_item(SystemTrayMenuItem::Separator)
                 .add_item(CustomMenuItem::new("about", "About Porua"))
                 .add_item(CustomMenuItem::new("quit", "Quit"));
         }
@@ -371,6 +547,8 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
 
     menu = menu
         .add_item(CustomMenuItem::new("status", status_text).disabled())
+        .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(CustomMenuItem::new("capture_screen", "Capture Screen Area"))
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(CustomMenuItem::new("about", "About Porua"))
         .add_item(CustomMenuItem::new("quit", "Quit"));
@@ -467,6 +645,16 @@ fn handle_tray_event(app: &tauri::AppHandle, event_id: &str) {
                     } else {
                         info!("Ignoring stop request - server is in {:?} state", current_status);
                     }
+                }
+            });
+        }
+        "capture_screen" => {
+            let app_handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                info!("Screen capture requested from tray");
+                match capture::overlay::create_overlay_window(&app_handle).await {
+                    Ok(_) => info!("Screen capture overlay opened"),
+                    Err(e) => error!("Failed to open capture overlay: {}", e),
                 }
             });
         }

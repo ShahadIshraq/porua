@@ -1,0 +1,72 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    cursor: crosshair;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
+#overlay-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+}
+
+#selection-box {
+    position: absolute;
+    border: 2px solid #0066ff;
+    background: rgba(0, 102, 255, 0.1);
+    pointer-events: none;
+    z-index: 10000;
+}
+
+#dimensions-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-weight: 500;
+    pointer-events: none;
+    z-index: 10001;
+    white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+#instructions {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    color: white;
+    font-size: 18px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    pointer-events: none;
+    z-index: 9998;
+}
+
+#instructions p {
+    margin: 8px 0;
+}
+
+#instructions .hint {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
+/* Hide instructions when dragging */
+#overlay-container.dragging #instructions {
+    display: none;
+}

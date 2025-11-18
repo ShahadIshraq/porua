@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Select Area</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="overlay.css">
+</head>
+<body>
+    <div id="overlay-container">
+        <!-- Selection rectangle -->
+        <div id="selection-box" style="display: none;"></div>
+
+        <!-- Dimensions tooltip -->
+        <div id="dimensions-tooltip" style="display: none;">
+            <span id="dimensions-text">0 × 0</span>
+        </div>
+
+        <!-- Instructions -->
+        <div id="instructions">
+            <p>Click and drag to select an area</p>
+            <p class="hint">Press ESC to cancel</p>
+        </div>
+    </div>
+
+    <script src="overlay.js"></script>
+</body>
+</html>

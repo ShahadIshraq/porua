@@ -45,6 +45,16 @@
       },
       "path": {
         "all": true
+      },
+      "window": {
+        "all": true
+      },
+      "dialog": {
+        "all": false,
+        "save": true
+      },
+      "globalShortcut": {
+        "all": true
       }
     },
     "bundle": {
