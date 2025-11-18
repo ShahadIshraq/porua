@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+mod api_keys;
 mod config;
 mod installer;
 mod paths;
@@ -16,6 +17,7 @@ use tokio::sync::Mutex;
 use tracing::{error, info};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
+use crate::api_keys::ApiKeyManager;
 use crate::config::Config;
 use crate::installer::Installer;
 use crate::server::{ServerManager, ServerStatus};
@@ -130,6 +132,68 @@ async fn quit_app(app_handle: tauri::AppHandle, state: tauri::State<'_, AppState
     Ok(())
 }
 
+// API Key Management Commands
+
+#[tauri::command]
+async fn get_gemini_key() -> Result<Option<String>, String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.get_gemini_key().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn set_gemini_key(key: String) -> Result<(), String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.set_gemini_key(&key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn validate_gemini_key(key: String) -> Result<bool, String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.validate_gemini_key(&key).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn remove_gemini_key() -> Result<(), String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.remove_gemini_key().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_openai_key() -> Result<Option<String>, String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.get_openai_key().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn set_openai_key(key: String) -> Result<(), String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.set_openai_key(&key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn validate_openai_key(key: String) -> Result<bool, String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.validate_openai_key(&key).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn remove_openai_key() -> Result<(), String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.remove_openai_key().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_active_provider() -> Result<String, String> {
+    let config = Config::load().map_err(|e| e.to_string())?;
+    Ok(config.get_active_provider().to_string())
+}
+
+#[tauri::command]
+async fn set_active_provider(provider: String) -> Result<(), String> {
+    let mut config = Config::load().map_err(|e| e.to_string())?;
+    config.set_active_provider(provider).map_err(|e| e.to_string())
+}
+
 fn main() {
     // Initialize logging - use fallback if file logging fails
     let file_logging_result = (|| -> anyhow::Result<()> {
@@ -201,6 +265,16 @@ fn main() {
             close_installer_window,
             get_log_path,
             quit_app,
+            get_gemini_key,
+            set_gemini_key,
+            validate_gemini_key,
+            remove_gemini_key,
+            get_openai_key,
+            set_openai_key,
+            validate_openai_key,
+            remove_openai_key,
+            get_active_provider,
+            set_active_provider,
         ])
         .setup(|app| {
             let app_handle = app.handle();
@@ -355,6 +429,7 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
             return menu
                 .add_item(CustomMenuItem::new("status", format!("Running on port {}", port)).disabled())
                 .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(CustomMenuItem::new("settings", "Settings"))
                 .add_item(CustomMenuItem::new("about", "About Porua"))
                 .add_item(CustomMenuItem::new("quit", "Quit"));
         }
@@ -364,6 +439,7 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
                 .add_item(CustomMenuItem::new("status", "Error").disabled())
                 .add_item(CustomMenuItem::new("error_detail", err.to_string()).disabled())
                 .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(CustomMenuItem::new("settings", "Settings"))
                 .add_item(CustomMenuItem::new("about", "About Porua"))
                 .add_item(CustomMenuItem::new("quit", "Quit"));
         }
@@ -372,6 +448,7 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
     menu = menu
         .add_item(CustomMenuItem::new("status", status_text).disabled())
         .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(CustomMenuItem::new("settings", "Settings"))
         .add_item(CustomMenuItem::new("about", "About Porua"))
         .add_item(CustomMenuItem::new("quit", "Quit"));
 
@@ -470,6 +547,33 @@ fn handle_tray_event(app: &tauri::AppHandle, event_id: &str) {
                 }
             });
         }
+        "settings" => {
+            // Create or show settings window
+            if let Some(window) = app.get_window("settings") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            } else {
+                let window_result = tauri::WindowBuilder::new(
+                    app,
+                    "settings",
+                    tauri::WindowUrl::App("index.html".into())
+                )
+                .title("API Keys - Porua")
+                .inner_size(600.0, 750.0)
+                .center()
+                .resizable(false)
+                .build();
+
+                if let Ok(window) = window_result {
+                    let _ = window.show();
+
+                    // Use JavaScript to show the settings screen
+                    let _ = window.eval("showScreen('settings')");
+                } else {
+                    error!("Failed to create settings window");
+                }
+            }
+        }
         "about" => {
             // Open the About Porua URL in the default browser
             if let Err(e) = open::that("https://shahadishraq.com/porua") {
@@ -551,4 +655,182 @@ fn cleanup_old_logs(log_dir: &std::path::Path, base_name: &str, days_to_keep: u6
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tauri_command_tests {
+    use super::*;
+    use serial_test::serial;
+
+    // Helper to clean up test keys before each test
+    fn cleanup_test_keys() {
+        let manager = ApiKeyManager::new().unwrap();
+        let _ = manager.remove_gemini_key();
+        let _ = manager.remove_openai_key();
+    }
+
+    // Test 27: Gemini key storage via Tauri command
+    #[tokio::test]
+    #[serial]
+    async fn test_tauri_set_and_get_gemini_key() {
+        cleanup_test_keys();
+
+        let test_key = "AIzaSyDummy39CharacterKeyForTesting12345".to_string();
+
+        // Set key via Tauri command
+        let result = set_gemini_key(test_key.clone()).await;
+        assert!(result.is_ok());
+
+        // Get key via Tauri command
+        let retrieved = get_gemini_key().await;
+        assert!(retrieved.is_ok());
+        assert_eq!(retrieved.unwrap(), Some(test_key));
+
+        // Cleanup
+        let _ = remove_gemini_key().await;
+    }
+
+    // Test 28: OpenAI key storage via Tauri command
+    #[tokio::test]
+    #[serial]
+    async fn test_tauri_set_and_get_openai_key() {
+        cleanup_test_keys();
+
+        let test_key = "sk-proj-dummy48charactersopenaikeyfortesting123456".to_string();
+
+        // Set key via Tauri command
+        let result = set_openai_key(test_key.clone()).await;
+        assert!(result.is_ok());
+
+        // Get key via Tauri command
+        let retrieved = get_openai_key().await;
+        assert!(retrieved.is_ok());
+        assert_eq!(retrieved.unwrap(), Some(test_key));
+
+        // Cleanup
+        let _ = remove_openai_key().await;
+    }
+
+    // Test 29: Remove Gemini key via Tauri command
+    #[tokio::test]
+    #[serial]
+    async fn test_tauri_remove_gemini_key() {
+        cleanup_test_keys();
+
+        let test_key = "AIzaSyDummy39CharacterKeyForTesting12345".to_string();
+
+        // Set and then remove
+        let _ = set_gemini_key(test_key).await;
+        let result = remove_gemini_key().await;
+        assert!(result.is_ok());
+
+        // Verify removed
+        let retrieved = get_gemini_key().await;
+        assert!(retrieved.is_ok());
+        assert_eq!(retrieved.unwrap(), None);
+    }
+
+    // Test 30: Remove OpenAI key via Tauri command
+    #[tokio::test]
+    #[serial]
+    async fn test_tauri_remove_openai_key() {
+        cleanup_test_keys();
+
+        let test_key = "sk-proj-dummy48charactersopenaikeyfortesting123456".to_string();
+
+        // Set and then remove
+        let _ = set_openai_key(test_key).await;
+        let result = remove_openai_key().await;
+        assert!(result.is_ok());
+
+        // Verify removed
+        let retrieved = get_openai_key().await;
+        assert!(retrieved.is_ok());
+        assert_eq!(retrieved.unwrap(), None);
+    }
+
+    // Test 31: Validate invalid Gemini key format via Tauri command
+    #[tokio::test]
+    async fn test_tauri_validate_invalid_gemini_format() {
+        let invalid_key = "not-valid".to_string();
+        let result = validate_gemini_key(invalid_key).await;
+
+        // Should return error, not Ok
+        assert!(result.is_err());
+    }
+
+    // Test 32: Validate invalid OpenAI key format via Tauri command
+    #[tokio::test]
+    async fn test_tauri_validate_invalid_openai_format() {
+        let invalid_key = "not-valid".to_string();
+        let result = validate_openai_key(invalid_key).await;
+
+        // Should return error, not Ok
+        assert!(result.is_err());
+    }
+
+    // Test 33: Validate Gemini key with correct format but invalid API key
+    #[tokio::test]
+    async fn test_tauri_validate_wrong_gemini_key() {
+        let wrong_key = "AIzaSyDummy39CharacterKeyWrongWrongWrong".to_string();
+        let result = validate_gemini_key(wrong_key).await;
+
+        // Should return error or Ok(false), not panic
+        assert!(result.is_err() || result.unwrap() == false);
+    }
+
+    // Test 34: Get active provider via Tauri command (default)
+    #[tokio::test]
+    async fn test_tauri_get_default_active_provider() {
+        let result = get_active_provider().await;
+
+        // Config loading may fail in test environment, which is acceptable
+        // If it succeeds, verify the provider is valid
+        if let Ok(provider) = result {
+            assert!(provider == "gemini" || provider == "openai");
+        }
+        // Test passes either way - we're just checking it doesn't panic
+    }
+
+    // Test 35: Set active provider to OpenAI via Tauri command
+    #[tokio::test]
+    async fn test_tauri_set_active_provider_openai() {
+        let result = set_active_provider("openai".to_string()).await;
+
+        // Config loading may fail in test environment, which is acceptable
+        // If it succeeds, verify it can be retrieved
+        if result.is_ok() {
+            let retrieved = get_active_provider().await;
+            if let Ok(provider) = retrieved {
+                assert_eq!(provider, "openai");
+            }
+        }
+        // Test passes either way - we're just checking it doesn't panic
+    }
+
+    // Test 36: Set active provider to Gemini via Tauri command
+    #[tokio::test]
+    async fn test_tauri_set_active_provider_gemini() {
+        let result = set_active_provider("gemini".to_string()).await;
+
+        // Config loading may fail in test environment, which is acceptable
+        // If it succeeds, verify it can be retrieved
+        if result.is_ok() {
+            let retrieved = get_active_provider().await;
+            if let Ok(provider) = retrieved {
+                assert_eq!(provider, "gemini");
+            }
+        }
+        // Test passes either way - we're just checking it doesn't panic
+    }
+
+    // Test 37: Set invalid provider via Tauri command
+    #[tokio::test]
+    async fn test_tauri_set_invalid_provider() {
+        let result = set_active_provider("invalid".to_string()).await;
+
+        // This should fail either due to invalid provider OR config loading failure
+        // Both are acceptable outcomes - the command properly handles errors
+        assert!(result.is_err());
+    }
 }

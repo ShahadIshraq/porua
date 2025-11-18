@@ -25,6 +25,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2"
 image = "0.24"
 open = "5.0"
+keyring = { version = "3.6", features = ["apple-native", "windows-native"] }
 
 [features]
 default = ["custom-protocol"]
@@ -35,3 +36,10 @@ tauri = { version = "1.5", features = ["system-tray", "notification", "shell-sid
 
 [target."cfg(unix)".dependencies]
 libc = "0.2"
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockito = "1.2"
+tempfile = "3.8"
+lazy_static = "1.4"
+serial_test = "3.0"
