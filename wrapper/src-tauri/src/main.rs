@@ -11,7 +11,7 @@ mod server;
 
 use std::sync::Arc;
 use tauri::{
-    CustomMenuItem, Icon, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
+    CustomMenuItem, GlobalShortcutManager, Icon, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
 };
 use tokio::sync::Mutex;
 use tracing::{error, info};
@@ -311,6 +311,23 @@ fn main() {
         .setup(|app| {
             let app_handle = app.handle();
 
+            // Register global shortcut for screen capture (Ctrl+Shift+S)
+            let shortcut_app_handle = app_handle.clone();
+            let mut shortcut_manager = app.global_shortcut_manager();
+            match shortcut_manager.register("Ctrl+Shift+S", move || {
+                info!("Global shortcut triggered: Ctrl+Shift+S");
+                let app = shortcut_app_handle.clone();
+                tauri::async_runtime::spawn(async move {
+                    match capture::overlay::create_overlay_window(&app).await {
+                        Ok(_) => info!("Screen capture overlay opened from shortcut"),
+                        Err(e) => error!("Failed to open capture overlay from shortcut: {}", e),
+                    }
+                });
+            }) {
+                Ok(_) => info!("Global shortcut Ctrl+Shift+S registered successfully"),
+                Err(e) => error!("Failed to register global shortcut: {}", e),
+            }
+
             // Check if already installed - if so, set activation policy immediately
             #[cfg(target_os = "macos")]
             {
@@ -461,6 +478,8 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
             return menu
                 .add_item(CustomMenuItem::new("status", format!("Running on port {}", port)).disabled())
                 .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(CustomMenuItem::new("capture_screen", "Capture Screen Area"))
+                .add_native_item(SystemTrayMenuItem::Separator)
                 .add_item(CustomMenuItem::new("about", "About Porua"))
                 .add_item(CustomMenuItem::new("quit", "Quit"));
         }
@@ -477,6 +496,8 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
 
     menu = menu
         .add_item(CustomMenuItem::new("status", status_text).disabled())
+        .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(CustomMenuItem::new("capture_screen", "Capture Screen Area"))
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(CustomMenuItem::new("about", "About Porua"))
         .add_item(CustomMenuItem::new("quit", "Quit"));
@@ -573,6 +594,16 @@ fn handle_tray_event(app: &tauri::AppHandle, event_id: &str) {
                     } else {
                         info!("Ignoring stop request - server is in {:?} state", current_status);
                     }
+                }
+            });
+        }
+        "capture_screen" => {
+            let app_handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                info!("Screen capture requested from tray");
+                match capture::overlay::create_overlay_window(&app_handle).await {
+                    Ok(_) => info!("Screen capture overlay opened"),
+                    Err(e) => error!("Failed to open capture overlay: {}", e),
                 }
             });
         }

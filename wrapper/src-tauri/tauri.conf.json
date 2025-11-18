@@ -52,6 +52,9 @@
       "dialog": {
         "all": false,
         "save": true
+      },
+      "globalShortcut": {
+        "all": true
       }
     },
     "bundle": {
