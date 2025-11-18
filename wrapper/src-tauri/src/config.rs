@@ -9,6 +9,7 @@ pub struct Config {
     pub version: String,
     pub paths: PathsConfig,
     pub server: ServerConfig,
+    pub llm: LlmConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,6 +38,19 @@ impl Default for ServerConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LlmConfig {
+    pub active_provider: String, // "gemini" or "openai"
+}
+
+impl Default for LlmConfig {
+    fn default() -> Self {
+        Self {
+            active_provider: "gemini".to_string(),
+        }
+    }
+}
+
 impl Config {
     /// Create a new config with default values and platform-specific paths
     pub fn new() -> Result<Self> {
@@ -50,6 +64,7 @@ impl Config {
                 log_dir: paths::get_logs_dir()?,
             },
             server: ServerConfig::default(),
+            llm: LlmConfig::default(),
         })
     }
 
@@ -144,6 +159,21 @@ impl Config {
         self.server.log_level = log_level;
         self.save()
     }
+
+    /// Update active LLM provider
+    pub fn set_active_provider(&mut self, provider: String) -> Result<()> {
+        // Validate provider
+        if provider != "gemini" && provider != "openai" {
+            return Err(anyhow::anyhow!("Invalid provider: must be 'gemini' or 'openai'"));
+        }
+        self.llm.active_provider = provider;
+        self.save()
+    }
+
+    /// Get active LLM provider
+    pub fn get_active_provider(&self) -> &str {
+        &self.llm.active_provider
+    }
 }
 
 #[cfg(test)]
@@ -156,5 +186,107 @@ mod tests {
         assert_eq!(config.server.port, 3000);
         assert_eq!(config.server.pool_size, 2);
         assert_eq!(config.server.log_level, "info");
+    }
+}
+
+#[cfg(test)]
+mod llm_config_tests {
+    use super::*;
+
+    // Test 17: Default LLM config
+    #[test]
+    fn test_default_llm_config() {
+        let config = LlmConfig::default();
+        assert_eq!(config.active_provider, "gemini");
+    }
+
+    // Test 18: Config serialization includes LLM config
+    #[test]
+    fn test_config_serialization() {
+        let config = Config::new().unwrap();
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("active_provider"));
+        assert!(json.contains("gemini"));
+    }
+
+    // Test 19: Config deserialization with LLM config
+    #[test]
+    fn test_config_deserialization() {
+        let json = r#"{
+            "version": "0.1.0",
+            "paths": {
+                "server_binary": "/tmp/server",
+                "model_dir": "/tmp/models",
+                "samples_dir": "/tmp/samples",
+                "espeak_data_dir": "/tmp/espeak",
+                "log_dir": "/tmp/logs"
+            },
+            "server": {
+                "port": 3000,
+                "pool_size": 2,
+                "log_level": "info"
+            },
+            "llm": {
+                "active_provider": "openai"
+            }
+        }"#;
+
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(config.llm.active_provider, "openai");
+    }
+
+    // Test 20: Save and load config with LLM settings
+    #[test]
+    fn test_save_load_llm_config() {
+        // Create temp config
+        let mut config = Config::new().unwrap();
+        config.llm.active_provider = "openai".to_string();
+
+        // Test serialization (save would normally write to file)
+        let json = serde_json::to_string_pretty(&config).unwrap();
+
+        // Deserialize back
+        let loaded: Config = serde_json::from_str(&json).unwrap();
+        assert_eq!(loaded.llm.active_provider, "openai");
+    }
+
+    // Test 21: Set active provider to OpenAI
+    #[test]
+    fn test_set_active_provider_openai() {
+        let mut config = Config::new().unwrap();
+        assert_eq!(config.get_active_provider(), "gemini"); // Default
+
+        // Note: set_active_provider normally saves to file, but we test the logic
+        config.llm.active_provider = "openai".to_string();
+        assert_eq!(config.get_active_provider(), "openai");
+    }
+
+    // Test 22: Set active provider to Gemini
+    #[test]
+    fn test_set_active_provider_gemini() {
+        let mut config = Config::new().unwrap();
+        config.llm.active_provider = "openai".to_string();
+
+        config.llm.active_provider = "gemini".to_string();
+        assert_eq!(config.get_active_provider(), "gemini");
+    }
+
+    // Test 23: Invalid provider validation
+    #[test]
+    fn test_invalid_provider() {
+        let mut config = Config::new().unwrap();
+        let result = config.set_active_provider("invalid".to_string());
+        assert!(result.is_err());
+
+        // Ensure provider wasn't changed
+        assert_eq!(config.get_active_provider(), "gemini");
+    }
+
+    // Test 24: Provider getter
+    #[test]
+    fn test_get_active_provider() {
+        let config = Config::new().unwrap();
+        let provider = config.get_active_provider();
+        assert_eq!(provider, "gemini");
     }
 }

@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+mod api_keys;
 mod config;
 mod installer;
 mod paths;
@@ -16,6 +17,7 @@ use tokio::sync::Mutex;
 use tracing::{error, info};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
+use crate::api_keys::ApiKeyManager;
 use crate::config::Config;
 use crate::installer::Installer;
 use crate::server::{ServerManager, ServerStatus};
@@ -130,6 +132,68 @@ async fn quit_app(app_handle: tauri::AppHandle, state: tauri::State<'_, AppState
     Ok(())
 }
 
+// API Key Management Commands
+
+#[tauri::command]
+async fn get_gemini_key() -> Result<Option<String>, String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.get_gemini_key().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn set_gemini_key(key: String) -> Result<(), String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.set_gemini_key(&key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn validate_gemini_key(key: String) -> Result<bool, String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.validate_gemini_key(&key).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn remove_gemini_key() -> Result<(), String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.remove_gemini_key().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_openai_key() -> Result<Option<String>, String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.get_openai_key().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn set_openai_key(key: String) -> Result<(), String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.set_openai_key(&key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn validate_openai_key(key: String) -> Result<bool, String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.validate_openai_key(&key).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn remove_openai_key() -> Result<(), String> {
+    let manager = ApiKeyManager::new().map_err(|e| e.to_string())?;
+    manager.remove_openai_key().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn get_active_provider() -> Result<String, String> {
+    let config = Config::load().map_err(|e| e.to_string())?;
+    Ok(config.get_active_provider().to_string())
+}
+
+#[tauri::command]
+async fn set_active_provider(provider: String) -> Result<(), String> {
+    let mut config = Config::load().map_err(|e| e.to_string())?;
+    config.set_active_provider(provider).map_err(|e| e.to_string())
+}
+
 fn main() {
     // Initialize logging - use fallback if file logging fails
     let file_logging_result = (|| -> anyhow::Result<()> {
@@ -201,6 +265,16 @@ fn main() {
             close_installer_window,
             get_log_path,
             quit_app,
+            get_gemini_key,
+            set_gemini_key,
+            validate_gemini_key,
+            remove_gemini_key,
+            get_openai_key,
+            set_openai_key,
+            validate_openai_key,
+            remove_openai_key,
+            get_active_provider,
+            set_active_provider,
         ])
         .setup(|app| {
             let app_handle = app.handle();
