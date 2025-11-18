@@ -208,9 +208,220 @@ async function initialize() {
     }
 }
 
+// Settings Screen Management
+function initializeSettingsScreen() {
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const provider = e.target.dataset.provider;
+            switchProviderTab(provider);
+        });
+    });
+
+    // Show/hide password toggles
+    document.querySelectorAll('.toggle-visibility-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const targetId = e.target.dataset.target;
+            togglePasswordVisibility(targetId);
+        });
+    });
+
+    // Validation buttons
+    const validateGeminiBtn = document.getElementById('validate-gemini-btn');
+    const validateOpenAIBtn = document.getElementById('validate-openai-btn');
+
+    if (validateGeminiBtn) {
+        validateGeminiBtn.addEventListener('click', validateAndSaveGemini);
+    }
+    if (validateOpenAIBtn) {
+        validateOpenAIBtn.addEventListener('click', validateAndSaveOpenAI);
+    }
+
+    // Remove buttons
+    const removeGeminiBtn = document.getElementById('remove-gemini-btn');
+    const removeOpenAIBtn = document.getElementById('remove-openai-btn');
+
+    if (removeGeminiBtn) {
+        removeGeminiBtn.addEventListener('click', removeGeminiKey);
+    }
+    if (removeOpenAIBtn) {
+        removeOpenAIBtn.addEventListener('click', removeOpenAIKey);
+    }
+
+    // Provider selection
+    document.querySelectorAll('input[name="provider"]').forEach(radio => {
+        radio.addEventListener('change', saveActiveProvider);
+    });
+
+    // Close button
+    const closeBtn = document.getElementById('close-settings-btn');
+    if (closeBtn) {
+        closeBtn.addEventListener('click', closeSettings);
+    }
+
+    // Load existing settings
+    loadSettings();
+}
+
+function switchProviderTab(provider) {
+    // Update tab buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.provider === provider) {
+            btn.classList.add('active');
+        }
+    });
+
+    // Update content
+    document.querySelectorAll('.provider-content').forEach(content => {
+        content.classList.remove('active');
+        if (content.dataset.provider === provider) {
+            content.classList.add('active');
+        }
+    });
+}
+
+function togglePasswordVisibility(inputId) {
+    const input = document.getElementById(inputId);
+    if (input) {
+        input.type = input.type === 'password' ? 'text' : 'password';
+    }
+}
+
+function showValidationStatus(element, state, message) {
+    element.className = 'validation-status ' + state;
+    element.textContent = message;
+}
+
+async function validateAndSaveGemini() {
+    const key = document.getElementById('gemini-key').value.trim();
+    const statusEl = document.getElementById('gemini-status');
+
+    if (!key) {
+        showValidationStatus(statusEl, 'error', 'Please enter an API key');
+        return;
+    }
+
+    showValidationStatus(statusEl, 'pending', 'Validating...');
+
+    try {
+        const isValid = await invoke('validate_gemini_key', { key });
+
+        if (isValid) {
+            await invoke('set_gemini_key', { key });
+            showValidationStatus(statusEl, 'success', 'Key validated and saved successfully');
+            document.getElementById('remove-gemini-btn').style.display = 'inline-block';
+        } else {
+            showValidationStatus(statusEl, 'error', 'Invalid API key');
+        }
+    } catch (error) {
+        showValidationStatus(statusEl, 'error', `Error: ${error}`);
+    }
+}
+
+async function validateAndSaveOpenAI() {
+    const key = document.getElementById('openai-key').value.trim();
+    const statusEl = document.getElementById('openai-status');
+
+    if (!key) {
+        showValidationStatus(statusEl, 'error', 'Please enter an API key');
+        return;
+    }
+
+    showValidationStatus(statusEl, 'pending', 'Validating...');
+
+    try {
+        const isValid = await invoke('validate_openai_key', { key });
+
+        if (isValid) {
+            await invoke('set_openai_key', { key });
+            showValidationStatus(statusEl, 'success', 'Key validated and saved successfully');
+            document.getElementById('remove-openai-btn').style.display = 'inline-block';
+        } else {
+            showValidationStatus(statusEl, 'error', 'Invalid API key');
+        }
+    } catch (error) {
+        showValidationStatus(statusEl, 'error', `Error: ${error}`);
+    }
+}
+
+async function removeGeminiKey() {
+    const statusEl = document.getElementById('gemini-status');
+
+    try {
+        await invoke('remove_gemini_key');
+        document.getElementById('gemini-key').value = '';
+        document.getElementById('remove-gemini-btn').style.display = 'none';
+        showValidationStatus(statusEl, 'success', 'Key removed successfully');
+    } catch (error) {
+        showValidationStatus(statusEl, 'error', `Error: ${error}`);
+    }
+}
+
+async function removeOpenAIKey() {
+    const statusEl = document.getElementById('openai-status');
+
+    try {
+        await invoke('remove_openai_key');
+        document.getElementById('openai-key').value = '';
+        document.getElementById('remove-openai-btn').style.display = 'none';
+        showValidationStatus(statusEl, 'success', 'Key removed successfully');
+    } catch (error) {
+        showValidationStatus(statusEl, 'error', `Error: ${error}`);
+    }
+}
+
+async function saveActiveProvider() {
+    const selectedProvider = document.querySelector('input[name="provider"]:checked').value;
+
+    try {
+        await invoke('set_active_provider', { provider: selectedProvider });
+        console.log('Active provider set to:', selectedProvider);
+    } catch (error) {
+        console.error('Failed to set active provider:', error);
+    }
+}
+
+async function loadSettings() {
+    try {
+        // Load Gemini key status
+        const geminiKey = await invoke('get_gemini_key');
+        if (geminiKey) {
+            document.getElementById('remove-gemini-btn').style.display = 'inline-block';
+            // Don't populate the input with the actual key for security
+        }
+
+        // Load OpenAI key status
+        const openaiKey = await invoke('get_openai_key');
+        if (openaiKey) {
+            document.getElementById('remove-openai-btn').style.display = 'inline-block';
+            // Don't populate the input with the actual key for security
+        }
+
+        // Load active provider
+        const activeProvider = await invoke('get_active_provider');
+        const providerRadio = document.querySelector(`input[name="provider"][value="${activeProvider}"]`);
+        if (providerRadio) {
+            providerRadio.checked = true;
+        }
+    } catch (error) {
+        console.error('Failed to load settings:', error);
+    }
+}
+
+function closeSettings() {
+    // In a real app, this would close the settings window
+    // For now, just hide the settings screen
+    showScreen('welcome');
+}
+
 // Start the application when DOM is ready
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initialize);
+    document.addEventListener('DOMContentLoaded', () => {
+        initialize();
+        initializeSettingsScreen();
+    });
 } else {
     initialize();
+    initializeSettingsScreen();
 }

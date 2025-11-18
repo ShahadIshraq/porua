@@ -102,6 +102,79 @@
                 <button id="quit-btn" class="primary-btn">Quit</button>
             </div>
         </div>
+
+        <!-- Settings Screen -->
+        <div id="settings-screen" class="screen">
+            <img src="icon.png" alt="Porua" class="app-icon-small">
+            <h1>API Keys</h1>
+            <p class="subtitle">Configure LLM providers for vision features</p>
+
+            <!-- Provider Tabs -->
+            <div class="provider-tabs">
+                <button class="tab-btn active" data-provider="gemini">Google Gemini</button>
+                <button class="tab-btn" data-provider="openai">OpenAI</button>
+            </div>
+
+            <!-- Gemini Tab Content -->
+            <div class="provider-content active" data-provider="gemini">
+                <div class="form-group">
+                    <label for="gemini-key">API Key</label>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="gemini-key" placeholder="Enter Gemini API key" autocomplete="off" spellcheck="false" />
+                        <button type="button" class="toggle-visibility-btn" data-target="gemini-key" title="Show/Hide API Key">👁️</button>
+                    </div>
+                    <small class="help-text">
+                        Get your key from <a href="https://ai.google.dev/gemini-api/docs/api-key" class="external-link">Google AI Studio</a>
+                    </small>
+                </div>
+
+                <div class="validation-status" id="gemini-status"></div>
+
+                <div class="button-group">
+                    <button id="validate-gemini-btn" class="primary-btn">Validate & Save</button>
+                    <button id="remove-gemini-btn" class="secondary-btn" style="display:none;">Remove Key</button>
+                </div>
+            </div>
+
+            <!-- OpenAI Tab Content -->
+            <div class="provider-content" data-provider="openai">
+                <div class="form-group">
+                    <label for="openai-key">API Key</label>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="openai-key" placeholder="Enter OpenAI API key" autocomplete="off" spellcheck="false" />
+                        <button type="button" class="toggle-visibility-btn" data-target="openai-key" title="Show/Hide API Key">👁️</button>
+                    </div>
+                    <small class="help-text">
+                        Get your key from <a href="https://platform.openai.com/api-keys" class="external-link">OpenAI Platform</a>
+                    </small>
+                </div>
+
+                <div class="validation-status" id="openai-status"></div>
+
+                <div class="button-group">
+                    <button id="validate-openai-btn" class="primary-btn">Validate & Save</button>
+                    <button id="remove-openai-btn" class="secondary-btn" style="display:none;">Remove Key</button>
+                </div>
+            </div>
+
+            <!-- Provider Selection -->
+            <div class="provider-selection">
+                <h3>Active Provider</h3>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="provider" value="gemini" checked />
+                        <span>Google Gemini</span>
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="provider" value="openai" />
+                        <span>OpenAI</span>
+                    </label>
+                </div>
+                <small class="help-text">Select which provider to use for vision features</small>
+            </div>
+
+            <button id="close-settings-btn" class="secondary-btn">Close</button>
+        </div>
     </div>
 
     <script src="app.js"></script>

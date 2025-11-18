@@ -524,3 +524,216 @@ button {
         font-size: 60px;
     }
 }
+
+/* Settings Screen Styles */
+
+/* Provider Tabs */
+.provider-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 24px 0;
+    width: 100%;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 12px 16px;
+    background: #f7fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    transition: all 0.2s;
+    color: #4a5568;
+}
+
+.tab-btn:hover {
+    background: #edf2f7;
+    border-color: #cbd5e0;
+}
+
+.tab-btn.active {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-color: #667eea;
+}
+
+/* Provider Content */
+.provider-content {
+    display: none;
+    width: 100%;
+    margin-top: 16px;
+}
+
+.provider-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Form Groups */
+.form-group {
+    margin-bottom: 20px;
+    text-align: left;
+    width: 100%;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #2d3748;
+    font-size: 14px;
+}
+
+/* Password Input Wrapper */
+.password-input-wrapper {
+    position: relative;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.password-input-wrapper input {
+    flex: 1;
+    padding: 12px 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-family: monospace;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.password-input-wrapper input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.toggle-visibility-btn {
+    padding: 10px 14px;
+    background: #f7fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.toggle-visibility-btn:hover {
+    background: #edf2f7;
+    border-color: #cbd5e0;
+}
+
+.toggle-visibility-btn:active {
+    transform: scale(0.95);
+}
+
+/* Help Text */
+.help-text {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #718096;
+}
+
+.external-link {
+    color: #667eea;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.external-link:hover {
+    text-decoration: underline;
+}
+
+/* Validation Status */
+.validation-status {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 16px 0;
+    display: none;
+    text-align: left;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.validation-status.pending {
+    display: block;
+    background: #bee3f8;
+    color: #2c5282;
+    border: 2px solid #90cdf4;
+}
+
+.validation-status.success {
+    display: block;
+    background: #c6f6d5;
+    color: #22543d;
+    border: 2px solid #9ae6b4;
+}
+
+.validation-status.error {
+    display: block;
+    background: #fed7d7;
+    color: #742a2a;
+    border: 2px solid #fc8181;
+}
+
+/* Provider Selection */
+.provider-selection {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 2px solid #e2e8f0;
+    width: 100%;
+}
+
+.provider-selection h3 {
+    font-size: 16px;
+    margin-bottom: 16px;
+    color: #2d3748;
+    text-align: left;
+}
+
+.radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 16px 0;
+}
+
+.radio-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.radio-label:hover {
+    background: #f7fafc;
+    border-color: #cbd5e0;
+}
+
+.radio-label input[type="radio"] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
+.radio-label input[type="radio"]:checked + span {
+    font-weight: 600;
+    color: #667eea;
+}
+
+.radio-label span {
+    font-size: 14px;
+    color: #4a5568;
+}
+
+/* Button adjustments for settings */
+#close-settings-btn {
+    margin-top: 24px;
+}
