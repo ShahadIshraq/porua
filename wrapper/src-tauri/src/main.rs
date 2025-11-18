@@ -225,8 +225,59 @@ async fn get_monitor_info() -> Result<Vec<capture::monitors::MonitorInfo>, Strin
 #[tauri::command]
 async fn save_capture_as(source_path: String, destination_path: String) -> Result<(), String> {
     info!("Saving capture from {} to {}", source_path, destination_path);
-    std::fs::copy(&source_path, &destination_path)
+
+    // Validate source path is a temp capture file
+    let source = std::path::Path::new(&source_path);
+    let temp_dir = std::env::temp_dir();
+
+    // Ensure source is in temp directory and has expected filename pattern
+    if let Some(parent) = source.parent() {
+        if parent != temp_dir {
+            return Err("Invalid source path: must be a temporary capture file".to_string());
+        }
+    } else {
+        return Err("Invalid source path".to_string());
+    }
+
+    // Validate source filename pattern (porua_capture_*)
+    if let Some(filename) = source.file_name().and_then(|n| n.to_str()) {
+        if !filename.starts_with("porua_capture_") || !filename.ends_with(".png") {
+            return Err("Invalid source file: not a valid capture file".to_string());
+        }
+    } else {
+        return Err("Invalid source filename".to_string());
+    }
+
+    // Validate destination path
+    let dest = std::path::Path::new(&destination_path);
+
+    // Canonicalize destination to resolve any .. or . components
+    // This prevents path traversal attacks
+    let dest_canonical = match dest.parent() {
+        Some(parent) => {
+            // Check if parent directory exists
+            if !parent.exists() {
+                return Err("Destination directory does not exist".to_string());
+            }
+            // Get canonical path of parent
+            match parent.canonicalize() {
+                Ok(canonical_parent) => canonical_parent.join(dest.file_name().unwrap()),
+                Err(_) => return Err("Invalid destination path".to_string()),
+            }
+        }
+        None => return Err("Invalid destination path".to_string()),
+    };
+
+    // Ensure destination has .png extension
+    if dest_canonical.extension().and_then(|e| e.to_str()) != Some("png") {
+        return Err("Destination must be a .png file".to_string());
+    }
+
+    // Perform the copy with validated paths
+    std::fs::copy(&source_path, &dest_canonical)
         .map_err(|e| format!("Failed to save file: {}", e))?;
+
+    info!("Successfully saved to {}", dest_canonical.display());
     Ok(())
 }
 
