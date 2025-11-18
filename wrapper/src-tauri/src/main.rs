@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+mod api_keys;
 mod config;
 mod installer;
 mod paths;
