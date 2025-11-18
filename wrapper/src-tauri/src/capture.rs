@@ -250,11 +250,22 @@ mod windows_backend {
 
                 let _ = GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y);
 
-                dpi_x as f64 / 96.0
+                // Use average of X and Y DPI in case they differ (rare but possible)
+                ((dpi_x as f64 + dpi_y as f64) / 2.0) / 96.0
             }
         }
 
         fn capture_region_pixels(&self, rect: Rect) -> Result<ImageBuffer<Rgba<u8>, Vec<u8>>, CaptureError> {
+            // Validate that rect is within screen bounds before attempting capture
+            let bounds = self.get_virtual_screen_bounds();
+            if rect.x < bounds.x
+                || rect.y < bounds.y
+                || rect.x + rect.width as i32 > bounds.x + bounds.width as i32
+                || rect.y + rect.height as i32 > bounds.y + bounds.height as i32
+            {
+                return Err(CaptureError::OutOfBounds);
+            }
+
             // SAFETY: This function uses Windows GDI APIs to capture screen content.
             // All GDI resources are properly managed with cleanup on all code paths:
             // - screen_dc: Released via ReleaseDC on all error paths and success path
@@ -339,7 +350,13 @@ mod windows_backend {
                 };
 
                 // Allocate buffer for pixel data
-                let buffer_size = (rect.width * rect.height * 4) as usize;
+                // Use checked arithmetic to prevent integer overflow on very large captures
+                let buffer_size = (rect.width as usize)
+                    .checked_mul(rect.height as usize)
+                    .and_then(|size| size.checked_mul(4))
+                    .ok_or_else(|| CaptureError::CaptureFailure(
+                        "Image dimensions too large for buffer allocation".to_string()
+                    ))?;
                 let mut buffer: Vec<u8> = vec![0; buffer_size];
 
                 // Get the bitmap bits
@@ -429,7 +446,8 @@ mod windows_backend {
             let mut dpi_x: u32 = 96;
             let mut dpi_y: u32 = 96;
             let _ = GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi_x, &mut dpi_y);
-            let dpi_scale = dpi_x as f64 / 96.0;
+            // Use average of X and Y DPI in case they differ (rare but possible)
+            let dpi_scale = ((dpi_x as f64 + dpi_y as f64) / 2.0) / 96.0;
 
             // Get monitor name
             let name_slice = &monitor_info.szDevice;
@@ -609,13 +627,28 @@ impl<B: ScreenBackend> ScreenCapture<B> {
     }
 
     /// Apply DPI scaling to convert logical coordinates to physical pixels
-    pub fn apply_dpi_scaling(rect: Rect, scale: f64) -> Rect {
-        Rect::new(
+    ///
+    /// # Arguments
+    /// * `rect` - The rectangle in logical coordinates
+    /// * `scale` - DPI scale factor (typically 1.0 to 4.0)
+    ///
+    /// # Returns
+    /// Scaled rectangle, or error if scale is invalid
+    pub fn apply_dpi_scaling(rect: Rect, scale: f64) -> Result<Rect, CaptureError> {
+        // Validate scale is within reasonable bounds
+        // DPI scaling typically ranges from 100% (1.0) to 400% (4.0)
+        if scale <= 0.0 || scale > 10.0 {
+            return Err(CaptureError::CaptureFailure(
+                format!("Invalid DPI scale factor: {}. Expected 0.0 < scale <= 10.0", scale)
+            ));
+        }
+
+        Ok(Rect::new(
             (rect.x as f64 * scale) as i32,
             (rect.y as f64 * scale) as i32,
             (rect.width as f64 * scale) as u32,
             (rect.height as f64 * scale) as u32,
-        )
+        ))
     }
 
     /// Clean up old capture files from the temp directory
@@ -682,7 +715,7 @@ impl<B: ScreenBackend> ScreenCapture<B> {
         debug!("DPI scale factor: {}", dpi_scale);
 
         // Apply DPI scaling to get physical pixel coordinates
-        let physical_rect = Self::apply_dpi_scaling(validated_rect, dpi_scale);
+        let physical_rect = Self::apply_dpi_scaling(validated_rect, dpi_scale)?;
 
         // Capture the screen region
         let image_data = self.backend.capture_region_pixels(physical_rect)?;
@@ -805,7 +838,7 @@ mod tests {
     #[test]
     fn test_apply_dpi_scaling_100_percent() {
         let rect = Rect::new(100, 200, 300, 400);
-        let scaled = ScreenCapture::<MockScreenBackend>::apply_dpi_scaling(rect, 1.0);
+        let scaled = ScreenCapture::<MockScreenBackend>::apply_dpi_scaling(rect, 1.0).unwrap();
 
         assert_eq!(scaled.x, 100);
         assert_eq!(scaled.y, 200);
@@ -816,7 +849,7 @@ mod tests {
     #[test]
     fn test_apply_dpi_scaling_150_percent() {
         let rect = Rect::new(100, 200, 300, 400);
-        let scaled = ScreenCapture::<MockScreenBackend>::apply_dpi_scaling(rect, 1.5);
+        let scaled = ScreenCapture::<MockScreenBackend>::apply_dpi_scaling(rect, 1.5).unwrap();
 
         assert_eq!(scaled.x, 150);
         assert_eq!(scaled.y, 300);
@@ -827,7 +860,7 @@ mod tests {
     #[test]
     fn test_apply_dpi_scaling_200_percent() {
         let rect = Rect::new(100, 200, 300, 400);
-        let scaled = ScreenCapture::<MockScreenBackend>::apply_dpi_scaling(rect, 2.0);
+        let scaled = ScreenCapture::<MockScreenBackend>::apply_dpi_scaling(rect, 2.0).unwrap();
 
         assert_eq!(scaled.x, 200);
         assert_eq!(scaled.y, 400);
@@ -838,12 +871,33 @@ mod tests {
     #[test]
     fn test_apply_dpi_scaling_125_percent() {
         let rect = Rect::new(100, 200, 300, 400);
-        let scaled = ScreenCapture::<MockScreenBackend>::apply_dpi_scaling(rect, 1.25);
+        let scaled = ScreenCapture::<MockScreenBackend>::apply_dpi_scaling(rect, 1.25).unwrap();
 
         assert_eq!(scaled.x, 125);
         assert_eq!(scaled.y, 250);
         assert_eq!(scaled.width, 375);
         assert_eq!(scaled.height, 500);
+    }
+
+    #[test]
+    fn test_apply_dpi_scaling_invalid_zero() {
+        let rect = Rect::new(100, 200, 300, 400);
+        let result = ScreenCapture::<MockScreenBackend>::apply_dpi_scaling(rect, 0.0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_apply_dpi_scaling_invalid_negative() {
+        let rect = Rect::new(100, 200, 300, 400);
+        let result = ScreenCapture::<MockScreenBackend>::apply_dpi_scaling(rect, -1.0);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_apply_dpi_scaling_invalid_too_large() {
+        let rect = Rect::new(100, 200, 300, 400);
+        let result = ScreenCapture::<MockScreenBackend>::apply_dpi_scaling(rect, 11.0);
+        assert!(result.is_err());
     }
 
     // ==================== Validation Tests ====================
