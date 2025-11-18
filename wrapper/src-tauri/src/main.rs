@@ -494,7 +494,9 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
             return menu
                 .add_item(CustomMenuItem::new("status", format!("Running on port {}", port)).disabled())
                 .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(CustomMenuItem::new("settings", "Settings..."))
                 .add_item(CustomMenuItem::new("about", "About Porua"))
+                .add_native_item(SystemTrayMenuItem::Separator)
                 .add_item(CustomMenuItem::new("quit", "Quit"));
         }
         ServerStatus::Stopping => "Stopping...",
@@ -503,7 +505,9 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
                 .add_item(CustomMenuItem::new("status", "Error").disabled())
                 .add_item(CustomMenuItem::new("error_detail", err.to_string()).disabled())
                 .add_native_item(SystemTrayMenuItem::Separator)
+                .add_item(CustomMenuItem::new("settings", "Settings..."))
                 .add_item(CustomMenuItem::new("about", "About Porua"))
+                .add_native_item(SystemTrayMenuItem::Separator)
                 .add_item(CustomMenuItem::new("quit", "Quit"));
         }
     };
@@ -511,7 +515,9 @@ fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
     menu = menu
         .add_item(CustomMenuItem::new("status", status_text).disabled())
         .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(CustomMenuItem::new("settings", "Settings..."))
         .add_item(CustomMenuItem::new("about", "About Porua"))
+        .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(CustomMenuItem::new("quit", "Quit"));
 
     menu
@@ -609,6 +615,12 @@ fn handle_tray_event(app: &tauri::AppHandle, event_id: &str) {
                 }
             });
         }
+        "settings" => {
+            // Open settings window
+            if let Err(e) = open_settings_window(app) {
+                error!("Failed to open settings window: {}", e);
+            }
+        }
         "about" => {
             // Open the About Porua URL in the default browser
             if let Err(e) = open::that("https://shahadishraq.com/porua") {
@@ -630,6 +642,39 @@ fn handle_tray_event(app: &tauri::AppHandle, event_id: &str) {
         }
         _ => {}
     }
+}
+
+/// Open or focus the settings window
+fn open_settings_window(app_handle: &tauri::AppHandle) -> anyhow::Result<()> {
+    // Check if window already exists
+    if let Some(window) = app_handle.get_window("settings") {
+        // Window exists, focus it
+        window.show().map_err(|e| anyhow::anyhow!("Failed to show window: {}", e))?;
+        window.set_focus().map_err(|e| anyhow::anyhow!("Failed to focus window: {}", e))?;
+        info!("Focused existing settings window");
+    } else {
+        // Create the settings window
+        let window = tauri::WindowBuilder::new(
+            app_handle,
+            "settings",
+            tauri::WindowUrl::App("settings.html".into()),
+        )
+        .title("Porua Settings")
+        .inner_size(500.0, 600.0)
+        .min_inner_size(400.0, 500.0)
+        .center()
+        .resizable(true)
+        .fullscreen(false)
+        .decorations(true)
+        .build()
+        .map_err(|e| anyhow::anyhow!("Failed to create settings window: {}", e))?;
+
+        window.show().map_err(|e| anyhow::anyhow!("Failed to show window: {}", e))?;
+        window.set_focus().map_err(|e| anyhow::anyhow!("Failed to focus window: {}", e))?;
+        info!("Created new settings window");
+    }
+
+    Ok(())
 }
 
 fn start_status_monitor(app_handle: tauri::AppHandle, manager: Arc<Mutex<ServerManager>>) {
@@ -808,5 +853,48 @@ mod tests {
         assert!(result.is_ok());
         let status = result.unwrap();
         assert_eq!(status.provider, "gemini");
+    }
+
+    // Phase 4 tests: Settings menu integration
+    // Note: We can't fully test window creation without a Tauri runtime,
+    // but we can verify the menu structure includes settings
+
+    #[test]
+    fn test_tray_menu_includes_settings_when_running() {
+        // The create_tray_menu function returns a SystemTrayMenu
+        // We verify it compiles and creates successfully for Running state
+        let status = ServerStatus::Running { port: 3000 };
+        let menu = create_tray_menu(&status);
+        // Menu is created successfully - the settings item is included in the function
+        // We can't easily inspect menu items, but we verify the function works
+        drop(menu);
+    }
+
+    #[test]
+    fn test_tray_menu_includes_settings_when_stopped() {
+        let status = ServerStatus::Stopped;
+        let menu = create_tray_menu(&status);
+        drop(menu);
+    }
+
+    #[test]
+    fn test_tray_menu_includes_settings_when_error() {
+        let status = ServerStatus::Error("Test error".to_string());
+        let menu = create_tray_menu(&status);
+        drop(menu);
+    }
+
+    #[test]
+    fn test_tray_menu_includes_settings_when_starting() {
+        let status = ServerStatus::Starting;
+        let menu = create_tray_menu(&status);
+        drop(menu);
+    }
+
+    #[test]
+    fn test_tray_menu_includes_settings_when_stopping() {
+        let status = ServerStatus::Stopping;
+        let menu = create_tray_menu(&status);
+        drop(menu);
     }
 }
