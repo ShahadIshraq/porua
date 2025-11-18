@@ -28,6 +28,9 @@ open = "5.0"
 keyring = "2"
 once_cell = "1.19"
 
+[dev-dependencies]
+serial_test = "3.0"
+
 [features]
 default = ["custom-protocol"]
 custom-protocol = ["tauri/custom-protocol"]

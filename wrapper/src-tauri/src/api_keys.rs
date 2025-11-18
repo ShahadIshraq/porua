@@ -1,5 +1,4 @@
 use anyhow::{Context, Result};
-use keyring::Entry;
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
@@ -96,51 +95,135 @@ pub struct KeyStatus {
     pub masked_key: Option<String>,
 }
 
+/// Trait for secure key storage backends
+/// This abstraction allows for mocking in tests
+pub trait KeyStorage: Send + Sync {
+    fn store(&self, key_id: &str, value: &str) -> Result<()>;
+    fn get(&self, key_id: &str) -> Result<Option<String>>;
+    fn delete(&self, key_id: &str) -> Result<()>;
+}
+
+/// Production implementation using system keyring
+pub struct SystemKeyring;
+
+impl KeyStorage for SystemKeyring {
+    fn store(&self, key_id: &str, value: &str) -> Result<()> {
+        let entry = keyring::Entry::new(KEYRING_SERVICE, key_id)
+            .context("Failed to create keyring entry")?;
+        entry
+            .set_password(value)
+            .context("Failed to store in keychain")?;
+        Ok(())
+    }
+
+    fn get(&self, key_id: &str) -> Result<Option<String>> {
+        let entry = keyring::Entry::new(KEYRING_SERVICE, key_id)
+            .context("Failed to create keyring entry")?;
+        match entry.get_password() {
+            Ok(value) => Ok(Some(value)),
+            Err(keyring::Error::NoEntry) => Ok(None),
+            Err(e) => Err(anyhow::anyhow!("Failed to retrieve from keychain: {}", e)),
+        }
+    }
+
+    fn delete(&self, key_id: &str) -> Result<()> {
+        let entry = keyring::Entry::new(KEYRING_SERVICE, key_id)
+            .context("Failed to create keyring entry")?;
+        match entry.delete_password() {
+            Ok(()) => Ok(()),
+            Err(keyring::Error::NoEntry) => Ok(()), // Already deleted
+            Err(e) => Err(anyhow::anyhow!("Failed to delete from keychain: {}", e)),
+        }
+    }
+}
+
+/// Mock implementation of KeyStorage for testing
+#[cfg(test)]
+pub mod mock {
+    use super::*;
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    pub struct MockKeyStorage {
+        store: Mutex<HashMap<String, String>>,
+    }
+
+    impl MockKeyStorage {
+        pub fn new() -> Self {
+            Self {
+                store: Mutex::new(HashMap::new()),
+            }
+        }
+
+        /// Clear all stored keys (for test isolation)
+        pub fn clear(&self) {
+            self.store.lock().unwrap().clear();
+        }
+    }
+
+    impl KeyStorage for MockKeyStorage {
+        fn store(&self, key_id: &str, value: &str) -> Result<()> {
+            self.store
+                .lock()
+                .unwrap()
+                .insert(key_id.to_string(), value.to_string());
+            Ok(())
+        }
+
+        fn get(&self, key_id: &str) -> Result<Option<String>> {
+            Ok(self.store.lock().unwrap().get(key_id).cloned())
+        }
+
+        fn delete(&self, key_id: &str) -> Result<()> {
+            self.store.lock().unwrap().remove(key_id);
+            Ok(())
+        }
+    }
+}
+
+/// Global storage backend - uses SystemKeyring in production
+/// In tests, this uses MockKeyStorage
+#[cfg(not(test))]
+fn get_storage() -> &'static dyn KeyStorage {
+    static STORAGE: SystemKeyring = SystemKeyring;
+    &STORAGE
+}
+
+#[cfg(test)]
+fn get_storage() -> &'static mock::MockKeyStorage {
+    use std::sync::OnceLock;
+    static STORAGE: OnceLock<mock::MockKeyStorage> = OnceLock::new();
+    STORAGE.get_or_init(mock::MockKeyStorage::new)
+}
+
 /// Store an API key securely in the system keychain
 pub fn store_api_key(provider: Provider, key: &str) -> Result<()> {
-    let entry = Entry::new(KEYRING_SERVICE, provider.key_id())
-        .context("Failed to create keyring entry")?;
-
-    entry
-        .set_password(key)
-        .context("Failed to store API key in keychain")?;
-
+    get_storage().store(provider.key_id(), key)?;
     info!("Stored API key for provider: {:?}", provider);
     Ok(())
 }
 
 /// Retrieve an API key from the system keychain
 pub fn get_api_key(provider: Provider) -> Result<Option<String>> {
-    let entry = Entry::new(KEYRING_SERVICE, provider.key_id())
-        .context("Failed to create keyring entry")?;
-
-    match entry.get_password() {
-        Ok(key) => Ok(Some(key)),
-        Err(keyring::Error::NoEntry) => Ok(None),
+    match get_storage().get(provider.key_id()) {
+        Ok(key) => Ok(key),
         Err(e) => {
             error!("Failed to retrieve API key for {:?}: {}", provider, e);
-            Err(anyhow::anyhow!("Failed to retrieve API key: {}", e))
+            Err(e)
         }
     }
 }
 
 /// Delete an API key from the system keychain
 pub fn delete_api_key(provider: Provider) -> Result<()> {
-    let entry = Entry::new(KEYRING_SERVICE, provider.key_id())
-        .context("Failed to create keyring entry")?;
-
-    match entry.delete_password() {
+    match get_storage().delete(provider.key_id()) {
         Ok(()) => {
             info!("Deleted API key for provider: {:?}", provider);
             Ok(())
         }
-        Err(keyring::Error::NoEntry) => {
-            // Key doesn't exist, that's fine
-            Ok(())
-        }
         Err(e) => {
             error!("Failed to delete API key for {:?}: {}", provider, e);
-            Err(anyhow::anyhow!("Failed to delete API key: {}", e))
+            Err(e)
         }
     }
 }
@@ -278,6 +361,12 @@ pub async fn validate_and_store_api_key(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
+
+    /// Helper to clear mock storage before each test
+    fn setup_test() {
+        get_storage().clear();
+    }
 
     #[test]
     fn test_key_identifier_format() {
@@ -360,15 +449,13 @@ mod tests {
         assert_eq!(masked2, "ABCD••••••••end!");
     }
 
-    // Integration tests for keyring operations
-    // These tests interact with the actual system keychain
-    // They are marked #[ignore] because they require user authorization on macOS
-    // Run with: cargo test api_keys -- --ignored
+    // Storage tests using mock
+    // These tests use #[serial] to ensure they run serially and don't interfere
 
     #[test]
-    #[ignore = "Requires keychain access - run manually with --ignored"]
+    #[serial]
     fn test_store_and_get_api_key() {
-        // Use a test key that won't conflict with real keys
+        setup_test();
         let test_key = "test-key-12345";
 
         // Store the key
@@ -379,16 +466,12 @@ mod tests {
         let get_result = get_api_key(Provider::Gemini);
         assert!(get_result.is_ok(), "Failed to get key: {:?}", get_result);
         assert_eq!(get_result.unwrap(), Some(test_key.to_string()));
-
-        // Clean up
-        let _ = delete_api_key(Provider::Gemini);
     }
 
     #[test]
-    #[ignore = "Requires keychain access - run manually with --ignored"]
+    #[serial]
     fn test_get_nonexistent_key() {
-        // First ensure the key doesn't exist
-        let _ = delete_api_key(Provider::OpenAI);
+        setup_test();
 
         // Try to get a key that doesn't exist
         let result = get_api_key(Provider::OpenAI);
@@ -397,11 +480,13 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires keychain access - run manually with --ignored"]
+    #[serial]
     fn test_delete_api_key() {
-        // Store a key first
+        setup_test();
         let test_key = "test-key-to-delete";
-        let _ = store_api_key(Provider::OpenAI, test_key);
+
+        // Store a key first
+        store_api_key(Provider::OpenAI, test_key).unwrap();
 
         // Delete the key
         let delete_result = delete_api_key(Provider::OpenAI);
@@ -414,10 +499,9 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires keychain access - run manually with --ignored"]
+    #[serial]
     fn test_delete_nonexistent_key() {
-        // Ensure key doesn't exist
-        let _ = delete_api_key(Provider::Gemini);
+        setup_test();
 
         // Deleting non-existent key should succeed (idempotent)
         let result = delete_api_key(Provider::Gemini);
@@ -425,26 +509,24 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires keychain access - run manually with --ignored"]
+    #[serial]
     fn test_has_api_key_true() {
-        // Store a key
+        setup_test();
         let test_key = "test-key-has";
-        let _ = store_api_key(Provider::Gemini, test_key);
+
+        // Store a key
+        store_api_key(Provider::Gemini, test_key).unwrap();
 
         // Check it exists
         let result = has_api_key(Provider::Gemini);
         assert!(result.is_ok());
         assert!(result.unwrap());
-
-        // Clean up
-        let _ = delete_api_key(Provider::Gemini);
     }
 
     #[test]
-    #[ignore = "Requires keychain access - run manually with --ignored"]
+    #[serial]
     fn test_has_api_key_false() {
-        // Ensure key doesn't exist
-        let _ = delete_api_key(Provider::OpenAI);
+        setup_test();
 
         // Check it doesn't exist
         let result = has_api_key(Provider::OpenAI);
@@ -453,11 +535,13 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Requires keychain access - run manually with --ignored"]
+    #[serial]
     fn test_get_key_status_configured() {
-        // Store a key
+        setup_test();
         let test_key = "sk-testapikey1234567890";
-        let _ = store_api_key(Provider::Gemini, test_key);
+
+        // Store a key
+        store_api_key(Provider::Gemini, test_key).unwrap();
 
         // Get status
         let result = get_key_status(Provider::Gemini);
@@ -471,18 +555,14 @@ mod tests {
         let masked = status.masked_key.unwrap();
         assert!(masked.contains("••••••••"));
         assert!(masked.starts_with("sk-t"));
-
-        // Clean up
-        let _ = delete_api_key(Provider::Gemini);
     }
 
     #[test]
-    #[ignore = "Requires keychain access - run manually with --ignored"]
+    #[serial]
     fn test_get_key_status_not_configured() {
-        // Ensure key doesn't exist
-        let _ = delete_api_key(Provider::OpenAI);
+        setup_test();
 
-        // Get status
+        // Get status for non-existent key
         let result = get_key_status(Provider::OpenAI);
         assert!(result.is_ok());
 
@@ -490,6 +570,41 @@ mod tests {
         assert_eq!(status.provider, "openai");
         assert!(!status.configured);
         assert!(status.masked_key.is_none());
+    }
+
+    #[test]
+    #[serial]
+    fn test_store_overwrites_existing_key() {
+        setup_test();
+
+        // Store initial key
+        store_api_key(Provider::Gemini, "initial-key").unwrap();
+
+        // Overwrite with new key
+        store_api_key(Provider::Gemini, "new-key").unwrap();
+
+        // Verify new key is stored
+        let result = get_api_key(Provider::Gemini).unwrap();
+        assert_eq!(result, Some("new-key".to_string()));
+    }
+
+    #[test]
+    #[serial]
+    fn test_different_providers_independent() {
+        setup_test();
+
+        // Store keys for both providers
+        store_api_key(Provider::Gemini, "gemini-key").unwrap();
+        store_api_key(Provider::OpenAI, "openai-key").unwrap();
+
+        // Verify they're independent
+        assert_eq!(get_api_key(Provider::Gemini).unwrap(), Some("gemini-key".to_string()));
+        assert_eq!(get_api_key(Provider::OpenAI).unwrap(), Some("openai-key".to_string()));
+
+        // Delete one, other should remain
+        delete_api_key(Provider::Gemini).unwrap();
+        assert_eq!(get_api_key(Provider::Gemini).unwrap(), None);
+        assert_eq!(get_api_key(Provider::OpenAI).unwrap(), Some("openai-key".to_string()));
     }
 
     // Async validation tests
@@ -541,9 +656,8 @@ mod tests {
         assert!(!openai_result.unwrap().valid);
     }
 
-    // Note: Tests for actual API validation with invalid keys would make real network calls
-    // These are integration tests that verify the validation logic works correctly
-    // They will fail with auth errors which is the expected behavior for invalid keys
+    // Note: Tests for actual API validation with invalid keys make real network calls
+    // These verify the validation logic works correctly with actual API responses
     #[tokio::test]
     async fn test_validate_gemini_invalid_key() {
         let result = validate_gemini_key("invalid-key-12345").await;
