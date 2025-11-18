@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Capture Preview</title>
+    <link rel="stylesheet" href="preview.css">
+</head>
+<body>
+    <div id="preview-container">
+        <div id="image-wrapper">
+            <img id="preview-image" alt="Captured screenshot" />
+            <div id="loading-indicator">
+                <div class="spinner"></div>
+                <span>Loading image...</span>
+            </div>
+        </div>
+
+        <div id="toolbar">
+            <div id="image-info">
+                <span id="dimensions"></span>
+                <span id="file-size"></span>
+            </div>
+
+            <div id="actions">
+                <button id="btn-recapture" class="btn btn-secondary" title="Take another capture (R)">
+                    Recapture
+                </button>
+                <button id="btn-save" class="btn btn-primary" title="Save to file (Ctrl+S)">
+                    Save As...
+                </button>
+                <button id="btn-close" class="btn btn-secondary" title="Close preview (Esc)">
+                    Close
+                </button>
+            </div>
+        </div>
+
+        <div id="zoom-controls">
+            <button id="btn-zoom-out" class="zoom-btn" title="Zoom out (-)">-</button>
+            <span id="zoom-level">100%</span>
+            <button id="btn-zoom-in" class="zoom-btn" title="Zoom in (+)">+</button>
+            <button id="btn-zoom-fit" class="zoom-btn" title="Fit to window (F)">Fit</button>
+            <button id="btn-zoom-actual" class="zoom-btn" title="Actual size (1)">1:1</button>
+        </div>
+
+        <div id="error-toast" class="toast hidden">
+            <span id="error-message"></span>
+        </div>
+
+        <div id="success-toast" class="toast toast-success hidden">
+            <span id="success-message"></span>
+        </div>
+    </div>
+
+    <script src="preview.js"></script>
+</body>
+</html>

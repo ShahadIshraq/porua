@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+mod capture;
 mod config;
 mod installer;
 mod paths;
@@ -10,12 +11,17 @@ mod server;
 
 use std::sync::Arc;
 use tauri::{
-    CustomMenuItem, Icon, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
+    CustomMenuItem, GlobalShortcutManager, Icon, Manager, SystemTray, SystemTrayEvent,
+    SystemTrayMenu, SystemTrayMenuItem,
 };
 use tokio::sync::Mutex;
 use tracing::{error, info};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
+use crate::capture::{
+    CaptureResult, MockScreenBackend, MonitorInfo, Rect, ScreenCapture,
+    get_monitors_native, get_virtual_screen_bounds_native, check_permission_native,
+};
 use crate::config::Config;
 use crate::installer::Installer;
 use crate::server::{ServerManager, ServerStatus};
@@ -130,6 +136,213 @@ async fn quit_app(app_handle: tauri::AppHandle, state: tauri::State<'_, AppState
     Ok(())
 }
 
+// ==================== Screen Capture Commands ====================
+
+#[tauri::command]
+async fn get_monitors_info() -> Result<Vec<MonitorInfo>, String> {
+    info!("get_monitors_info command called");
+    get_monitors_native().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn start_capture_mode(app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("start_capture_mode command called");
+
+    // Hide main window if it exists
+    if let Some(window) = app_handle.get_window("main") {
+        let _ = window.hide();
+    }
+
+    // Check if overlay already exists
+    if app_handle.get_window("capture-overlay").is_some() {
+        info!("Capture overlay already exists");
+        return Ok(());
+    }
+
+    // Create the overlay window
+    let overlay = tauri::WindowBuilder::new(
+        &app_handle,
+        "capture-overlay",
+        tauri::WindowUrl::App("overlay.html".into()),
+    )
+    .title("Screen Capture")
+    .fullscreen(true)
+    .transparent(true)
+    .decorations(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .build()
+    .map_err(|e| format!("Failed to create overlay window: {}", e))?;
+
+    overlay.show().map_err(|e| e.to_string())?;
+    overlay.set_focus().map_err(|e| e.to_string())?;
+
+    info!("Capture overlay window created");
+    Ok(())
+}
+
+#[tauri::command]
+async fn cancel_capture(app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("cancel_capture command called");
+
+    // Close overlay window
+    if let Some(overlay) = app_handle.get_window("capture-overlay") {
+        overlay.close().map_err(|e| e.to_string())?;
+    }
+
+    // Show main window again if it exists
+    if let Some(main_window) = app_handle.get_window("main") {
+        let _ = main_window.show();
+        let _ = main_window.set_focus();
+    }
+
+    info!("Capture cancelled");
+    Ok(())
+}
+
+#[tauri::command]
+async fn capture_screen_region(
+    app_handle: tauri::AppHandle,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<CaptureResult, String> {
+    info!(
+        "capture_screen_region command called: x={}, y={}, width={}, height={}",
+        x, y, width, height
+    );
+
+    // Get temp directory for captures
+    let temp_dir = paths::get_app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("captures");
+
+    // Use mock backend on non-Windows platforms, real backend on Windows
+    #[cfg(target_os = "windows")]
+    let capture = crate::capture::create_screen_capture(temp_dir);
+
+    #[cfg(not(target_os = "windows"))]
+    let capture = ScreenCapture::with_backend(MockScreenBackend::new(), temp_dir);
+
+    let rect = Rect::new(x, y, width, height);
+
+    // Close overlay window before capturing
+    if let Some(overlay) = app_handle.get_window("capture-overlay") {
+        overlay.close().map_err(|e| e.to_string())?;
+    }
+
+    // Small delay to ensure overlay is fully closed
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
+    // Perform capture
+    let result = capture.capture_region(rect).map_err(|e| e.to_string())?;
+
+    info!("Screen region captured successfully: {:?}", result.file_path);
+    Ok(result)
+}
+
+#[tauri::command]
+async fn open_preview_window(
+    app_handle: tauri::AppHandle,
+    image_path: String,
+    timestamp: String,
+) -> Result<(), String> {
+    info!("open_preview_window command called: {}", image_path);
+
+    // Check if preview window already exists
+    if let Some(existing) = app_handle.get_window("capture-preview") {
+        existing.close().map_err(|e| e.to_string())?;
+    }
+
+    // Create preview window
+    let preview = tauri::WindowBuilder::new(
+        &app_handle,
+        "capture-preview",
+        tauri::WindowUrl::App("preview.html".into()),
+    )
+    .title(format!("Capture - {}", timestamp))
+    .inner_size(800.0, 600.0)
+    .min_inner_size(400.0, 300.0)
+    .resizable(true)
+    .center()
+    .build()
+    .map_err(|e| format!("Failed to create preview window: {}", e))?;
+
+    preview.show().map_err(|e| e.to_string())?;
+    preview.set_focus().map_err(|e| e.to_string())?;
+
+    // Emit the image path to the preview window
+    preview
+        .emit("load-image", &image_path)
+        .map_err(|e| e.to_string())?;
+
+    info!("Preview window opened");
+    Ok(())
+}
+
+#[tauri::command]
+async fn save_captured_image(
+    app_handle: tauri::AppHandle,
+    source_path: String,
+) -> Result<String, String> {
+    info!("save_captured_image command called: {}", source_path);
+
+    use tauri::api::dialog::blocking::FileDialogBuilder;
+
+    // Show save dialog
+    let save_path = FileDialogBuilder::new()
+        .add_filter("PNG Image", &["png"])
+        .set_file_name("capture.png")
+        .save_file();
+
+    match save_path {
+        Some(path) => {
+            // Copy file to selected location
+            std::fs::copy(&source_path, &path).map_err(|e| {
+                error!("Failed to save image: {}", e);
+                format!("Failed to save image: {}", e)
+            })?;
+
+            info!("Image saved to: {:?}", path);
+            Ok(path.to_string_lossy().to_string())
+        }
+        None => {
+            info!("Save dialog cancelled");
+            Err("Save cancelled".to_string())
+        }
+    }
+}
+
+#[tauri::command]
+async fn check_capture_permission() -> Result<bool, String> {
+    info!("check_capture_permission command called");
+    check_permission_native().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn get_virtual_screen_bounds() -> Rect {
+    get_virtual_screen_bounds_native()
+}
+
+#[tauri::command]
+async fn cleanup_old_captures() -> Result<usize, String> {
+    info!("cleanup_old_captures command called");
+
+    let temp_dir = paths::get_app_data_dir()
+        .map_err(|e| e.to_string())?
+        .join("captures");
+
+    #[cfg(target_os = "windows")]
+    let capture = crate::capture::create_screen_capture(temp_dir);
+
+    #[cfg(not(target_os = "windows"))]
+    let capture = ScreenCapture::with_backend(MockScreenBackend::new(), temp_dir);
+
+    // Clean up captures older than 24 hours
+    capture.cleanup_old_captures(24).map_err(|e| e.to_string())
+}
+
 fn main() {
     // Initialize logging - use fallback if file logging fails
     let file_logging_result = (|| -> anyhow::Result<()> {
@@ -201,6 +414,16 @@ fn main() {
             close_installer_window,
             get_log_path,
             quit_app,
+            // Screen capture commands
+            get_monitors_info,
+            start_capture_mode,
+            cancel_capture,
+            capture_screen_region,
+            open_preview_window,
+            save_captured_image,
+            check_capture_permission,
+            get_virtual_screen_bounds,
+            cleanup_old_captures,
         ])
         .setup(|app| {
             let app_handle = app.handle();
@@ -218,6 +441,9 @@ fn main() {
 
             // Note: No window is created initially (windows: [] in tauri.conf.json)
             // Windows are created programmatically only when needed (e.g., for installation)
+
+            // Register global keyboard shortcut for screen capture
+            register_capture_shortcut(&app_handle);
 
             // Spawn async setup
             tauri::async_runtime::spawn(async move {
@@ -283,6 +509,22 @@ async fn setup_app(app_handle: tauri::AppHandle) -> anyhow::Result<()> {
 
     // Already installed - proceed normally
 
+    // Clean up old capture files on startup (captures older than 24 hours)
+    let temp_dir = paths::get_app_data_dir()?.join("captures");
+    if temp_dir.exists() {
+        #[cfg(target_os = "windows")]
+        let capture = crate::capture::create_screen_capture(temp_dir.clone());
+
+        #[cfg(not(target_os = "windows"))]
+        let capture = ScreenCapture::with_backend(MockScreenBackend::new(), temp_dir.clone());
+
+        match capture.cleanup_old_captures(24) {
+            Ok(count) if count > 0 => info!("Cleaned up {} old capture files on startup", count),
+            Ok(_) => {}
+            Err(e) => error!("Failed to cleanup old captures on startup: {}", e),
+        }
+    }
+
     // Load configuration
     let config = Config::load()?;
 
@@ -319,6 +561,19 @@ async fn setup_app(app_handle: tauri::AppHandle) -> anyhow::Result<()> {
 
 fn create_tray_menu(status: &ServerStatus) -> SystemTrayMenu {
     let mut menu = SystemTrayMenu::new();
+
+    // Add capture option at the top (available in all states)
+    #[cfg(target_os = "macos")]
+    let shortcut_hint = "⌘⇧S";
+    #[cfg(not(target_os = "macos"))]
+    let shortcut_hint = "Ctrl+Shift+S";
+
+    menu = menu
+        .add_item(CustomMenuItem::new(
+            "capture",
+            format!("Capture Screen    {}", shortcut_hint),
+        ))
+        .add_native_item(SystemTrayMenuItem::Separator);
 
     match status {
         ServerStatus::Stopped | ServerStatus::Error(_) => {
@@ -420,10 +675,82 @@ fn update_tray_menu(app_handle: &tauri::AppHandle, status: &ServerStatus) {
     }
 }
 
+/// Helper function to trigger screen capture mode
+/// Used by both tray menu and global shortcut
+async fn trigger_capture(app_handle: &tauri::AppHandle) {
+    // Check if overlay already exists
+    if app_handle.get_window("capture-overlay").is_some() {
+        info!("Capture overlay already open, ignoring trigger");
+        return;
+    }
+
+    // Hide main window if it exists
+    if let Some(window) = app_handle.get_window("main") {
+        let _ = window.hide();
+    }
+
+    // Create the overlay window
+    match tauri::WindowBuilder::new(
+        app_handle,
+        "capture-overlay",
+        tauri::WindowUrl::App("overlay.html".into()),
+    )
+    .title("Screen Capture")
+    .fullscreen(true)
+    .transparent(true)
+    .decorations(false)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .build()
+    {
+        Ok(overlay) => {
+            if let Err(e) = overlay.show() {
+                error!("Failed to show overlay: {}", e);
+            }
+            if let Err(e) = overlay.set_focus() {
+                error!("Failed to focus overlay: {}", e);
+            }
+            info!("Capture overlay window created via shortcut/tray");
+        }
+        Err(e) => {
+            error!("Failed to create overlay window: {}", e);
+        }
+    }
+}
+
+/// Register global keyboard shortcut for screen capture
+fn register_capture_shortcut(app_handle: &tauri::AppHandle) {
+    let handle = app_handle.clone();
+
+    // Use Cmd+Shift+S on macOS, Ctrl+Shift+S on other platforms
+    #[cfg(target_os = "macos")]
+    let shortcut = "Cmd+Shift+S";
+    #[cfg(not(target_os = "macos"))]
+    let shortcut = "Ctrl+Shift+S";
+
+    match app_handle.global_shortcut_manager().register(shortcut, move || {
+        info!("Global shortcut {} triggered", shortcut);
+        let app = handle.clone();
+        tauri::async_runtime::spawn(async move {
+            trigger_capture(&app).await;
+        });
+    }) {
+        Ok(_) => info!("Registered global shortcut: {}", shortcut),
+        Err(e) => error!("Failed to register global shortcut {}: {}", shortcut, e),
+    }
+}
+
 fn handle_tray_event(app: &tauri::AppHandle, event_id: &str) {
     info!("Tray event: {}", event_id);
 
     match event_id {
+        "capture" => {
+            let app_handle = app.clone();
+            tauri::async_runtime::spawn(async move {
+                info!("Capture requested from tray menu");
+                trigger_capture(&app_handle).await;
+            });
+        }
         "start" => {
             let app_handle = app.clone();
             tauri::async_runtime::spawn(async move {

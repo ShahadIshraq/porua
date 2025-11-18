@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen Capture</title>
+    <link rel="stylesheet" href="overlay.css">
+</head>
+<body>
+    <!-- Main canvas for rendering the selection overlay -->
+    <canvas id="overlay-canvas"></canvas>
+
+    <!-- Dimension tooltip that follows the cursor -->
+    <div id="dimension-tooltip" class="tooltip hidden">
+        <span id="tooltip-width">0</span> x <span id="tooltip-height">0</span>
+    </div>
+
+    <!-- Instructions overlay shown initially -->
+    <div id="instructions" class="instructions">
+        <div class="instructions-content">
+            <h2>Screen Capture</h2>
+            <p>Click and drag to select an area</p>
+            <p class="hint">Press <kbd>ESC</kbd> to cancel</p>
+        </div>
+    </div>
+
+    <!-- Error toast for displaying errors -->
+    <div id="error-toast" class="toast hidden">
+        <span id="toast-message"></span>
+    </div>
+
+    <script src="overlay.js"></script>
+</body>
+</html>

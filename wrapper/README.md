@@ -9,9 +9,36 @@ A lightweight menu bar/system tray application for managing the Porua TTS Server
 ## Features
 
 - **System Tray Control**: Start/Stop the TTS server from your menu bar (macOS) or system tray (Windows)
+- **Screen Capture**: Region-based screen capture with preview and save functionality (Windows only)
 - **Automatic Installation**: First-run installer handles server setup and model downloads
 - **Status Monitoring**: Real-time server status updates
 - **Minimal Footprint**: ~60-70 MB installer, lightweight Tauri-based wrapper
+
+## Screen Capture Feature
+
+### Platform Support
+
+| Feature | Windows | macOS | Linux |
+|---------|---------|-------|-------|
+| Screen Capture | ✅ Full Support | ❌ Not Implemented | ❌ Not Implemented |
+| Selection Overlay | ✅ | Mock only | Mock only |
+| Multi-monitor | ✅ | Mock only | Mock only |
+
+**Windows-Only Implementation**: The screen capture feature uses Windows GDI APIs (`GetDC`, `CreateCompatibleDC`, `BitBlt`, `GetDIBits`) for pixel capture. On non-Windows platforms, a mock backend is used for testing purposes only - actual capture functionality is not available.
+
+### Usage
+
+1. **Trigger capture**: Press `Ctrl+Shift+S` (Windows) or `Cmd+Shift+S` (macOS, mock only) or click "Capture Screen" from tray menu
+2. **Select region**: Click and drag to select the area you want to capture
+3. **Preview**: The captured image opens in a preview window
+4. **Save**: Use the save button to export the image to a location of your choice
+
+### Capture File Management
+
+Captures are saved to a temporary directory and automatically cleaned up after 24 hours. The cleanup runs on app startup.
+
+- **Temp location (Windows)**: `%APPDATA%\Porua\captures\`
+- **Filename format**: `capture_YYYYMMDD_HHMMSS_XXXXXXXX.png`
 
 ## Architecture
 
@@ -59,11 +86,16 @@ npm run build
 
 ```
 wrapper/
-├── src/                    # Frontend (minimal HTML)
-│   └── index.html
+├── src/                    # Frontend (HTML/JS)
+│   ├── index.html          # Installer UI
+│   ├── overlay.html        # Screen capture overlay
+│   ├── overlay.js          # Selection logic
+│   ├── preview.html        # Capture preview window
+│   └── preview.js          # Preview/zoom logic
 ├── src-tauri/              # Rust backend
 │   ├── src/
-│   │   ├── main.rs         # App entry, system tray
+│   │   ├── main.rs         # App entry, system tray, capture commands
+│   │   ├── capture.rs      # Screen capture (Windows-only real impl)
 │   │   ├── server.rs       # Server process management
 │   │   ├── installer.rs    # First-run installation
 │   │   ├── config.rs       # Configuration handling
