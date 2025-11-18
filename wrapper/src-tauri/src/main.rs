@@ -17,7 +17,10 @@ use tokio::sync::Mutex;
 use tracing::{error, info};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-use crate::capture::{CaptureResult, MonitorInfo, Rect, ScreenCapture};
+use crate::capture::{
+    CaptureResult, MockScreenBackend, MonitorInfo, Rect, ScreenCapture,
+    get_monitors_native, get_virtual_screen_bounds_native, check_permission_native,
+};
 use crate::config::Config;
 use crate::installer::Installer;
 use crate::server::{ServerManager, ServerStatus};
@@ -137,7 +140,7 @@ async fn quit_app(app_handle: tauri::AppHandle, state: tauri::State<'_, AppState
 #[tauri::command]
 async fn get_monitors_info() -> Result<Vec<MonitorInfo>, String> {
     info!("get_monitors_info command called");
-    ScreenCapture::get_monitors().map_err(|e| e.to_string())
+    get_monitors_native().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -214,7 +217,13 @@ async fn capture_screen_region(
         .map_err(|e| e.to_string())?
         .join("captures");
 
-    let capture = ScreenCapture::new(temp_dir);
+    // Use mock backend on non-Windows platforms, real backend on Windows
+    #[cfg(target_os = "windows")]
+    let capture = crate::capture::create_screen_capture(temp_dir);
+
+    #[cfg(not(target_os = "windows"))]
+    let capture = ScreenCapture::with_backend(MockScreenBackend::new(), temp_dir);
+
     let rect = Rect::new(x, y, width, height);
 
     // Close overlay window before capturing
@@ -307,12 +316,12 @@ async fn save_captured_image(
 #[tauri::command]
 async fn check_capture_permission() -> Result<bool, String> {
     info!("check_capture_permission command called");
-    ScreenCapture::check_permission().map_err(|e| e.to_string())
+    check_permission_native().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn get_virtual_screen_bounds() -> Rect {
-    ScreenCapture::get_virtual_screen_bounds()
+    get_virtual_screen_bounds_native()
 }
 
 fn main() {
