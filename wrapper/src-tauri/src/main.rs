@@ -3,6 +3,7 @@
     windows_subsystem = "windows"
 )]
 
+mod capture;
 mod config;
 mod installer;
 mod paths;
