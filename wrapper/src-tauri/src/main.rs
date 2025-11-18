@@ -131,6 +131,69 @@ async fn quit_app(app_handle: tauri::AppHandle, state: tauri::State<'_, AppState
     Ok(())
 }
 
+// Screen capture commands
+
+#[tauri::command]
+async fn start_screen_capture(app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("Starting screen capture overlay");
+    capture::overlay::create_overlay_window(&app_handle).await?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn capture_region(
+    app_handle: tauri::AppHandle,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+) -> Result<String, String> {
+    info!("Capturing region: x={}, y={}, w={}, h={}", x, y, width, height);
+
+    // Get virtual screen bounds for validation
+    let (vx, vy, vw, vh) = capture::monitors::get_virtual_screen_bounds();
+
+    // Clamp selection to screen bounds
+    let (clamped_x, clamped_y, clamped_w, clamped_h) =
+        capture::overlay::clamp_selection_to_bounds(x, y, width, height, (vx, vy, vw, vh));
+
+    // Validate selection meets minimum requirements
+    if !capture::overlay::is_selection_valid(clamped_w, clamped_h) {
+        return Err("Selection is too small (minimum 10x10 pixels)".to_string());
+    }
+
+    // Capture the screen region
+    let image_path = capture::screenshot::capture_screen_region(
+        clamped_x, clamped_y, clamped_w, clamped_h
+    ).await?;
+
+    // Close the overlay window
+    capture::overlay::close_overlay_window(&app_handle).await?;
+
+    info!("Capture successful: {}", image_path);
+    Ok(image_path)
+}
+
+#[tauri::command]
+async fn cancel_capture(app_handle: tauri::AppHandle) -> Result<(), String> {
+    info!("Cancelling screen capture");
+    capture::overlay::close_overlay_window(&app_handle).await
+}
+
+#[tauri::command]
+async fn get_monitor_info() -> Result<Vec<capture::monitors::MonitorInfo>, String> {
+    info!("Getting monitor information");
+    Ok(capture::monitors::get_all_monitors_sync())
+}
+
+#[tauri::command]
+async fn save_capture_as(source_path: String, destination_path: String) -> Result<(), String> {
+    info!("Saving capture from {} to {}", source_path, destination_path);
+    std::fs::copy(&source_path, &destination_path)
+        .map_err(|e| format!("Failed to save file: {}", e))?;
+    Ok(())
+}
+
 fn main() {
     // Initialize logging - use fallback if file logging fails
     let file_logging_result = (|| -> anyhow::Result<()> {
@@ -202,6 +265,11 @@ fn main() {
             close_installer_window,
             get_log_path,
             quit_app,
+            start_screen_capture,
+            capture_region,
+            cancel_capture,
+            get_monitor_info,
+            save_capture_as,
         ])
         .setup(|app| {
             let app_handle = app.handle();
