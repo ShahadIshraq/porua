@@ -9,6 +9,7 @@ pub struct Config {
     pub version: String,
     pub paths: PathsConfig,
     pub server: ServerConfig,
+    #[serde(default)]
     pub llm: LlmConfig,
 }
 

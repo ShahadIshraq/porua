@@ -199,17 +199,20 @@ impl ApiKeyManager {
         }
 
         // Make API call to validate the key
-        let url = format!(
-            "https://generativelanguage.googleapis.com/v1/models?key={}",
-            trimmed_key
-        );
+        // Use header instead of query parameter to prevent key exposure in logs
+        let url = "https://generativelanguage.googleapis.com/v1/models";
 
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(10))
             .build()
             .map_err(|e| ApiKeyError::NetworkError(e.to_string()))?;
 
-        match client.get(&url).send().await {
+        match client
+            .get(url)
+            .header("X-API-Key", trimmed_key)
+            .send()
+            .await
+        {
             Ok(response) => {
                 if response.status().is_success() {
                     Ok(true)

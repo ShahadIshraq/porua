@@ -294,13 +294,19 @@ function showValidationStatus(element, state, message) {
 }
 
 async function validateAndSaveGemini() {
-    const key = document.getElementById('gemini-key').value.trim();
+    const keyInput = document.getElementById('gemini-key');
+    const validateBtn = document.getElementById('validate-gemini-btn');
     const statusEl = document.getElementById('gemini-status');
+    const key = keyInput.value.trim();
 
     if (!key) {
         showValidationStatus(statusEl, 'error', 'Please enter an API key');
         return;
     }
+
+    // Disable inputs during validation to prevent race conditions
+    keyInput.disabled = true;
+    validateBtn.disabled = true;
 
     showValidationStatus(statusEl, 'pending', 'Validating...');
 
@@ -316,17 +322,27 @@ async function validateAndSaveGemini() {
         }
     } catch (error) {
         showValidationStatus(statusEl, 'error', `Error: ${error}`);
+    } finally {
+        // Re-enable inputs after validation
+        keyInput.disabled = false;
+        validateBtn.disabled = false;
     }
 }
 
 async function validateAndSaveOpenAI() {
-    const key = document.getElementById('openai-key').value.trim();
+    const keyInput = document.getElementById('openai-key');
+    const validateBtn = document.getElementById('validate-openai-btn');
     const statusEl = document.getElementById('openai-status');
+    const key = keyInput.value.trim();
 
     if (!key) {
         showValidationStatus(statusEl, 'error', 'Please enter an API key');
         return;
     }
+
+    // Disable inputs during validation to prevent race conditions
+    keyInput.disabled = true;
+    validateBtn.disabled = true;
 
     showValidationStatus(statusEl, 'pending', 'Validating...');
 
@@ -342,6 +358,10 @@ async function validateAndSaveOpenAI() {
         }
     } catch (error) {
         showValidationStatus(statusEl, 'error', `Error: ${error}`);
+    } finally {
+        // Re-enable inputs after validation
+        keyInput.disabled = false;
+        validateBtn.disabled = false;
     }
 }
 
@@ -372,7 +392,14 @@ async function removeOpenAIKey() {
 }
 
 async function saveActiveProvider() {
-    const selectedProvider = document.querySelector('input[name="provider"]:checked').value;
+    const providerInput = document.querySelector('input[name="provider"]:checked');
+
+    if (!providerInput) {
+        console.error('No provider selected');
+        return;
+    }
+
+    const selectedProvider = providerInput.value;
 
     try {
         await invoke('set_active_provider', { provider: selectedProvider });
